@@ -42,9 +42,18 @@ import Testing
         #expect(GHClient.locate(environmentPath: nil) { _ in false } == nil)
     }
 
+    @Test func mergeFieldsAreOptInViaAGraphQLVariable() {
+        let with = GHClient.arguments(for: "is:pr", includeMergeState: true)
+        let without = GHClient.arguments(for: "is:pr", includeMergeState: false)
+        #expect(with.contains("withMerge=true"))
+        #expect(without.contains("withMerge=false"))
+        #expect(with.contains("q=is:pr"))
+        #expect(GHClient.searchQuery.contains("@include(if: $withMerge)"))
+    }
+
     @Test func missingExecutableYieldsGhNotFound() async {
         let client = GHClient(executable: nil)
-        #expect(await client.search("is:pr") == .ghNotFound)
+        #expect(await client.search("is:pr", includeMergeState: false) == .ghNotFound)
     }
 
     // Review Focus 5: gh installed after the app started must be picked up without a restart.
@@ -53,8 +62,8 @@ import Testing
         let client = GHClient(locator: {
             calls.withLock { $0 += 1; return $0 >= 2 ? URL(fileURLWithPath: "/usr/bin/true") : nil }
         })
-        #expect(await client.search("q") == .ghNotFound)
-        #expect(await client.search("q") == .success(Data()))
+        #expect(await client.search("q", includeMergeState: false) == .ghNotFound)
+        #expect(await client.search("q", includeMergeState: false) == .success(Data()))
     }
 
     /// Blocking cooperative-pool threads made the timeout never fire once enough processes ran at once.

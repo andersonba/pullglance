@@ -138,7 +138,7 @@ private struct OwnerRow: View {
             }
             .toggleStyle(.checkbox)
             .labelsHidden()
-            AuthorInitial(login: owner.login)
+            AuthorAvatar(login: owner.login, url: URL(string: "https://github.com/\(owner.login).png"))
             Text(verbatim: owner.login)
             if owner.isViewer {
                 Text("(you)", bundle: .app).foregroundStyle(.secondary)

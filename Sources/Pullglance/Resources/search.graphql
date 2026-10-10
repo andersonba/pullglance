@@ -1,12 +1,14 @@
-query($q: String!) {
+query($q: String!, $withMerge: Boolean!) {
   viewer { login organizations(first: 100) { nodes { login } } }
   search(query: $q, type: ISSUE, first: 100) {
     issueCount
     nodes {
       ... on PullRequest {
-        number title url isDraft updatedAt mergeable mergeStateStatus
+        number title url isDraft updatedAt
+        mergeable @include(if: $withMerge)
+        mergeStateStatus @include(if: $withMerge)
         repository { nameWithOwner }
-        author { login }
+        author { login avatarUrl }
         reviewDecision
         reviewThreads(first: 50) { nodes { isResolved } }
         reviewRequests(first: 10) { nodes { requestedReviewer { __typename ... on Team { slug } } } }

@@ -93,7 +93,7 @@ struct PopoverView: View {
         if !prs.isEmpty {
             SectionHeader(title: section.title, count: prs.count)
             ForEach(prs) { pr in
-                PRRow(pr: pr, leading: .ci)
+                PRRow(pr: pr)
                 Divider().padding(.leading, 12)
             }
         }
@@ -125,7 +125,7 @@ struct PopoverView: View {
                 .padding(.vertical, 8)
         }
         ForEach(store.directList) { pr in
-            PRRow(pr: pr, leading: .author, showAuthor: true)
+            PRRow(pr: pr, showAuthor: true)
             Divider().padding(.leading, 12)
         }
     }
@@ -151,7 +151,7 @@ struct PopoverView: View {
                 ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding()
             } else {
                 ForEach(store.viaTeamList) { pr in
-                    PRRow(pr: pr, leading: .author, showAuthor: true, teamLabel: pr.requestedTeams.first)
+                    PRRow(pr: pr, showAuthor: true, teamLabel: pr.requestedTeams.first)
                     Divider().padding(.leading, 12)
                 }
                 Button {

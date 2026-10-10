@@ -44,9 +44,14 @@ struct GHClient: GHRunning {
         return text
     }()
 
-    func search(_ query: String) async -> GHOutcome {
+    /// `-F` sends a typed value, so `withMerge` reaches GraphQL as a Boolean.
+    static func arguments(for query: String, includeMergeState: Bool) -> [String] {
+        ["api", "graphql", "-f", "query=\(searchQuery)", "-f", "q=\(query)", "-F", "withMerge=\(includeMergeState)"]
+    }
+
+    func search(_ query: String, includeMergeState: Bool) async -> GHOutcome {
         guard let executable = locator() else { return .ghNotFound }
-        let arguments = ["api", "graphql", "-f", "query=\(Self.searchQuery)", "-f", "q=\(query)"]
+        let arguments = Self.arguments(for: query, includeMergeState: includeMergeState)
         do {
             let result = try await runProcess(executable: executable, arguments: arguments, timeout: Self.timeout)
             return Self.interpret(

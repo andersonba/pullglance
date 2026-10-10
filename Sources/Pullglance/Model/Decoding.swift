@@ -28,9 +28,15 @@ func parseSearchResponse(_ data: Data) throws -> SearchPage {
     guard let search = envelope.data?.search else {
         throw DecodingFailure.noData(errors: errors)
     }
+    let pullRequests = search.nodes.compactMap { $0.value?.pullRequest }
+    // GitHub reports per-node failures (e.g. "Resource limits for this query exceeded") as null nodes
+    // next to a non-zero issueCount. Nothing usable came back: surface it instead of showing an empty list.
+    if pullRequests.isEmpty, !search.nodes.isEmpty, !errors.isEmpty {
+        throw DecodingFailure.noData(errors: errors)
+    }
     return SearchPage(
         issueCount: search.issueCount,
-        pullRequests: search.nodes.compactMap { $0.value?.pullRequest },
+        pullRequests: pullRequests,
         viewerLogin: envelope.data?.viewer?.login,
         viewerOrganizations: envelope.data?.viewer?.organizations?.nodes.compactMap { $0.value?.login } ?? [],
         errorMessages: errors
@@ -94,7 +100,10 @@ private struct PRNode: Decodable {
     let commits: Commits?
 
     struct Repository: Decodable { let nameWithOwner: String }
-    struct Login: Decodable { let login: String }
+    struct Login: Decodable {
+        let login: String
+        let avatarUrl: URL?
+    }
     struct Threads: Decodable { let nodes: [Lossy<Thread>] }
     struct Thread: Decodable { let isResolved: Bool }
     struct Requests: Decodable { let nodes: [Lossy<Request>] }
@@ -140,7 +149,8 @@ private struct PRNode: Decodable {
             unresolvedThreads: unresolved,
             requestedTeams: teams,
             hasConflicts: mergeable == "CONFLICTING",
-            isBehindBase: mergeStateStatus == "BEHIND"
+            isBehindBase: mergeStateStatus == "BEHIND",
+            authorAvatarURL: author?.avatarUrl
         )
     }
 }

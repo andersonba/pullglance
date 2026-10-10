@@ -2,24 +2,21 @@ import AppKit
 import SwiftUI
 
 struct PRRow: View {
-    enum Leading { case ci, author }
-
     let pr: PullRequest
-    let leading: Leading
+    /// Review tab: author name in the metadata and the author's initial on the right.
     var showAuthor = false
     var teamLabel: String? = nil
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            switch leading {
-            case .ci: CIDot(state: pr.ciState, url: pr.checksURL)
-            case .author: AuthorInitial(login: pr.author)
-            }
+            // CI status always on the left, on both tabs.
+            CIDot(state: pr.ciState, url: pr.checksURL)
             VStack(alignment: .leading, spacing: 3) {
                 Text(pr.title)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .foregroundStyle(.primary)
+                    .help(Text(verbatim: pr.title))
                 HStack(spacing: 4) {
                     Text(verbatim: "\(pr.repoName) #\(pr.number)")
                     if showAuthor { Text(verbatim: "· \(pr.author)") }
@@ -41,8 +38,8 @@ struct PRRow: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            if leading == .author {
-                CIDot(state: pr.ciState, url: pr.checksURL)
+            if showAuthor {
+                AuthorAvatar(login: pr.author, url: pr.authorAvatarURL)
             }
         }
         .padding(.vertical, 6)
@@ -100,22 +97,32 @@ struct CIDot: View {
     }
 }
 
-struct AuthorInitial: View {
+/// The author's GitHub picture, loaded through the shared URL cache; a neutral initial until it arrives
+/// or when there is none (deleted account, offline).
+struct AuthorAvatar: View {
     let login: String
+    let url: URL?
 
     var body: some View {
-        Text(verbatim: String(login.prefix(1)).uppercased())
-            .font(.system(size: 8.5, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: 14, height: 14)
-            .background(Circle().fill(color))
-            .padding(.top, 3)
+        AsyncImage(url: url?.appending(queryItems: [URLQueryItem(name: "s", value: "40")])) { phase in
+            if let image = phase.image {
+                image.resizable().scaledToFill()
+            } else {
+                initial
+            }
+        }
+        .frame(width: 16, height: 16)
+        .clipShape(Circle())
+        .padding(.top, 3)
+        .help(Text(verbatim: login))
     }
 
-    /// Stable hue per login so the same author always gets the same color.
-    private var color: Color {
-        let hue = Double(abs(login.hashValue % 360)) / 360
-        return Color(hue: hue, saturation: 0.55, brightness: 0.75)
+    private var initial: some View {
+        Text(verbatim: String(login.prefix(1)).uppercased())
+            .font(.system(size: 8.5, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(width: 16, height: 16)
+            .background(Circle().fill(Color.primary.opacity(0.1)))
     }
 }
 

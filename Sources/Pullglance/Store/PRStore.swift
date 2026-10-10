@@ -259,8 +259,8 @@ final class PRStore {
     private func runCycle() async {
         phase = .loading
 
-        async let mineOutcome = client.search(SearchQuery.mine(hiding: hiddenOwners))
-        async let directOutcome = client.search(SearchQuery.direct(hiding: hiddenOwners))
+        async let mineOutcome = client.search(SearchQuery.mine(hiding: hiddenOwners), includeMergeState: true)
+        async let directOutcome = client.search(SearchQuery.direct(hiding: hiddenOwners), includeMergeState: false)
         let (m, d) = await (mineOutcome, directOutcome)
 
         var errors: [ErrorKind] = []
@@ -268,7 +268,7 @@ final class PRStore {
         if let error = apply(d, to: &direct) { errors.append(error) }
 
         if wantsTeamFetch {
-            let t = await client.search(SearchQuery.viaTeam(hiding: hiddenOwners))
+            let t = await client.search(SearchQuery.viaTeam(hiding: hiddenOwners), includeMergeState: false)
             var snapshot = viaTeam ?? Snapshot(value: [], total: 0, fetchedAt: nil)
             if let error = apply(t, to: &snapshot) {
                 errors.append(error)
@@ -286,7 +286,7 @@ final class PRStore {
     func refreshViaTeam() async {
         isLoadingViaTeam = true
         defer { isLoadingViaTeam = false }
-        let outcome = await client.search(SearchQuery.viaTeam(hiding: hiddenOwners))
+        let outcome = await client.search(SearchQuery.viaTeam(hiding: hiddenOwners), includeMergeState: false)
         var snapshot = viaTeam ?? Snapshot(value: [], total: 0, fetchedAt: nil)
         if let error = apply(outcome, to: &snapshot) {
             viaTeamError = error

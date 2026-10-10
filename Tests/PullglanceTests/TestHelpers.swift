@@ -20,7 +20,8 @@ func makePR(
     unresolvedThreads: Int = 0,
     requestedTeams: [String] = [],
     hasConflicts: Bool = false,
-    isBehindBase: Bool = false
+    isBehindBase: Bool = false,
+    authorAvatarURL: URL? = nil
 ) -> PullRequest {
     PullRequest(
         repo: repo, number: number, title: title,
@@ -28,7 +29,8 @@ func makePR(
         isDraft: isDraft, author: author, updatedAt: updatedAt,
         reviewDecision: reviewDecision, ciState: ciState,
         unresolvedThreads: unresolvedThreads, requestedTeams: requestedTeams,
-        hasConflicts: hasConflicts, isBehindBase: isBehindBase
+        hasConflicts: hasConflicts, isBehindBase: isBehindBase,
+        authorAvatarURL: authorAvatarURL
     )
 }
 
@@ -44,7 +46,7 @@ func node(number: Int, ci: String?, decision: String? = nil, draft: Bool = false
     let rollup = ci.map { "{\"state\":\"\($0)\"}" } ?? "null"
     let dec = decision.map { "\"\($0)\"" } ?? "null"
     return """
-    {"number":\(number),"title":"PR \(number)","url":"https://github.com/acme/web/pull/\(number)","isDraft":\(draft),"mergeable":"\(mergeable)","mergeStateStatus":"\(mergeState)","updatedAt":"2026-10-10T10:00:00Z","repository":{"nameWithOwner":"acme/web"},"author":{"login":"someone"},"reviewDecision":\(dec),"reviewThreads":{"nodes":[]},"reviewRequests":{"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":\(rollup)}}]}}
+    {"number":\(number),"title":"PR \(number)","url":"https://github.com/acme/web/pull/\(number)","isDraft":\(draft),"mergeable":"\(mergeable)","mergeStateStatus":"\(mergeState)","updatedAt":"2026-10-10T10:00:00Z","repository":{"nameWithOwner":"acme/web"},"author":{"login":"someone","avatarUrl":"https://example.com/someone.png"},"reviewDecision":\(dec),"reviewThreads":{"nodes":[]},"reviewRequests":{"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":\(rollup)}}]}}
     """
 }
 
@@ -53,13 +55,15 @@ actor FakeGH: GHRunning {
     private var outcomes: [String: GHOutcome] = [:]
     private var delay: Duration = .zero
     private(set) var calls: [String] = []
+    private(set) var mergeFlags: [String: Bool] = [:]
 
     func set(_ outcome: GHOutcome, for query: String) { outcomes[query] = outcome }
     func setDelay(_ value: Duration) { delay = value }
     func callCount(for query: String) -> Int { calls.filter { $0 == query }.count }
 
-    func search(_ query: String) async -> GHOutcome {
+    func search(_ query: String, includeMergeState: Bool) async -> GHOutcome {
         calls.append(query)
+        mergeFlags[query] = includeMergeState
         if delay > .zero { try? await Task.sleep(for: delay) }
         return outcomes[query] ?? .failure("no scripted outcome for \(query)")
     }

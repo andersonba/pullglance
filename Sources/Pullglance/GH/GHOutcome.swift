@@ -8,5 +8,7 @@ enum GHOutcome: Sendable, Equatable {
 }
 
 protocol GHRunning: Sendable {
-    func search(_ query: String) async -> GHOutcome
+    /// `includeMergeState` asks for `mergeable`/`mergeStateStatus`, which GitHub computes on demand and
+    /// refuses for large pages ("Resource limits for this query exceeded"). Only your own PRs need it.
+    func search(_ query: String, includeMergeState: Bool) async -> GHOutcome
 }

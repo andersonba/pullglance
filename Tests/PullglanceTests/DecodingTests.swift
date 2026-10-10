@@ -64,6 +64,15 @@ import Testing
         #expect(page.pullRequests.first?.isBehindBase == false)
     }
 
+    @Test func decodesAuthorAvatarAndToleratesItsAbsence() throws {
+        let withAvatar = try parseSearchResponse(envelope(nodes: [node(number: 1, ci: nil)]))
+        #expect(withAvatar.pullRequests.first?.authorAvatarURL?.absoluteString == "https://example.com/someone.png")
+        let raw = node(number: 2, ci: nil).replacingOccurrences(of: ",\"avatarUrl\":\"https://example.com/someone.png\"", with: "")
+        let without = try parseSearchResponse(envelope(nodes: [raw]))
+        #expect(without.pullRequests.first?.authorAvatarURL == nil)
+        #expect(try parseSearchResponse(fixture("search-partial.json")).pullRequests.first?.authorAvatarURL == nil)
+    }
+
     @Test func nullRollupBecomesNone() throws {
         let page = try parseSearchResponse(envelope(nodes: [node(number: 1, ci: nil)]))
         #expect(page.pullRequests.first?.ciState == CIState.none)
@@ -84,6 +93,22 @@ import Testing
         #expect(page.pullRequests[0].ciState == CIState.none)
         #expect(page.pullRequests[0].reviewDecision == nil)
         #expect(page.errorMessages == ["Resource protected by organization SAML enforcement."])
+    }
+
+    /// GitHub answers "Resource limits for this query exceeded" per node, with every node null and
+    /// issueCount still set. That is a failed fetch, not an empty list.
+    @Test func allNodesFailedWithErrorsIsNoData() throws {
+        let body = """
+        {"data":{"viewer":{"login":"octocat"},"search":{"issueCount":154,"nodes":[null,null,null]}},"errors":[{"message":"Resource limits for this query exceeded."},{"message":"Resource limits for this query exceeded."}]}
+        """
+        #expect(throws: DecodingFailure.noData(errors: ["Resource limits for this query exceeded.", "Resource limits for this query exceeded."])) {
+            try parseSearchResponse(Data(body.utf8))
+        }
+    }
+
+    @Test func genuinelyEmptyResultIsNotAnError() throws {
+        let page = try parseSearchResponse(envelope(nodes: [], issueCount: 0))
+        #expect(page.pullRequests.isEmpty)
     }
 
     @Test func errorsWithoutDataThrowNoData() throws {

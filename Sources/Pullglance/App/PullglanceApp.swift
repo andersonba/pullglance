@@ -6,6 +6,8 @@ struct PullglanceApp: App {
 
     init() {
         NSApplication.shared.setActivationPolicy(.accessory)
+        // Tooltips are the way to read truncated titles here, so show them faster than the 1 s system default.
+        UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 250])
         let store = PRStore(client: GHClient())
         store.start()
         _store = State(initialValue: store)

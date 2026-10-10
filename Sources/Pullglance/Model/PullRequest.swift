@@ -29,6 +29,8 @@ struct PullRequest: Sendable, Equatable, Identifiable {
     let hasConflicts: Bool
     /// `mergeStateStatus == BEHIND`
     let isBehindBase: Bool
+    /// GitHub avatar of the author; nil for deleted users or when the field is missing.
+    let authorAvatarURL: URL?
 
     var id: String { "\(repo)#\(number)" }
     var checksURL: URL { url.appendingPathComponent("checks") }

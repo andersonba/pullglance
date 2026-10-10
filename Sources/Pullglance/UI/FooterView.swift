@@ -12,6 +12,7 @@ struct FooterView: View {
             }
             .font(.caption)
             .lineLimit(1)
+            .help(store.lastError == nil ? Text(verbatim: "") : statusHelp)
             Spacer(minLength: 0)
             if !store.hiddenOwners.isEmpty {
                 Button {
@@ -51,6 +52,21 @@ struct FooterView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
         .background(.bar)
+    }
+
+    /// Tooltip for the failure state only: the full line (it truncates next to the filter chip) plus the reason.
+    private var statusHelp: Text {
+        guard case .error(let kind, let date) = store.phase else { return Text(verbatim: "") }
+        return Text("Failed to refresh \(date, format: .relative(presentation: .named)) · data from \(store.lastGoodDate ?? date, format: .dateTime.hour().minute())", bundle: .app)
+            + Text(verbatim: "\n") + Text(verbatim: errorDescription(kind))
+    }
+
+    private func errorDescription(_ kind: ErrorKind) -> String {
+        switch kind {
+        case .ghNotFound: String(localized: "gh CLI not found", bundle: .app)
+        case .notAuthenticated: String(localized: "gh is not logged in to github.com", bundle: .app)
+        case .other(let message): message
+        }
     }
 
     @ViewBuilder private var status: some View {

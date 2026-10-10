@@ -38,6 +38,17 @@ import Testing
         #expect(await gh.callCount(for: SearchQuery.viaTeam) == 0)
     }
 
+    /// Merge state is expensive for GitHub to compute; only your own PRs need it (Needs action, Ready to merge).
+    @Test func onlyTheMineSearchAsksForMergeState() async throws {
+        let gh = try await happyGH()
+        let store = makeStore(gh)
+        store.isViaTeamExpanded = true
+        await store.refresh()
+        #expect(await gh.mergeFlags[SearchQuery.mine] == true)
+        #expect(await gh.mergeFlags[SearchQuery.direct] == false)
+        #expect(await gh.mergeFlags[SearchQuery.viaTeam] == false)
+    }
+
     @Test func failureKeepsPreviousSnapshotAndBadge() async throws {
         let gh = try await happyGH()
         let store = makeStore(gh)
