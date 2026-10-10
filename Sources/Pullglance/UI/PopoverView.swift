@@ -15,13 +15,7 @@ struct PopoverView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker(selection: $tab) {
-                (Text("My PRs", bundle: .app) + Text(verbatim: "  \(store.mineTabCount)")).tag(Tab.mine)
-                (Text("To review", bundle: .app) + Text(verbatim: "  \(store.reviewTabCount)")).tag(Tab.review)
-            } label: { EmptyView() }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .padding(10)
+            TabPicker(selection: $tab, mineCount: store.mineTabCount, reviewCount: store.reviewTabCount)
 
             if store.hasAnyData, store.blockingError == nil {
                 let items = quickFilterItems(
