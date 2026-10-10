@@ -5,6 +5,7 @@ enum SettingsTab: String, Hashable, CaseIterable {
     case general
     case sections
     case filters
+    case logs
 }
 
 /// Which tab the Settings window should show; set before calling `openSettings`.
@@ -41,6 +42,9 @@ struct SettingsView: View {
             FiltersSettingsView(store: store)
                 .tabItem { Label { Text("Filters", bundle: .app) } icon: { Image(systemName: "line.3.horizontal.decrease.circle") } }
                 .tag(SettingsTab.filters)
+            LogsSettingsView(store: store)
+                .tabItem { Label { Text("Logs", bundle: .app) } icon: { Image(systemName: "doc.text") } }
+                .tag(SettingsTab.logs)
         }
         .frame(width: 520)
     }
@@ -327,5 +331,59 @@ private struct ReorderSectionGroup: View {
                 if on { store[keyPath: keyPath].insert(section) } else { store[keyPath: keyPath].remove(section) }
             }
         )
+    }
+}
+
+struct LogsSettingsView: View {
+    @Bindable var store: PRStore
+
+    private static let timestamp: Date.FormatStyle = .dateTime.year().month(.twoDigits).day().hour().minute().second()
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if store.failureLog.isEmpty {
+                VStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle").font(.system(size: 26)).foregroundStyle(.green)
+                    Text("No failures so far", bundle: .app).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                Table(store.failureLog) {
+                    TableColumn(Text("Time", bundle: .app)) { entry in
+                        Text(entry.date, format: .dateTime.hour().minute().second()).monospacedDigit()
+                    }
+                    .width(70)
+                    TableColumn(Text("Type", bundle: .app)) { entry in Text(verbatim: entry.category) }
+                        .width(90)
+                    TableColumn(Text("Search", bundle: .app)) { entry in Text(verbatim: entry.search.rawValue) }
+                        .width(50)
+                    TableColumn(Text("Message", bundle: .app)) { entry in
+                        Text(verbatim: entry.message).help(Text(verbatim: entry.message))
+                    }
+                }
+                .font(.caption)
+            }
+            HStack {
+                Text(verbatim: "\(store.failureLog.count) / \(PRStore.failureLogLimit)")
+                    .font(.caption).foregroundStyle(.tertiary)
+                Spacer()
+                Button { copyAll() } label: { Text("Copy all", bundle: .app) }
+                    .disabled(store.failureLog.isEmpty)
+                Button { store.clearFailureLog() } label: { Text("Clear", bundle: .app) }
+                    .disabled(store.failureLog.isEmpty)
+            }
+            .controlSize(.small)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+        }
+        .frame(height: 360)
+    }
+
+    private func copyAll() {
+        let lines = store.failureLog.map { entry in
+            "\(entry.date.formatted(Self.timestamp))\t\(entry.search.rawValue)\t\(entry.category)\t\(entry.message)"
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
     }
 }

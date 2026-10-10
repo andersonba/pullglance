@@ -21,11 +21,8 @@
 "Open checks" = "Abrir checks";
 
 /* Footer */
-"Updated %@" = "Atualizado %@";
 "Refreshing…" = "Atualizando…";
-"Failed to refresh %@ · data from %@" = "Falha ao atualizar %@ · dados de %@";
 "Fetching from GitHub…" = "Buscando no GitHub…";
-"Refresh" = "Atualizar";
 "Open my PRs on GitHub" = "Abrir meus PRs no GitHub";
 "Open review requests on GitHub" = "Abrir revisões no GitHub";
 "Launch at login" = "Abrir no login";
@@ -89,3 +86,25 @@
 "Drag to reorder. Hidden sections stay out of the list; the badge adds up the checked sections, after the owner filter." = "Arraste para reordenar. Seções ocultas ficam fora da lista; o contador soma as seções marcadas, depois do filtro de donos.";
 "Reset to default" = "Redefinir padrão";
 "Drag to reorder" = "Arraste para reordenar";
+
+/* Footer & Logs */
+"Updated now" = "Atualizado agora";
+"Refresh in %@" = "Atualiza em %@";
+"Refresh now" = "Atualizar agora";
+"Failed to refresh · data from %@" = "Falha ao atualizar · dados de %@";
+"Open log" = "Abrir log";
+"Logs" = "Logs";
+"No failures so far" = "Nenhuma falha até agora";
+"Copy all" = "Copiar tudo";
+"Clear" = "Limpar";
+"Time" = "Hora";
+"Type" = "Tipo";
+"Search" = "Busca";
+"Message" = "Mensagem";
+"gh not found" = "gh não encontrado";
+"Not logged in" = "Não autenticado";
+"Timeout" = "Tempo esgotado";
+"Rate limit" = "Limite de uso";
+"GraphQL" = "GraphQL";
+"Network" = "Rede";
+"Error" = "Erro";

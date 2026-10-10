@@ -52,6 +52,11 @@ final class PRStore {
     private(set) var badgeCount: Int? = nil
     private(set) var viewerLogin: String? = nil
     private(set) var viewerOrganizations: [String] = []
+    /// When the timer will run the next cycle; nil before the first one completes.
+    private(set) var nextRefreshAt: Date? = nil
+    /// Newest first, capped at `failureLogLimit`. In memory only.
+    private(set) var failureLog: [LogEntry] = []
+    static let failureLogLimit = 100
 
     /// Owners excluded from every search, and therefore from both tabs and the badge. Stored per machine.
     var hiddenOwners: Set<String> {
@@ -264,13 +269,13 @@ final class PRStore {
         let (m, d) = await (mineOutcome, directOutcome)
 
         var errors: [ErrorKind] = []
-        if let error = apply(m, to: &mine) { errors.append(error) }
-        if let error = apply(d, to: &direct) { errors.append(error) }
+        if let error = apply(m, to: &mine, search: .mine) { errors.append(error) }
+        if let error = apply(d, to: &direct, search: .direct) { errors.append(error) }
 
         if wantsTeamFetch {
             let t = await client.search(SearchQuery.viaTeam(hiding: hiddenOwners), includeMergeState: false)
             var snapshot = viaTeam ?? Snapshot(value: [], total: 0, fetchedAt: nil)
-            if let error = apply(t, to: &snapshot) {
+            if let error = apply(t, to: &snapshot, search: .team) {
                 errors.append(error)
                 viaTeamError = error
             } else {
@@ -288,7 +293,7 @@ final class PRStore {
         defer { isLoadingViaTeam = false }
         let outcome = await client.search(SearchQuery.viaTeam(hiding: hiddenOwners), includeMergeState: false)
         var snapshot = viaTeam ?? Snapshot(value: [], total: 0, fetchedAt: nil)
-        if let error = apply(outcome, to: &snapshot) {
+        if let error = apply(outcome, to: &snapshot, search: .team) {
             viaTeamError = error
         } else {
             viaTeam = snapshot
@@ -297,8 +302,23 @@ final class PRStore {
         }
     }
 
+    func clearFailureLog() {
+        failureLog.removeAll()
+    }
+
+    private func log(_ kind: ErrorKind, search: SearchKind) {
+        failureLog.insert(LogEntry(date: now(), search: search, kind: kind), at: 0)
+        if failureLog.count > Self.failureLogLimit { failureLog.removeLast(failureLog.count - Self.failureLogLimit) }
+    }
+
     /// Updates `snapshot` on success and returns nil; returns the error kind otherwise and leaves it untouched.
-    private func apply(_ outcome: GHOutcome, to snapshot: inout Snapshot<[PullRequest]>) -> ErrorKind? {
+    private func apply(_ outcome: GHOutcome, to snapshot: inout Snapshot<[PullRequest]>, search: SearchKind) -> ErrorKind? {
+        let error = applyOutcome(outcome, to: &snapshot)
+        if let error { log(error, search: search) }
+        return error
+    }
+
+    private func applyOutcome(_ outcome: GHOutcome, to snapshot: inout Snapshot<[PullRequest]>) -> ErrorKind? {
         switch outcome {
         case .ghNotFound:
             return .ghNotFound
@@ -329,6 +349,7 @@ final class PRStore {
 
     private func finish(errors: [ErrorKind]) {
         let date = now()
+        nextRefreshAt = date.addingTimeInterval(TimeInterval(refreshInterval.components.seconds))
         if errors.isEmpty {
             lastError = nil
             phase = .ok(date)

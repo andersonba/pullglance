@@ -21,11 +21,8 @@
 "Open checks" = "Open checks";
 
 /* Footer */
-"Updated %@" = "Updated %@";
 "Refreshing…" = "Refreshing…";
-"Failed to refresh %@ · data from %@" = "Failed to refresh %@ · data from %@";
 "Fetching from GitHub…" = "Fetching from GitHub…";
-"Refresh" = "Refresh";
 "Open my PRs on GitHub" = "Open my PRs on GitHub";
 "Open review requests on GitHub" = "Open review requests on GitHub";
 "Launch at login" = "Launch at login";
@@ -89,3 +86,25 @@
 "Drag to reorder. Hidden sections stay out of the list; the badge adds up the checked sections, after the owner filter." = "Drag to reorder. Hidden sections stay out of the list; the badge adds up the checked sections, after the owner filter.";
 "Reset to default" = "Reset to default";
 "Drag to reorder" = "Drag to reorder";
+
+/* Footer & Logs */
+"Updated now" = "Updated now";
+"Refresh in %@" = "Refresh in %@";
+"Refresh now" = "Refresh now";
+"Failed to refresh · data from %@" = "Failed to refresh · data from %@";
+"Open log" = "Open log";
+"Logs" = "Logs";
+"No failures so far" = "No failures so far";
+"Copy all" = "Copy all";
+"Clear" = "Clear";
+"Time" = "Time";
+"Type" = "Type";
+"Search" = "Search";
+"Message" = "Message";
+"gh not found" = "gh not found";
+"Not logged in" = "Not logged in";
+"Timeout" = "Timeout";
+"Rate limit" = "Rate limit";
+"GraphQL" = "GraphQL";
+"Network" = "Network";
+"Error" = "Error";

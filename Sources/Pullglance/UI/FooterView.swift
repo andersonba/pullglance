@@ -7,13 +7,25 @@ struct FooterView: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            TimelineView(.periodic(from: .now, by: 30)) { _ in
-                status
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                StatusButton(
+                    status: footerStatus(phase: store.phase, hasData: store.hasAnyData, nextRefresh: store.nextRefreshAt, now: context.date),
+                    lastGoodDate: store.lastGoodDate,
+                    reason: store.lastError.map(reasonText),
+                    refresh: { Task { await store.refresh() } }
+                )
             }
-            .font(.caption)
-            .lineLimit(1)
-            .help(store.lastError == nil ? Text(verbatim: "") : statusHelp)
             Spacer(minLength: 0)
+            if store.lastError != nil {
+                Button {
+                    open(tab: .logs)
+                } label: {
+                    Image(systemName: "arrow.up.forward.square")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help(Text("Open log", bundle: .app))
+            }
             if !store.hiddenOwners.isEmpty {
                 Button {
                     open(tab: .filters)
@@ -31,15 +43,6 @@ struct FooterView: View {
                 .buttonStyle(.plain)
                 .help(Text("Filters", bundle: .app))
             }
-            Button {
-                Task { await store.refresh() }
-            } label: {
-                Image(systemName: "arrow.clockwise")
-            }
-            .buttonStyle(.plain)
-            .disabled(store.isRefreshing)
-            .keyboardShortcut("r", modifiers: .command)
-            .help(Text("Refresh", bundle: .app))
             Menu {
                 menuItems
             } label: {
@@ -54,44 +57,11 @@ struct FooterView: View {
         .background(.bar)
     }
 
-    /// Tooltip for the failure state only: the full line (it truncates next to the filter chip) plus the reason.
-    private var statusHelp: Text {
-        guard case .error(let kind, let date) = store.phase else { return Text(verbatim: "") }
-        return Text("Failed to refresh \(date, format: .relative(presentation: .named)) · data from \(store.lastGoodDate ?? date, format: .dateTime.hour().minute())", bundle: .app)
-            + Text(verbatim: "\n") + Text(verbatim: errorDescription(kind))
-    }
-
-    private func errorDescription(_ kind: ErrorKind) -> String {
+    private func reasonText(_ kind: ErrorKind) -> String {
         switch kind {
         case .ghNotFound: String(localized: "gh CLI not found", bundle: .app)
         case .notAuthenticated: String(localized: "gh is not logged in to github.com", bundle: .app)
         case .other(let message): message
-        }
-    }
-
-    @ViewBuilder private var status: some View {
-        switch store.phase {
-        case .idle:
-            Text("Fetching from GitHub…", bundle: .app).foregroundStyle(.secondary)
-        case .loading where !store.hasAnyData:
-            Text("Fetching from GitHub…", bundle: .app).foregroundStyle(.secondary)
-        case .loading:
-            Text("Refreshing…", bundle: .app).foregroundStyle(.secondary)
-        case .ok(let date):
-            Label {
-                Text("Updated \(date, format: .relative(presentation: .named))", bundle: .app)
-            } icon: {
-                Circle().fill(.green).frame(width: 7, height: 7)
-            }
-            .foregroundStyle(.secondary)
-        case .error(_, let date):
-            let good = store.lastGoodDate ?? date
-            Label {
-                Text("Failed to refresh \(date, format: .relative(presentation: .named)) · data from \(good, format: .dateTime.hour().minute())", bundle: .app)
-            } icon: {
-                Image(systemName: "exclamationmark.triangle.fill")
-            }
-            .foregroundStyle(.yellow)
         }
     }
 
@@ -119,5 +89,72 @@ struct FooterView: View {
             Text("Quit", bundle: .app)
         }
         .keyboardShortcut("q", modifiers: .command)
+    }
+}
+
+/// The status text doubles as the refresh control: a quiet pill appears on hover when a refresh is allowed.
+private struct StatusButton: View {
+    let status: FooterStatus
+    let lastGoodDate: Date?
+    let reason: String?
+    let refresh: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: refresh) {
+            HStack(spacing: 5) {
+                indicator
+                label
+            }
+            .font(.caption)
+            .lineLimit(1)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Color.primary.opacity(hovering && status.allowsManualRefresh ? 0.08 : 0), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!status.allowsManualRefresh)
+        .keyboardShortcut("r", modifiers: .command)
+        .onHover { over in
+            hovering = over
+            if over, status.allowsManualRefresh { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+        .help(helpText)
+    }
+
+    @ViewBuilder private var indicator: some View {
+        switch status {
+        case .fetching, .refreshing:
+            ProgressView().controlSize(.mini).frame(width: 7, height: 7)
+        case .updatedNow, .countdown:
+            Circle().fill(.green).frame(width: 7, height: 7)
+        case .failed:
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
+        }
+    }
+
+    @ViewBuilder private var label: some View {
+        switch status {
+        case .fetching:
+            Text("Fetching from GitHub…", bundle: .app).foregroundStyle(.secondary)
+        case .refreshing:
+            Text("Refreshing…", bundle: .app).foregroundStyle(.secondary)
+        case .updatedNow:
+            Text("Updated now", bundle: .app).foregroundStyle(.secondary)
+        case .countdown:
+            Text("Refresh in \(status.countdownText)", bundle: .app).foregroundStyle(.secondary).monospacedDigit()
+        case .failed(let date):
+            Text("Failed to refresh · data from \(lastGoodDate ?? date, format: .dateTime.hour().minute())", bundle: .app)
+                .foregroundStyle(.yellow)
+        }
+    }
+
+    private var helpText: Text {
+        switch status {
+        case .failed: Text(verbatim: reason ?? "")
+        case .countdown: Text("Refresh now", bundle: .app)
+        case .fetching, .refreshing, .updatedNow: Text(verbatim: "")
+        }
     }
 }
