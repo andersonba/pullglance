@@ -25,6 +25,10 @@ struct PullRequest: Sendable, Equatable, Identifiable {
     let ciState: CIState
     let unresolvedThreads: Int
     let requestedTeams: [String]
+    /// `mergeable == CONFLICTING`
+    let hasConflicts: Bool
+    /// `mergeStateStatus == BEHIND`
+    let isBehindBase: Bool
 
     var id: String { "\(repo)#\(number)" }
     var checksURL: URL { url.appendingPathComponent("checks") }

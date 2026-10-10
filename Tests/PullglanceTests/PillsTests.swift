@@ -27,6 +27,14 @@ import Testing
         #expect(pills(for: makePR(isDraft: true, reviewDecision: .reviewRequired)) == [.awaitingReview])
     }
 
+    @Test func conflictsReplaceReadyToMerge() {
+        #expect(pills(for: makePR(reviewDecision: .approved, ciState: .success, hasConflicts: true)) == [.approved, .conflicts])
+    }
+
+    @Test func behindBaseShowsItsPill() {
+        #expect(pills(for: makePR(reviewDecision: .reviewRequired, ciState: .success, isBehindBase: true)) == [.awaitingReview, .behindBase])
+    }
+
     @Test func zeroThreadsHasNoThreadPill() {
         let result = pills(for: makePR(reviewDecision: .approved, ciState: .success, unresolvedThreads: 0))
         #expect(result.contains { if case .openThreads = $0 { true } else { false } } == false)

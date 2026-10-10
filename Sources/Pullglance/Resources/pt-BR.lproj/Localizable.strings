@@ -2,12 +2,10 @@
 "My PRs" = "Meus PRs";
 "To review" = "Para revisar";
 
+"Nothing pending in reviews." = "Nada pendente em revisões.";
+
 /* Sections */
-"Needs you" = "Precisa de você";
-"Waiting on others" = "Aguardando outros";
 "Drafts" = "Drafts";
-"Requested from you" = "Pediram a você";
-"Via team" = "Via time";
 "%lld most recent" = "%lld mais recentes";
 "Open all on GitHub" = "Abrir todos no GitHub";
 
@@ -31,15 +29,12 @@
 "Open my PRs on GitHub" = "Abrir meus PRs no GitHub";
 "Open review requests on GitHub" = "Abrir revisões no GitHub";
 "Launch at login" = "Abrir no login";
-"Refresh interval" = "Intervalo de atualização";
 "%lld min" = "%lld min";
 "Version %@" = "Versão %@";
 "Quit" = "Sair";
 
 /* Empty states */
 "All clear" = "Tudo em dia";
-"No open PRs of yours." = "Nenhum PR aberto seu.";
-"Nothing pending in reviews." = "Nada pendente em revisões.";
 "gh CLI not found" = "CLI gh não encontrado";
 "Looked in /opt/homebrew/bin, /usr/local/bin and PATH." = "Procurei em /opt/homebrew/bin, /usr/local/bin e no PATH.";
 "Install with Homebrew" = "Instalar com Homebrew";
@@ -65,3 +60,22 @@
 "Hidden owners are left out of both tabs and the badge. New owners show up checked." = "Donos ocultos ficam fora das duas abas e do contador. Donos novos aparecem marcados.";
 "Show all" = "Mostrar todos";
 "%lld hidden" = "%lld ocultos";
+
+/* Sections */
+"Sections" = "Seções";
+"Show" = "Mostrar";
+"Badge" = "Contador";
+"Needs action" = "Precisa de ação";
+"Waiting for review or checks" = "Aguardando review ou checks";
+"Needs your review" = "Precisa da sua revisão";
+"Needs your teams' review" = "Precisa da revisão dos seus times";
+"Failing checks, requested changes, merge conflicts or branch behind base" = "Checks falhando, mudanças solicitadas, conflitos de merge ou branch atrasada";
+"Approved, checks green, no conflicts" = "Aprovado, checks verdes, sem conflitos";
+"Awaiting a review or with checks still running" = "Aguardando review ou com checks rodando";
+"Started but not submitted for review" = "Iniciado, ainda não enviado para review";
+"Requested from you directly" = "Pedido diretamente a você";
+"Requested from a team you belong to" = "Pedido a um time do qual você faz parte";
+"Sections you hide stay out of the list. The badge adds up the checked sections, after the owner filter." = "Seções ocultas ficam fora da lista. O contador soma as seções marcadas, depois do filtro de donos.";
+"Nothing to show in the sections you keep visible." = "Nada a mostrar nas seções que você mantém visíveis.";
+"Conflicts" = "Conflitos";
+"Behind base" = "Atrás da base";

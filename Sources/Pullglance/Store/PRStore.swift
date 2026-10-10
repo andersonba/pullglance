@@ -33,6 +33,8 @@ final class PRStore {
     static let expandedKey = "viaTeamExpanded"
     static let intervalKey = "refreshIntervalSeconds"
     static let hiddenOwnersKey = "hiddenOwners"
+    static let visibleSectionsKey = "visibleSections"
+    static let badgeSectionsKey = "badgeSections"
 
     private(set) var mine = Snapshot<[PullRequest]>(value: [], total: 0, fetchedAt: nil)
     private(set) var direct = Snapshot<[PullRequest]>(value: [], total: 0, fetchedAt: nil)
@@ -60,6 +62,25 @@ final class PRStore {
             Task { await refresh() }
         }
     }
+
+    /// Sections shown in the popover. Missing from defaults means all.
+    var visibleSections: Set<Section> {
+        didSet { defaults.set(visibleSections.map(\.rawValue).sorted(), forKey: Self.visibleSectionsKey) }
+    }
+
+    /// Sections whose items add up to the menu bar number.
+    var badgeSections: Set<Section> {
+        didSet {
+            defaults.set(badgeSections.map(\.rawValue).sorted(), forKey: Self.badgeSectionsKey)
+            recomputeBadge()
+            if wantsTeamFetch, viaTeam == nil, !isLoadingViaTeam {
+                Task { await refreshViaTeam() }
+            }
+        }
+    }
+
+    /// The team search runs every cycle when the section is open or counted in the badge.
+    private var wantsTeamFetch: Bool { isViaTeamExpanded || badgeSections.contains(.needsTeamsReview) }
 
     var isViaTeamExpanded: Bool {
         didSet {
@@ -92,8 +113,15 @@ final class PRStore {
         self.now = now
         self.isViaTeamExpanded = defaults.bool(forKey: Self.expandedKey)
         self.hiddenOwners = Set(defaults.stringArray(forKey: Self.hiddenOwnersKey) ?? [])
+        self.visibleSections = Self.sections(in: defaults, key: Self.visibleSectionsKey) ?? Set(Section.allCases)
+        self.badgeSections = Self.sections(in: defaults, key: Self.badgeSectionsKey) ?? Section.defaultBadge
         let seconds = defaults.integer(forKey: Self.intervalKey)
         self.refreshInterval = .seconds(seconds > 0 ? seconds : 120)
+    }
+
+    private static func sections(in defaults: UserDefaults, key: String) -> Set<Section>? {
+        guard defaults.object(forKey: key) != nil else { return nil }
+        return Set((defaults.stringArray(forKey: key) ?? []).compactMap(Section.init(rawValue:)))
     }
 
     // MARK: Derived state for the UI
@@ -106,6 +134,17 @@ final class PRStore {
     /// Approximate count for the header: team requests minus the ones already shown as direct.
     var viaTeamTotal: Int? { viaTeam.map { max(0, $0.total - direct.total) } }
     var hasAnyData: Bool { mine.fetchedAt != nil || direct.fetchedAt != nil }
+
+    /// Numbers on the tab picker: only what the visible sections would show.
+    var mineTabCount: Int {
+        let groups = mineGroups
+        return Section.mineSections.filter { visibleSections.contains($0) }.reduce(0) { $0 + groups[$1].count }
+    }
+
+    /// Direct requests use the API total (there may be more than one page); team requests are not counted here.
+    var reviewTabCount: Int {
+        visibleSections.contains(.needsYourReview) ? direct.total : 0
+    }
 
     /// Everything that can own a PR of yours: your account, your organizations, owners seen in results,
     /// and owners currently hidden (so they can be shown again). Sorted by login.
@@ -187,7 +226,7 @@ final class PRStore {
         if let error = apply(m, to: &mine) { errors.append(error) }
         if let error = apply(d, to: &direct) { errors.append(error) }
 
-        if isViaTeamExpanded {
+        if wantsTeamFetch {
             let t = await client.search(SearchQuery.viaTeam(hiding: hiddenOwners))
             var snapshot = viaTeam ?? Snapshot(value: [], total: 0, fetchedAt: nil)
             if let error = apply(t, to: &snapshot) {
@@ -213,6 +252,7 @@ final class PRStore {
         } else {
             viaTeam = snapshot
             viaTeamError = nil
+            recomputeBadge()
         }
     }
 
@@ -251,12 +291,18 @@ final class PRStore {
         if errors.isEmpty {
             lastError = nil
             phase = .ok(date)
-            badgeCount = computeBadgeCount(mine: mine.value, direct: direct.value)
+            badgeCount = computeBadgeCount(mine: mine.value, direct: direct.value, viaTeam: viaTeamList, counting: badgeSections)
         } else {
             let kind = mostSevere(errors)
             lastError = kind
             phase = .error(kind, date)
         }
+    }
+
+    /// Only once a full cycle has succeeded; before that the badge stays nil on purpose.
+    private func recomputeBadge() {
+        guard badgeCount != nil else { return }
+        badgeCount = computeBadgeCount(mine: mine.value, direct: direct.value, viaTeam: viaTeamList, counting: badgeSections)
     }
 
     private func mostSevere(_ errors: [ErrorKind]) -> ErrorKind {

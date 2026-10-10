@@ -22,7 +22,7 @@ struct EmptyStateView: View {
             switch kind {
             case .allClear:
                 Text("All clear", bundle: .app).font(.headline)
-                Text("No open PRs of yours.", bundle: .app)
+                Text("Nothing to show in the sections you keep visible.", bundle: .app).font(.caption)
             case .ghNotFound:
                 Text("gh CLI not found", bundle: .app).font(.headline)
                 Text("Looked in /opt/homebrew/bin, /usr/local/bin and PATH.", bundle: .app).font(.caption)

@@ -47,6 +47,23 @@ import Testing
         #expect(page.pullRequests.first?.ciState == expected)
     }
 
+    @Test func decodesConflictsAndBehindBase() throws {
+        let page = try parseSearchResponse(envelope(nodes: [
+            node(number: 1, ci: "SUCCESS", mergeable: "CONFLICTING", mergeState: "DIRTY"),
+            node(number: 2, ci: "SUCCESS", mergeable: "MERGEABLE", mergeState: "BEHIND"),
+            node(number: 3, ci: "SUCCESS"),
+        ]))
+        #expect(page.pullRequests.map(\.hasConflicts) == [true, false, false])
+        #expect(page.pullRequests.map(\.isBehindBase) == [false, true, false])
+    }
+
+    @Test func missingMergeFieldsDefaultToFalse() throws {
+        let raw = node(number: 1, ci: "SUCCESS").replacingOccurrences(of: "\"mergeable\":\"MERGEABLE\",\"mergeStateStatus\":\"CLEAN\",", with: "")
+        let page = try parseSearchResponse(envelope(nodes: [raw]))
+        #expect(page.pullRequests.first?.hasConflicts == false)
+        #expect(page.pullRequests.first?.isBehindBase == false)
+    }
+
     @Test func nullRollupBecomesNone() throws {
         let page = try parseSearchResponse(envelope(nodes: [node(number: 1, ci: nil)]))
         #expect(page.pullRequests.first?.ciState == CIState.none)

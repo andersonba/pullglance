@@ -1,23 +1,33 @@
 import Foundation
 
-enum MineSection: Sendable, Equatable, CaseIterable {
-    case needsYou
-    case waitingOnOthers
-    case drafts
-}
-
-/// The one rule for both the "My PRs" sections and the menu bar badge.
-/// Open review threads deliberately do not move a PR here; they only show as a pill.
-func mineSection(for pr: PullRequest) -> MineSection {
+/// The one rule for the "My PRs" sections. The badge adds up whichever sections the user selected.
+/// Open review threads deliberately do not move a PR; they only show as a pill.
+func mineSection(for pr: PullRequest) -> Section {
     if pr.isDraft { return .drafts }
-    if pr.ciState == .failure || pr.reviewDecision == .changesRequested { return .needsYou }
-    return .waitingOnOthers
+    if pr.ciState == .failure || pr.reviewDecision == .changesRequested || pr.hasConflicts || pr.isBehindBase {
+        return .needsAction
+    }
+    if pr.reviewDecision == .approved, pr.ciState == .success || pr.ciState == .none {
+        return .readyToMerge
+    }
+    return .waitingForReview
 }
 
 struct MineGroups: Sendable, Equatable {
-    var needsYou: [PullRequest] = []
-    var waitingOnOthers: [PullRequest] = []
+    var needsAction: [PullRequest] = []
+    var readyToMerge: [PullRequest] = []
+    var waitingForReview: [PullRequest] = []
     var drafts: [PullRequest] = []
+
+    subscript(section: Section) -> [PullRequest] {
+        switch section {
+        case .needsAction: needsAction
+        case .readyToMerge: readyToMerge
+        case .waitingForReview: waitingForReview
+        case .drafts: drafts
+        case .needsYourReview, .needsTeamsReview: []
+        }
+    }
 }
 
 func sortedByRecency(_ prs: [PullRequest]) -> [PullRequest] {
@@ -28,9 +38,11 @@ func groupMine(_ prs: [PullRequest]) -> MineGroups {
     var groups = MineGroups()
     for pr in sortedByRecency(prs) {
         switch mineSection(for: pr) {
-        case .needsYou: groups.needsYou.append(pr)
-        case .waitingOnOthers: groups.waitingOnOthers.append(pr)
+        case .needsAction: groups.needsAction.append(pr)
+        case .readyToMerge: groups.readyToMerge.append(pr)
+        case .waitingForReview: groups.waitingForReview.append(pr)
         case .drafts: groups.drafts.append(pr)
+        case .needsYourReview, .needsTeamsReview: break
         }
     }
     return groups
@@ -46,6 +58,15 @@ func filterViaTeam(all: [PullRequest], direct: [PullRequest], viewerLogin: Strin
     )
 }
 
-func computeBadgeCount(mine: [PullRequest], direct: [PullRequest]) -> Int {
-    mine.filter { mineSection(for: $0) == .needsYou }.count + direct.count
+/// `viaTeam` is the already filtered team list (see `filterViaTeam`).
+func computeBadgeCount(mine: [PullRequest], direct: [PullRequest], viaTeam: [PullRequest], counting sections: Set<Section>) -> Int {
+    let groups = groupMine(mine)
+    var total = 0
+    for section in sections {
+        switch section.tab {
+        case .mine: total += groups[section].count
+        case .review: total += section == .needsYourReview ? direct.count : viaTeam.count
+        }
+    }
+    return total
 }

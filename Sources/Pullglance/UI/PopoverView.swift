@@ -13,8 +13,8 @@ struct PopoverView: View {
     var body: some View {
         VStack(spacing: 0) {
             Picker(selection: $tab) {
-                (Text("My PRs", bundle: .app) + Text(verbatim: "  \(store.mine.total)")).tag(Tab.mine)
-                (Text("To review", bundle: .app) + Text(verbatim: "  \(store.direct.total)")).tag(Tab.review)
+                (Text("My PRs", bundle: .app) + Text(verbatim: "  \(store.mineTabCount)")).tag(Tab.mine)
+                (Text("To review", bundle: .app) + Text(verbatim: "  \(store.reviewTabCount)")).tag(Tab.review)
             } label: { EmptyView() }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -60,19 +60,20 @@ struct PopoverView: View {
     }
 
     @ViewBuilder private var mineList: some View {
-        if store.mine.value.isEmpty {
+        let groups = store.mineGroups
+        let shown = Section.mineSections.filter { store.visibleSections.contains($0) }
+        if shown.allSatisfy({ groups[$0].isEmpty }) {
             EmptyStateView(kind: .allClear)
         } else {
-            let groups = store.mineGroups
-            section(String(localized: "Needs you", bundle: .app), groups.needsYou)
-            section(String(localized: "Waiting on others", bundle: .app), groups.waitingOnOthers)
-            section(String(localized: "Drafts", bundle: .app), groups.drafts)
+            ForEach(shown) { section in
+                mineSection(section, groups[section])
+            }
         }
     }
 
-    @ViewBuilder private func section(_ title: String, _ prs: [PullRequest]) -> some View {
+    @ViewBuilder private func mineSection(_ section: Section, _ prs: [PullRequest]) -> some View {
         if !prs.isEmpty {
-            SectionHeader(title: title, count: prs.count)
+            SectionHeader(title: section.title, count: prs.count)
             ForEach(prs) { pr in
                 PRRow(pr: pr, leading: .ci)
                 Divider().padding(.leading, 12)
@@ -81,7 +82,19 @@ struct PopoverView: View {
     }
 
     @ViewBuilder private var reviewList: some View {
-        SectionHeader(title: String(localized: "Requested from you", bundle: .app), count: store.direct.total)
+        if store.visibleSections.contains(.needsYourReview) {
+            directSection
+        }
+        if store.visibleSections.contains(.needsTeamsReview) {
+            teamSection
+        }
+        if store.visibleSections.isDisjoint(with: Section.reviewSections) {
+            EmptyStateView(kind: .allClear)
+        }
+    }
+
+    @ViewBuilder private var directSection: some View {
+        SectionHeader(title: Section.needsYourReview.title, count: store.direct.total)
         if store.directList.isEmpty {
             Text("Nothing pending in reviews.", bundle: .app)
                 .font(.caption)
@@ -94,9 +107,11 @@ struct PopoverView: View {
             PRRow(pr: pr, leading: .author, showAuthor: true)
             Divider().padding(.leading, 12)
         }
+    }
 
+    @ViewBuilder private var teamSection: some View {
         SectionHeader(
-            title: String(localized: "Via team", bundle: .app),
+            title: Section.needsTeamsReview.title,
             count: store.viaTeamTotal,
             expanded: $store.isViaTeamExpanded,
             detail: store.isViaTeamExpanded ? String(localized: "\(20) most recent", bundle: .app) : nil

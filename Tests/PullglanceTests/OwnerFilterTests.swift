@@ -55,7 +55,7 @@ import Testing
         let defaults = testDefaults()
         let store = PRStore(client: gh, defaults: defaults, now: { Date() })
         await store.refresh()
-        #expect(store.badgeCount == 4)
+        #expect(store.badgeCount == 6)
 
         store.hiddenOwners = ["acme"]
         try await Task.sleep(for: .milliseconds(150))

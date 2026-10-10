@@ -10,7 +10,7 @@ import Testing
 
     @Test func portugueseTranslationsExist() throws {
         let pt = try bundle("pt-br")
-        #expect(pt.localizedString(forKey: "Needs you", value: nil, table: nil) == "Precisa de você")
+        #expect(pt.localizedString(forKey: "Needs action", value: nil, table: nil) == "Precisa de ação")
         #expect(pt.localizedString(forKey: "To review", value: nil, table: nil) == "Para revisar")
         #expect(pt.localizedString(forKey: "Quit", value: nil, table: nil) == "Sair")
     }

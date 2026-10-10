@@ -138,16 +138,19 @@ struct PillView: View {
         case .approved: String(localized: "Approved", bundle: .app)
         case .readyToMerge: String(localized: "Ready to merge", bundle: .app)
         case .awaitingReview: String(localized: "Awaiting review", bundle: .app)
+        case .conflicts: String(localized: "Conflicts", bundle: .app)
+        case .behindBase: String(localized: "Behind base", bundle: .app)
         case .openThreads(let count): String(localized: "\(count) open threads", bundle: .app)
         }
     }
 
     private var tint: Color {
         switch pill {
-        case .ciFailed, .changesRequested: .red
+        case .ciFailed, .changesRequested, .conflicts: .red
         case .ciRunning: .yellow
         case .approved, .readyToMerge: .green
         case .awaitingReview: .orange
+        case .behindBase: .gray
         case .openThreads: .blue
         }
     }

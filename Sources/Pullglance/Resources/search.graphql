@@ -4,7 +4,7 @@ query($q: String!) {
     issueCount
     nodes {
       ... on PullRequest {
-        number title url isDraft updatedAt
+        number title url isDraft updatedAt mergeable mergeStateStatus
         repository { nameWithOwner }
         author { login }
         reviewDecision

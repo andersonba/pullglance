@@ -31,9 +31,9 @@ import Testing
         #expect(store.mine.value.count == 5)
         #expect(store.direct.value.count == 3)
         #expect(store.direct.total == 27)          // Review Focus 4
-        #expect(store.badgeCount == 4)
+        #expect(store.badgeCount == 6)
         #expect(store.viewerLogin == "octocat")
-        #expect(store.mineGroups.needsYou.map(\.number) == [101])
+        #expect(store.mineGroups.needsAction.map(\.number) == [101])
         #expect(store.directList.map(\.number) == [201, 202, 203])
         #expect(await gh.callCount(for: SearchQuery.viaTeam) == 0)
     }
@@ -46,7 +46,7 @@ import Testing
         await store.refresh()
         #expect(store.phase == .error(.other("network down"), Date(timeIntervalSince1970: 1_000)))
         #expect(store.direct.value.count == 3)
-        #expect(store.badgeCount == 4)
+        #expect(store.badgeCount == 6)
         #expect(store.blockingError == nil)
     }
 
@@ -82,7 +82,7 @@ import Testing
         await store.refresh()
         #expect(store.blockingError == nil)
         #expect(store.lastError == nil)
-        #expect(store.badgeCount == 4)
+        #expect(store.badgeCount == 6)
     }
 
     @Test func blockingErrorPersistsWhileRefreshing() async throws {
@@ -168,6 +168,54 @@ import Testing
         await store.refreshViaTeam()
         #expect(store.viaTeamError == nil)
         #expect(store.viaTeam?.total == 154)
+    }
+
+    @Test func sectionPreferencesDefaultAndPersist() async throws {
+        let defaults = testDefaults()
+        let store = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })
+        #expect(store.visibleSections == Set(Section.allCases))
+        #expect(store.badgeSections == Section.defaultBadge)
+        store.badgeSections = [.needsYourReview]
+        store.visibleSections = [.needsAction, .needsYourReview]
+        #expect(Set(defaults.stringArray(forKey: PRStore.badgeSectionsKey) ?? []) == ["needsYourReview"])
+        let reloaded = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })
+        #expect(reloaded.badgeSections == [.needsYourReview])
+        #expect(reloaded.visibleSections == [.needsAction, .needsYourReview])
+    }
+
+    @Test func changingBadgeSectionsRecomputesWithoutAFetch() async throws {
+        let gh = try await happyGH()
+        let store = makeStore(gh)
+        await store.refresh()
+        #expect(store.badgeCount == 6)
+        store.badgeSections = [.needsYourReview]
+        #expect(store.badgeCount == 3)
+        #expect(await gh.calls.count == 2)
+    }
+
+    @Test func countingTeamsInBadgeFetchesTeamEveryCycle() async throws {
+        let gh = try await happyGH()
+        let store = makeStore(gh)
+        await store.refresh()
+        store.badgeSections = [.needsTeamsReview]
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(await gh.callCount(for: SearchQuery.viaTeam) == 1)
+        #expect(store.viaTeamList.count == 2)
+        #expect(store.badgeCount == 2)
+        await store.refresh()
+        #expect(await gh.callCount(for: SearchQuery.viaTeam) == 2)
+    }
+
+    @Test func tabCountsFollowVisibleSections() async throws {
+        let store = makeStore(try await happyGH())
+        await store.refresh()
+        #expect(store.mineTabCount == 5)
+        #expect(store.reviewTabCount == 27)
+        store.visibleSections = [.needsAction, .needsTeamsReview]
+        #expect(store.mineTabCount == 1)
+        #expect(store.reviewTabCount == 0)
+        store.visibleSections = [.drafts]
+        #expect(store.mineTabCount == 2)
     }
 
     @Test func viaTeamExpansionPersistsInDefaults() async throws {

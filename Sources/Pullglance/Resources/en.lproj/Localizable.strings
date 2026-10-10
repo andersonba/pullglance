@@ -2,12 +2,10 @@
 "My PRs" = "My PRs";
 "To review" = "To review";
 
+"Nothing pending in reviews." = "Nothing pending in reviews.";
+
 /* Sections */
-"Needs you" = "Needs you";
-"Waiting on others" = "Waiting on others";
 "Drafts" = "Drafts";
-"Requested from you" = "Requested from you";
-"Via team" = "Via team";
 "%lld most recent" = "%lld most recent";
 "Open all on GitHub" = "Open all on GitHub";
 
@@ -31,15 +29,12 @@
 "Open my PRs on GitHub" = "Open my PRs on GitHub";
 "Open review requests on GitHub" = "Open review requests on GitHub";
 "Launch at login" = "Launch at login";
-"Refresh interval" = "Refresh interval";
 "%lld min" = "%lld min";
 "Version %@" = "Version %@";
 "Quit" = "Quit";
 
 /* Empty states */
 "All clear" = "All clear";
-"No open PRs of yours." = "No open PRs of yours.";
-"Nothing pending in reviews." = "Nothing pending in reviews.";
 "gh CLI not found" = "gh CLI not found";
 "Looked in /opt/homebrew/bin, /usr/local/bin and PATH." = "Looked in /opt/homebrew/bin, /usr/local/bin and PATH.";
 "Install with Homebrew" = "Install with Homebrew";
@@ -65,3 +60,22 @@
 "Hidden owners are left out of both tabs and the badge. New owners show up checked." = "Hidden owners are left out of both tabs and the badge. New owners show up checked.";
 "Show all" = "Show all";
 "%lld hidden" = "%lld hidden";
+
+/* Sections */
+"Sections" = "Sections";
+"Show" = "Show";
+"Badge" = "Badge";
+"Needs action" = "Needs action";
+"Waiting for review or checks" = "Waiting for review or checks";
+"Needs your review" = "Needs your review";
+"Needs your teams' review" = "Needs your teams' review";
+"Failing checks, requested changes, merge conflicts or branch behind base" = "Failing checks, requested changes, merge conflicts or branch behind base";
+"Approved, checks green, no conflicts" = "Approved, checks green, no conflicts";
+"Awaiting a review or with checks still running" = "Awaiting a review or with checks still running";
+"Started but not submitted for review" = "Started but not submitted for review";
+"Requested from you directly" = "Requested from you directly";
+"Requested from a team you belong to" = "Requested from a team you belong to";
+"Sections you hide stay out of the list. The badge adds up the checked sections, after the owner filter." = "Sections you hide stay out of the list. The badge adds up the checked sections, after the owner filter.";
+"Nothing to show in the sections you keep visible." = "Nothing to show in the sections you keep visible.";
+"Conflicts" = "Conflicts";
+"Behind base" = "Behind base";

@@ -3,6 +3,7 @@ import SwiftUI
 
 enum SettingsTab: String, Hashable, CaseIterable {
     case general
+    case sections
     case filters
 }
 
@@ -34,11 +35,14 @@ struct SettingsView: View {
             GeneralSettingsView(store: store)
                 .tabItem { Label { Text("General", bundle: .app) } icon: { Image(systemName: "gearshape") } }
                 .tag(SettingsTab.general)
+            SectionsSettingsView(store: store)
+                .tabItem { Label { Text("Sections", bundle: .app) } icon: { Image(systemName: "list.bullet.rectangle") } }
+                .tag(SettingsTab.sections)
             FiltersSettingsView(store: store)
                 .tabItem { Label { Text("Filters", bundle: .app) } icon: { Image(systemName: "line.3.horizontal.decrease.circle") } }
                 .tag(SettingsTab.filters)
         }
-        .frame(width: 480)
+        .frame(width: 520)
     }
 }
 
@@ -48,7 +52,7 @@ struct GeneralSettingsView: View {
 
     var body: some View {
         Form {
-            Section {
+            SwiftUI.Section {
                 Toggle(isOn: Binding(
                     get: { launchAtLogin },
                     set: { on in
@@ -69,7 +73,7 @@ struct GeneralSettingsView: View {
                     Text("Refresh every", bundle: .app)
                 }
             }
-            Section {
+            SwiftUI.Section {
                 LabeledContent {
                     HStack {
                         Text("Follows the system", bundle: .app).foregroundStyle(.secondary)
@@ -93,7 +97,7 @@ struct FiltersSettingsView: View {
 
     var body: some View {
         Form {
-            Section {
+            SwiftUI.Section {
                 ForEach(store.knownOwners) { owner in
                     OwnerRow(owner: owner, store: store)
                 }
@@ -157,5 +161,75 @@ private struct OwnerRow: View {
         }
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
+    }
+}
+
+struct SectionsSettingsView: View {
+    @Bindable var store: PRStore
+    private let columnWidth: CGFloat = 56
+
+    var body: some View {
+        Form {
+            SwiftUI.Section {
+                ForEach(Section.mineSections) { section in
+                    SectionRow(section: section, store: store, columnWidth: columnWidth)
+                }
+            } header: {
+                header(Text("My PRs", bundle: .app))
+            }
+            SwiftUI.Section {
+                ForEach(Section.reviewSections) { section in
+                    SectionRow(section: section, store: store, columnWidth: columnWidth)
+                }
+            } header: {
+                header(Text("To review", bundle: .app))
+            } footer: {
+                Text("Sections you hide stay out of the list. The badge adds up the checked sections, after the owner filter.", bundle: .app)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .padding(.vertical, 4)
+    }
+
+    private func header(_ title: Text) -> some View {
+        HStack {
+            title
+            Spacer()
+            Text("Show", bundle: .app).frame(width: columnWidth)
+            Text("Badge", bundle: .app).frame(width: columnWidth)
+        }
+        .font(.caption)
+        .textCase(nil)
+    }
+}
+
+private struct SectionRow: View {
+    let section: Section
+    @Bindable var store: PRStore
+    let columnWidth: CGFloat
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: section.title)
+                Text(verbatim: section.detail).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Toggle(isOn: membership(\.visibleSections)) { EmptyView() }
+                .toggleStyle(.checkbox).labelsHidden().frame(width: columnWidth)
+            Toggle(isOn: membership(\.badgeSections)) { EmptyView() }
+                .toggleStyle(.checkbox).labelsHidden().frame(width: columnWidth)
+        }
+    }
+
+    private func membership(_ keyPath: ReferenceWritableKeyPath<PRStore, Set<Section>>) -> Binding<Bool> {
+        Binding(
+            get: { store[keyPath: keyPath].contains(section) },
+            set: { on in
+                if on { store[keyPath: keyPath].insert(section) } else { store[keyPath: keyPath].remove(section) }
+            }
+        )
     }
 }

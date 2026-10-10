@@ -1,6 +1,6 @@
 {"data":{"viewer":{"login":"octocat"},"search":{"issueCount":4,"nodes":[
 null,
 {},
-{"number":401,"title":"docs: fix typo","url":"https://github.com/acme/docs/pull/401","isDraft":false,"updatedAt":"2026-10-01T00:00:00Z","repository":{"nameWithOwner":"acme/docs"},"author":null,"reviewDecision":null,"reviewThreads":{"nodes":[]},"reviewRequests":{"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":null}}]}},
-{"number":402,"title":"broken node without url","isDraft":false,"updatedAt":"2026-10-01T00:00:00Z","repository":{"nameWithOwner":"acme/docs"}}
+{"number":401,"title":"docs: fix typo","url":"https://github.com/acme/docs/pull/401","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","updatedAt":"2026-10-01T00:00:00Z","repository":{"nameWithOwner":"acme/docs"},"author":null,"reviewDecision":null,"reviewThreads":{"nodes":[]},"reviewRequests":{"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":null}}]}},
+{"number":402,"title":"broken node without url","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","updatedAt":"2026-10-01T00:00:00Z","repository":{"nameWithOwner":"acme/docs"}}
 ]}},"errors":[{"message":"Resource protected by organization SAML enforcement."}]}

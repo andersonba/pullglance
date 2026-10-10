@@ -83,6 +83,8 @@ private struct PRNode: Decodable {
     let title: String?
     let url: URL?
     let isDraft: Bool?
+    let mergeable: String?
+    let mergeStateStatus: String?
     let updatedAt: Date?
     let repository: Repository?
     let author: Login?
@@ -136,7 +138,9 @@ private struct PRNode: Decodable {
             reviewDecision: reviewDecision.flatMap(ReviewDecision.init(rawValue:)),
             ciState: ci,
             unresolvedThreads: unresolved,
-            requestedTeams: teams
+            requestedTeams: teams,
+            hasConflicts: mergeable == "CONFLICTING",
+            isBehindBase: mergeStateStatus == "BEHIND"
         )
     }
 }

@@ -18,14 +18,17 @@ func makePR(
     reviewDecision: ReviewDecision? = nil,
     ciState: CIState = .none,
     unresolvedThreads: Int = 0,
-    requestedTeams: [String] = []
+    requestedTeams: [String] = [],
+    hasConflicts: Bool = false,
+    isBehindBase: Bool = false
 ) -> PullRequest {
     PullRequest(
         repo: repo, number: number, title: title,
         url: URL(string: "https://github.com/\(repo)/pull/\(number)")!,
         isDraft: isDraft, author: author, updatedAt: updatedAt,
         reviewDecision: reviewDecision, ciState: ciState,
-        unresolvedThreads: unresolvedThreads, requestedTeams: requestedTeams
+        unresolvedThreads: unresolvedThreads, requestedTeams: requestedTeams,
+        hasConflicts: hasConflicts, isBehindBase: isBehindBase
     )
 }
 
@@ -37,11 +40,11 @@ func envelope(nodes: [String], issueCount: Int? = nil, viewer: String = "octocat
     return Data(body.utf8)
 }
 
-func node(number: Int, ci: String?, decision: String? = nil, draft: Bool = false) -> String {
+func node(number: Int, ci: String?, decision: String? = nil, draft: Bool = false, mergeable: String = "MERGEABLE", mergeState: String = "CLEAN") -> String {
     let rollup = ci.map { "{\"state\":\"\($0)\"}" } ?? "null"
     let dec = decision.map { "\"\($0)\"" } ?? "null"
     return """
-    {"number":\(number),"title":"PR \(number)","url":"https://github.com/acme/web/pull/\(number)","isDraft":\(draft),"updatedAt":"2026-10-10T10:00:00Z","repository":{"nameWithOwner":"acme/web"},"author":{"login":"someone"},"reviewDecision":\(dec),"reviewThreads":{"nodes":[]},"reviewRequests":{"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":\(rollup)}}]}}
+    {"number":\(number),"title":"PR \(number)","url":"https://github.com/acme/web/pull/\(number)","isDraft":\(draft),"mergeable":"\(mergeable)","mergeStateStatus":"\(mergeState)","updatedAt":"2026-10-10T10:00:00Z","repository":{"nameWithOwner":"acme/web"},"author":{"login":"someone"},"reviewDecision":\(dec),"reviewThreads":{"nodes":[]},"reviewRequests":{"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":\(rollup)}}]}}
     """
 }
 

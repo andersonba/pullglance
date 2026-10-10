@@ -5,6 +5,8 @@ enum Pill: Hashable, Sendable {
     case approved
     case readyToMerge
     case awaitingReview
+    case conflicts
+    case behindBase
     case openThreads(Int)
 }
 
@@ -21,10 +23,12 @@ func pills(for pr: PullRequest) -> [Pill] {
         result.append(.changesRequested)
     case .approved:
         result.append(.approved)
-        if pr.ciState == .success { result.append(.readyToMerge) }
+        if pr.ciState == .success, !pr.hasConflicts, !pr.isBehindBase { result.append(.readyToMerge) }
     case .reviewRequired, nil:
         result.append(.awaitingReview)
     }
+    if pr.hasConflicts { result.append(.conflicts) }
+    if pr.isBehindBase { result.append(.behindBase) }
     if pr.unresolvedThreads > 0 {
         result.append(.openThreads(pr.unresolvedThreads))
     }

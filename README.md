@@ -6,11 +6,17 @@ It talks to GitHub through the `gh` CLI you are already logged into. No GitHub A
 
 ## What you see
 
-- **My PRs**, in three sections: *Needs you* (CI failing or changes requested), *Waiting on others*, *Drafts*.
-- **To review**: pull requests where you were asked directly, always visible. Requests to your teams stay in a collapsed section.
-- **A number on the menu bar icon**: your non-draft PRs that need action, plus direct review requests. Nothing else counts.
+- **My PRs**, in four sections: *Needs action* (failing checks, requested changes, merge conflicts, branch behind base), *Ready to merge*, *Waiting for review or checks*, *Drafts*.
+- **To review**: pull requests where you were asked directly, plus a collapsed section for requests to your teams.
+- **A number on the menu bar icon**. By default it adds up *Needs action*, *Ready to merge* and *Needs your review*: everything that depends on you.
 
 Click a row to open the PR. Click the CI dot to open its checks. Refreshes every 2 minutes.
+
+## Settings (⌘,)
+
+- **General**: launch at login, refresh interval, language.
+- **Sections**: choose which sections appear and which ones count toward the badge.
+- **Filters**: hide organizations or accounts. Hidden owners are excluded from the searches themselves, so lists, totals and the badge all follow. Stored per machine.
 
 ## Install
 
