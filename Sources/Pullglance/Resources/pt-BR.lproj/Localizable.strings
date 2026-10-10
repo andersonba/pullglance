@@ -79,3 +79,11 @@
 "Nothing to show in the sections you keep visible." = "Nada a mostrar nas seções que você mantém visíveis.";
 "Conflicts" = "Conflitos";
 "Behind base" = "Atrás da base";
+
+/* Quick filter */
+"All" = "Tudo";
+"Action" = "Ação";
+"Ready" = "Prontos";
+"Waiting" = "Aguardando";
+"Yours" = "Seus";
+"Teams" = "Times";

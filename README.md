@@ -12,6 +12,8 @@ It talks to GitHub through the `gh` CLI you are already logged into. No GitHub A
 
 Click a row to open the PR. Click the CI dot to open its checks. Refreshes every 2 minutes.
 
+A row of chips under the tabs isolates one section with a click (keys `1`–`4`, `0` for all) and doubles as a count summary.
+
 ## Settings (⌘,)
 
 - **General**: launch at login, refresh interval, language.

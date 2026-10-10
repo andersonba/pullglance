@@ -79,3 +79,11 @@
 "Nothing to show in the sections you keep visible." = "Nothing to show in the sections you keep visible.";
 "Conflicts" = "Conflicts";
 "Behind base" = "Behind base";
+
+/* Quick filter */
+"All" = "All";
+"Action" = "Action";
+"Ready" = "Ready";
+"Waiting" = "Waiting";
+"Yours" = "Yours";
+"Teams" = "Teams";

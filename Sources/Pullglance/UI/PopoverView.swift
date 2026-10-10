@@ -5,6 +5,9 @@ struct PopoverView: View {
     @Bindable var store: PRStore
     @State private var tab: Tab = .mine
     @State private var listHeight: CGFloat = 0
+    /// Quick filter per tab. Not persisted: the popover always opens on "All".
+    @State private var mineFilter: Section? = nil
+    @State private var reviewFilter: Section? = nil
 
     static let maxListHeight: CGFloat = 480
 
@@ -20,11 +23,31 @@ struct PopoverView: View {
             .labelsHidden()
             .padding(10)
 
+            if store.hasAnyData, store.blockingError == nil {
+                let items = quickFilterItems(
+                    tab: tab == .mine ? .mine : .review,
+                    visible: store.visibleSections,
+                    mine: store.mineGroups,
+                    directTotal: store.direct.total,
+                    teamTotal: store.viaTeamTotal
+                )
+                if !items.isEmpty {
+                    QuickFilterBar(items: items, selection: tab == .mine ? $mineFilter : $reviewFilter)
+                        .onChange(of: reviewFilter) { _, new in
+                            if new == .needsTeamsReview { store.isViaTeamExpanded = true }
+                        }
+                }
+            }
+
             content
 
             FooterView(store: store)
         }
         .frame(width: 380)
+        .onDisappear {
+            mineFilter = nil
+            reviewFilter = nil
+        }
     }
 
     @ViewBuilder private var content: some View {
@@ -48,6 +71,7 @@ struct PopoverView: View {
             .scrollIndicators(.never)
             .background(OverlayScrollerStyle())
             .frame(height: min(max(listHeight, 1), Self.maxListHeight))
+            .transaction { $0.animation = nil }
         }
     }
 
@@ -61,19 +85,23 @@ struct PopoverView: View {
 
     @ViewBuilder private var mineList: some View {
         let groups = store.mineGroups
-        let shown = Section.mineSections.filter { store.visibleSections.contains($0) }
+        let shown = Section.mineSections.filter { store.visibleSections.contains($0) && (mineFilter == nil || mineFilter == $0) }
         if shown.allSatisfy({ groups[$0].isEmpty }) {
             EmptyStateView(kind: .allClear)
         } else {
             ForEach(shown) { section in
-                mineSection(section, groups[section])
+                mineSection(section, groups[section], showHeader: mineFilter == nil)
             }
         }
     }
 
-    @ViewBuilder private func mineSection(_ section: Section, _ prs: [PullRequest]) -> some View {
+    @ViewBuilder private func mineSection(_ section: Section, _ prs: [PullRequest], showHeader: Bool) -> some View {
         if !prs.isEmpty {
-            SectionHeader(title: section.title, count: prs.count)
+            if showHeader {
+                SectionHeader(title: section.title, count: prs.count)
+            } else {
+                Spacer().frame(height: 4)
+            }
             ForEach(prs) { pr in
                 PRRow(pr: pr, leading: .ci)
                 Divider().padding(.leading, 12)
@@ -82,10 +110,10 @@ struct PopoverView: View {
     }
 
     @ViewBuilder private var reviewList: some View {
-        if store.visibleSections.contains(.needsYourReview) {
+        if store.visibleSections.contains(.needsYourReview), reviewFilter == nil || reviewFilter == .needsYourReview {
             directSection
         }
-        if store.visibleSections.contains(.needsTeamsReview) {
+        if store.visibleSections.contains(.needsTeamsReview), reviewFilter == nil || reviewFilter == .needsTeamsReview {
             teamSection
         }
         if store.visibleSections.isDisjoint(with: Section.reviewSections) {
@@ -94,7 +122,11 @@ struct PopoverView: View {
     }
 
     @ViewBuilder private var directSection: some View {
-        SectionHeader(title: Section.needsYourReview.title, count: store.direct.total)
+        if reviewFilter == nil {
+            SectionHeader(title: Section.needsYourReview.title, count: store.direct.total)
+        } else {
+            Spacer().frame(height: 4)
+        }
         if store.directList.isEmpty {
             Text("Nothing pending in reviews.", bundle: .app)
                 .font(.caption)
@@ -110,13 +142,17 @@ struct PopoverView: View {
     }
 
     @ViewBuilder private var teamSection: some View {
-        SectionHeader(
-            title: Section.needsTeamsReview.title,
-            count: store.viaTeamTotal,
-            expanded: $store.isViaTeamExpanded,
-            detail: store.isViaTeamExpanded ? String(localized: "\(20) most recent", bundle: .app) : nil
-        )
-        if store.isViaTeamExpanded {
+        if reviewFilter == nil {
+            SectionHeader(
+                title: Section.needsTeamsReview.title,
+                count: store.viaTeamTotal,
+                expanded: $store.isViaTeamExpanded,
+                detail: store.isViaTeamExpanded ? String(localized: "\(20) most recent", bundle: .app) : nil
+            )
+        } else {
+            Spacer().frame(height: 4)
+        }
+        if store.isViaTeamExpanded || reviewFilter == .needsTeamsReview {
             if store.viaTeam == nil, store.viaTeamError != nil {
                 HStack(spacing: 8) {
                     Text("Couldn't reach GitHub", bundle: .app).foregroundStyle(.secondary)
