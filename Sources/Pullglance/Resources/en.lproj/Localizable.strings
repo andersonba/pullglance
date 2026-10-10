@@ -91,7 +91,8 @@
 "Updated now" = "Updated now";
 "Refresh in %@" = "Refresh in %@";
 "Refresh now" = "Refresh now";
-"Failed to refresh · data from %@" = "Failed to refresh · data from %@";
+"Failed to refresh" = "Failed to refresh";
+"Showing data from %@" = "Showing data from %@";
 "Open log" = "Open log";
 "Logs" = "Logs";
 "No failures so far" = "No failures so far";

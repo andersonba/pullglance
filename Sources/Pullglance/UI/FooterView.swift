@@ -144,17 +144,19 @@ private struct StatusButton: View {
             Text("Updated now", bundle: .app).foregroundStyle(.secondary)
         case .countdown:
             Text("Refresh in \(status.countdownText)", bundle: .app).foregroundStyle(.secondary).monospacedDigit()
-        case .failed(let date):
-            Text("Failed to refresh · data from \(lastGoodDate ?? date, format: .dateTime.hour().minute())", bundle: .app)
-                .foregroundStyle(.yellow)
+        case .failed:
+            Text("Failed to refresh", bundle: .app).foregroundStyle(.yellow)
         }
     }
 
+    /// On failure: how old the data on screen is, then the reason.
     private var helpText: Text {
         switch status {
-        case .failed: Text(verbatim: reason ?? "")
-        case .countdown: Text("Refresh now", bundle: .app)
-        case .fetching, .refreshing, .updatedNow: Text(verbatim: "")
+        case .failed(let date):
+            let age = Text("Showing data from \(lastGoodDate ?? date, format: .relative(presentation: .named))", bundle: .app)
+            return reason.map { age + Text(verbatim: "\n") + Text(verbatim: $0) } ?? age
+        case .countdown: return Text("Refresh now", bundle: .app)
+        case .fetching, .refreshing, .updatedNow: return Text(verbatim: "")
         }
     }
 }
