@@ -1,0 +1,17 @@
+query($q: String!) {
+  viewer { login organizations(first: 100) { nodes { login } } }
+  search(query: $q, type: ISSUE, first: 100) {
+    issueCount
+    nodes {
+      ... on PullRequest {
+        number title url isDraft updatedAt
+        repository { nameWithOwner }
+        author { login }
+        reviewDecision
+        reviewThreads(first: 50) { nodes { isResolved } }
+        reviewRequests(first: 10) { nodes { requestedReviewer { __typename ... on Team { slug } } } }
+        commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+      }
+    }
+  }
+}

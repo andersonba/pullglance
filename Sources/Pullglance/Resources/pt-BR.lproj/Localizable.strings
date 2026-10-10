@@ -1,0 +1,67 @@
+/* Tabs */
+"My PRs" = "Meus PRs";
+"To review" = "Para revisar";
+
+/* Sections */
+"Needs you" = "Precisa de você";
+"Waiting on others" = "Aguardando outros";
+"Drafts" = "Drafts";
+"Requested from you" = "Pediram a você";
+"Via team" = "Via time";
+"%lld most recent" = "%lld mais recentes";
+"Open all on GitHub" = "Abrir todos no GitHub";
+
+/* Pills */
+"CI failed" = "CI falhou";
+"CI running" = "CI rodando";
+"Changes requested" = "Mudanças solicitadas";
+"Approved" = "Aprovado";
+"Ready to merge" = "Pronto p/ merge";
+"Awaiting review" = "Aguardando review";
+
+/* Row */
+"Open checks" = "Abrir checks";
+
+/* Footer */
+"Updated %@" = "Atualizado %@";
+"Refreshing…" = "Atualizando…";
+"Failed to refresh %@ · data from %@" = "Falha ao atualizar %@ · dados de %@";
+"Fetching from GitHub…" = "Buscando no GitHub…";
+"Refresh" = "Atualizar";
+"Open my PRs on GitHub" = "Abrir meus PRs no GitHub";
+"Open review requests on GitHub" = "Abrir revisões no GitHub";
+"Launch at login" = "Abrir no login";
+"Refresh interval" = "Intervalo de atualização";
+"%lld min" = "%lld min";
+"Version %@" = "Versão %@";
+"Quit" = "Sair";
+
+/* Empty states */
+"All clear" = "Tudo em dia";
+"No open PRs of yours." = "Nenhum PR aberto seu.";
+"Nothing pending in reviews." = "Nada pendente em revisões.";
+"gh CLI not found" = "CLI gh não encontrado";
+"Looked in /opt/homebrew/bin, /usr/local/bin and PATH." = "Procurei em /opt/homebrew/bin, /usr/local/bin e no PATH.";
+"Install with Homebrew" = "Instalar com Homebrew";
+"gh is not logged in to github.com" = "O gh não está logado no github.com";
+"Run this in Terminal, then refresh:" = "Rode no Terminal e depois atualize:";
+"Open Terminal" = "Abrir Terminal";
+"Couldn't reach GitHub" = "Não foi possível acessar o GitHub";
+"Try again" = "Tentar de novo";
+"Pullglance" = "Pullglance";
+
+/* Settings */
+"Settings…" = "Ajustes…";
+"General" = "Geral";
+"Filters" = "Filtros";
+"Refresh every" = "Atualizar a cada";
+"Language" = "Idioma";
+"Follows the system" = "Segue o sistema";
+"Change…" = "Alterar…";
+"Show pull requests from" = "Mostrar pull requests de";
+"(you)" = "(você)";
+"%lld open" = "%lld abertos";
+"Only" = "Só este";
+"Hidden owners are left out of both tabs and the badge. New owners show up checked." = "Donos ocultos ficam fora das duas abas e do contador. Donos novos aparecem marcados.";
+"Show all" = "Mostrar todos";
+"%lld hidden" = "%lld ocultos";

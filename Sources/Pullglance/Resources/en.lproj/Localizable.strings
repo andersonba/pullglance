@@ -1,0 +1,67 @@
+/* Tabs */
+"My PRs" = "My PRs";
+"To review" = "To review";
+
+/* Sections */
+"Needs you" = "Needs you";
+"Waiting on others" = "Waiting on others";
+"Drafts" = "Drafts";
+"Requested from you" = "Requested from you";
+"Via team" = "Via team";
+"%lld most recent" = "%lld most recent";
+"Open all on GitHub" = "Open all on GitHub";
+
+/* Pills */
+"CI failed" = "CI failed";
+"CI running" = "CI running";
+"Changes requested" = "Changes requested";
+"Approved" = "Approved";
+"Ready to merge" = "Ready to merge";
+"Awaiting review" = "Awaiting review";
+
+/* Row */
+"Open checks" = "Open checks";
+
+/* Footer */
+"Updated %@" = "Updated %@";
+"Refreshing…" = "Refreshing…";
+"Failed to refresh %@ · data from %@" = "Failed to refresh %@ · data from %@";
+"Fetching from GitHub…" = "Fetching from GitHub…";
+"Refresh" = "Refresh";
+"Open my PRs on GitHub" = "Open my PRs on GitHub";
+"Open review requests on GitHub" = "Open review requests on GitHub";
+"Launch at login" = "Launch at login";
+"Refresh interval" = "Refresh interval";
+"%lld min" = "%lld min";
+"Version %@" = "Version %@";
+"Quit" = "Quit";
+
+/* Empty states */
+"All clear" = "All clear";
+"No open PRs of yours." = "No open PRs of yours.";
+"Nothing pending in reviews." = "Nothing pending in reviews.";
+"gh CLI not found" = "gh CLI not found";
+"Looked in /opt/homebrew/bin, /usr/local/bin and PATH." = "Looked in /opt/homebrew/bin, /usr/local/bin and PATH.";
+"Install with Homebrew" = "Install with Homebrew";
+"gh is not logged in to github.com" = "gh is not logged in to github.com";
+"Run this in Terminal, then refresh:" = "Run this in Terminal, then refresh:";
+"Open Terminal" = "Open Terminal";
+"Couldn't reach GitHub" = "Couldn't reach GitHub";
+"Try again" = "Try again";
+"Pullglance" = "Pullglance";
+
+/* Settings */
+"Settings…" = "Settings…";
+"General" = "General";
+"Filters" = "Filters";
+"Refresh every" = "Refresh every";
+"Language" = "Language";
+"Follows the system" = "Follows the system";
+"Change…" = "Change…";
+"Show pull requests from" = "Show pull requests from";
+"(you)" = "(you)";
+"%lld open" = "%lld open";
+"Only" = "Only";
+"Hidden owners are left out of both tabs and the badge. New owners show up checked." = "Hidden owners are left out of both tabs and the badge. New owners show up checked.";
+"Show all" = "Show all";
+"%lld hidden" = "%lld hidden";

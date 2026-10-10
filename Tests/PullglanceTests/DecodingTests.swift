@@ -1,0 +1,83 @@
+import Foundation
+import Testing
+@testable import Pullglance
+
+@Suite struct DecodingTests {
+    @Test func decodesMineFixture() throws {
+        let page = try parseSearchResponse(fixture("search-mine.json"))
+        #expect(page.issueCount == 5)
+        #expect(page.pullRequests.count == 5)
+        #expect(page.viewerLogin == "octocat")
+        #expect(page.errorMessages.isEmpty)
+
+        let pr = try #require(page.pullRequests.first { $0.number == 101 })
+        #expect(pr.repo == "acme/web")
+        #expect(pr.id == "acme/web#101")
+        #expect(pr.url.absoluteString == "https://github.com/acme/web/pull/101")
+        #expect(pr.checksURL.absoluteString == "https://github.com/acme/web/pull/101/checks")
+        #expect(pr.isDraft == false)
+        #expect(pr.author == "octocat")
+        #expect(pr.reviewDecision == .changesRequested)
+        #expect(pr.ciState == .failure)
+        #expect(pr.unresolvedThreads == 2)
+        #expect(pr.requestedTeams.isEmpty)
+    }
+
+    @Test func parsesISO8601UpdatedAt() throws {
+        let page = try parseSearchResponse(fixture("search-mine.json"))
+        let pr = try #require(page.pullRequests.first { $0.number == 102 })
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: pr.updatedAt)
+        #expect(comps.year == 2026 && comps.month == 10 && comps.day == 10 && comps.hour == 13 && comps.minute == 50)
+    }
+
+    @Test func extractsTeamSlugsAndIgnoresUsers() throws {
+        let page = try parseSearchResponse(fixture("search-direct.json"))
+        let pr = try #require(page.pullRequests.first { $0.number == 203 })
+        #expect(pr.requestedTeams == ["platform"])
+    }
+
+    @Test(arguments: [
+        ("SUCCESS", CIState.success), ("FAILURE", .failure), ("ERROR", .failure),
+        ("PENDING", .pending), ("EXPECTED", .pending),
+    ])
+    func mapsRollupState(raw: String, expected: CIState) throws {
+        let page = try parseSearchResponse(envelope(nodes: [node(number: 1, ci: raw)]))
+        #expect(page.pullRequests.first?.ciState == expected)
+    }
+
+    @Test func nullRollupBecomesNone() throws {
+        let page = try parseSearchResponse(envelope(nodes: [node(number: 1, ci: nil)]))
+        #expect(page.pullRequests.first?.ciState == CIState.none)
+    }
+
+    @Test func unknownReviewDecisionBecomesNil() throws {
+        let page = try parseSearchResponse(envelope(nodes: [node(number: 1, ci: "SUCCESS", decision: "SOMETHING_NEW")]))
+        #expect(page.pullRequests.first?.reviewDecision == nil)
+    }
+
+    // Review Focus 1, 2 e 3
+    @Test func partialResponseKeepsGoodNodesAndReportsErrors() throws {
+        let page = try parseSearchResponse(fixture("search-partial.json"))
+        #expect(page.issueCount == 4)
+        #expect(page.pullRequests.count == 1)
+        #expect(page.pullRequests[0].number == 401)
+        #expect(page.pullRequests[0].author == "ghost")
+        #expect(page.pullRequests[0].ciState == CIState.none)
+        #expect(page.pullRequests[0].reviewDecision == nil)
+        #expect(page.errorMessages == ["Resource protected by organization SAML enforcement."])
+    }
+
+    @Test func errorsWithoutDataThrowNoData() throws {
+        #expect(throws: DecodingFailure.noData(errors: ["Something went wrong while executing your query."])) {
+            try parseSearchResponse(fixture("search-errors-only.json"))
+        }
+    }
+
+    @Test func garbageThrowsMalformed() {
+        #expect(throws: DecodingFailure.self) {
+            try parseSearchResponse(Data("not json".utf8))
+        }
+    }
+}
