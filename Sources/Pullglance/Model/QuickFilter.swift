@@ -10,9 +10,9 @@ struct QuickFilterItem: Equatable, Identifiable, Sendable {
 
 /// Chips for a tab, honoring the sections the user keeps visible. Fewer than two sections means no chips:
 /// there is nothing to isolate.
-func quickFilterItems(tab: Section.Tab, visible: Set<Section>, mine: MineGroups, directTotal: Int, teamTotal: Int?) -> [QuickFilterItem] {
-    let sections = (tab == .mine ? Section.mineSections : Section.reviewSections).filter { visible.contains($0) }
-    guard sections.count >= 2 else { return [] }
+func quickFilterItems(sections ordered: [Section], visible: Set<Section>, mine: MineGroups, directTotal: Int, teamTotal: Int?) -> [QuickFilterItem] {
+    let sections = ordered.filter { visible.contains($0) }
+    guard sections.count >= 2, let tab = sections.first?.tab else { return [] }
     switch tab {
     case .mine:
         let all = QuickFilterItem(section: nil, count: sections.reduce(0) { $0 + mine[$1].count })

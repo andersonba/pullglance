@@ -75,7 +75,6 @@
 "Started but not submitted for review" = "Started but not submitted for review";
 "Requested from you directly" = "Requested from you directly";
 "Requested from a team you belong to" = "Requested from a team you belong to";
-"Sections you hide stay out of the list. The badge adds up the checked sections, after the owner filter." = "Sections you hide stay out of the list. The badge adds up the checked sections, after the owner filter.";
 "Nothing to show in the sections you keep visible." = "Nothing to show in the sections you keep visible.";
 "Conflicts" = "Conflicts";
 "Behind base" = "Behind base";
@@ -87,3 +86,6 @@
 "Waiting" = "Waiting";
 "Yours" = "Yours";
 "Teams" = "Teams";
+"Drag to reorder. Hidden sections stay out of the list; the badge adds up the checked sections, after the owner filter." = "Drag to reorder. Hidden sections stay out of the list; the badge adds up the checked sections, after the owner filter.";
+"Reset to default" = "Reset to default";
+"Drag to reorder" = "Drag to reorder";

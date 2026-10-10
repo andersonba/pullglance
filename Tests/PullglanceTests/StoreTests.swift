@@ -218,6 +218,48 @@ import Testing
         #expect(store.mineTabCount == 2)
     }
 
+    @Test func sectionOrderDefaultsToGitHubOrderAndPersists() async throws {
+        let defaults = testDefaults()
+        let store = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })
+        #expect(store.orderedSections(.mine) == Section.mineSections)
+        #expect(store.orderedSections(.review) == Section.reviewSections)
+        store.moveSections(in: .mine, from: IndexSet(integer: 3), to: 2)
+        #expect(store.orderedSections(.mine) == [.needsAction, .readyToMerge, .drafts, .waitingForReview])
+        store.moveSections(in: .mine, from: IndexSet(integer: 2), to: 0)
+        #expect(store.orderedSections(.mine) == [.drafts, .needsAction, .readyToMerge, .waitingForReview])
+        let reloaded = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })
+        #expect(reloaded.orderedSections(.mine) == [.drafts, .needsAction, .readyToMerge, .waitingForReview])
+        #expect(reloaded.orderedSections(.review) == Section.reviewSections)
+    }
+
+    @Test func dragMoveReordersWithinATab() async throws {
+        let store = makeStore(try await happyGH())
+        store.moveSections(in: .mine, from: IndexSet(integer: 0), to: 3)
+        #expect(store.orderedSections(.mine) == [.readyToMerge, .waitingForReview, .needsAction, .drafts])
+        store.moveSections(in: .review, from: IndexSet(integer: 1), to: 0)
+        #expect(store.orderedSections(.review) == [.needsTeamsReview, .needsYourReview])
+    }
+
+
+    @Test func unknownStoredSectionsAreIgnoredAndMissingOnesAppended() async throws {
+        let defaults = testDefaults()
+        defaults.set(["drafts", "bogus", "needsAction"], forKey: PRStore.sectionOrderKey)
+        let store = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })
+        #expect(store.orderedSections(.mine) == [.drafts, .needsAction, .readyToMerge, .waitingForReview])
+        #expect(store.orderedSections(.review) == Section.reviewSections)
+    }
+
+    @Test func resetSectionsRestoresOrderVisibilityAndBadge() async throws {
+        let store = makeStore(try await happyGH())
+        store.moveSections(in: .mine, from: IndexSet(integer: 3), to: 0)
+        store.visibleSections = [.drafts]
+        store.badgeSections = []
+        store.resetSectionsToDefault()
+        #expect(store.orderedSections(.mine) == Section.mineSections)
+        #expect(store.visibleSections == Set(Section.allCases))
+        #expect(store.badgeSections == Section.defaultBadge)
+    }
+
     @Test func viaTeamExpansionPersistsInDefaults() async throws {
         let defaults = testDefaults()
         let store = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })

@@ -25,7 +25,7 @@ struct PopoverView: View {
 
             if store.hasAnyData, store.blockingError == nil {
                 let items = quickFilterItems(
-                    tab: tab == .mine ? .mine : .review,
+                    sections: store.orderedSections(tab == .mine ? .mine : .review),
                     visible: store.visibleSections,
                     mine: store.mineGroups,
                     directTotal: store.direct.total,
@@ -85,7 +85,7 @@ struct PopoverView: View {
 
     @ViewBuilder private var mineList: some View {
         let groups = store.mineGroups
-        let shown = Section.mineSections.filter { store.visibleSections.contains($0) && (mineFilter == nil || mineFilter == $0) }
+        let shown = store.orderedSections(.mine).filter { store.visibleSections.contains($0) && (mineFilter == nil || mineFilter == $0) }
         if shown.allSatisfy({ groups[$0].isEmpty }) {
             EmptyStateView(kind: .allClear)
         } else {
@@ -106,11 +106,14 @@ struct PopoverView: View {
     }
 
     @ViewBuilder private var reviewList: some View {
-        if store.visibleSections.contains(.needsYourReview), reviewFilter == nil || reviewFilter == .needsYourReview {
-            directSection
-        }
-        if store.visibleSections.contains(.needsTeamsReview), reviewFilter == nil || reviewFilter == .needsTeamsReview {
-            teamSection
+        ForEach(store.orderedSections(.review)) { section in
+            if store.visibleSections.contains(section), reviewFilter == nil || reviewFilter == section {
+                switch section {
+                case .needsYourReview: directSection
+                case .needsTeamsReview: teamSection
+                default: EmptyView()
+                }
+            }
         }
         if store.visibleSections.isDisjoint(with: Section.reviewSections) {
             EmptyStateView(kind: .allClear)

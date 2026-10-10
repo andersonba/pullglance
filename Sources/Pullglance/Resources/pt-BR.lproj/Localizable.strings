@@ -75,7 +75,6 @@
 "Started but not submitted for review" = "Iniciado, ainda não enviado para review";
 "Requested from you directly" = "Pedido diretamente a você";
 "Requested from a team you belong to" = "Pedido a um time do qual você faz parte";
-"Sections you hide stay out of the list. The badge adds up the checked sections, after the owner filter." = "Seções ocultas ficam fora da lista. O contador soma as seções marcadas, depois do filtro de donos.";
 "Nothing to show in the sections you keep visible." = "Nada a mostrar nas seções que você mantém visíveis.";
 "Conflicts" = "Conflitos";
 "Behind base" = "Atrás da base";
@@ -87,3 +86,6 @@
 "Waiting" = "Aguardando";
 "Yours" = "Seus";
 "Teams" = "Times";
+"Drag to reorder. Hidden sections stay out of the list; the badge adds up the checked sections, after the owner filter." = "Arraste para reordenar. Seções ocultas ficam fora da lista; o contador soma as seções marcadas, depois do filtro de donos.";
+"Reset to default" = "Redefinir padrão";
+"Drag to reorder" = "Arraste para reordenar";

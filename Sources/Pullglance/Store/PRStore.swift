@@ -35,6 +35,7 @@ final class PRStore {
     static let hiddenOwnersKey = "hiddenOwners"
     static let visibleSectionsKey = "visibleSections"
     static let badgeSectionsKey = "badgeSections"
+    static let sectionOrderKey = "sectionOrder"
 
     private(set) var mine = Snapshot<[PullRequest]>(value: [], total: 0, fetchedAt: nil)
     private(set) var direct = Snapshot<[PullRequest]>(value: [], total: 0, fetchedAt: nil)
@@ -66,6 +67,11 @@ final class PRStore {
     /// Sections shown in the popover. Missing from defaults means all.
     var visibleSections: Set<Section> {
         didSet { defaults.set(visibleSections.map(\.rawValue).sorted(), forKey: Self.visibleSectionsKey) }
+    }
+
+    /// Display order across both tabs. Each tab keeps its own relative order; see `orderedSections(_:)`.
+    private(set) var sectionOrder: [Section] {
+        didSet { defaults.set(sectionOrder.map(\.rawValue), forKey: Self.sectionOrderKey) }
     }
 
     /// Sections whose items add up to the menu bar number.
@@ -115,8 +121,43 @@ final class PRStore {
         self.hiddenOwners = Set(defaults.stringArray(forKey: Self.hiddenOwnersKey) ?? [])
         self.visibleSections = Self.sections(in: defaults, key: Self.visibleSectionsKey) ?? Set(Section.allCases)
         self.badgeSections = Self.sections(in: defaults, key: Self.badgeSectionsKey) ?? Section.defaultBadge
+        self.sectionOrder = Self.normalizedOrder(defaults.stringArray(forKey: Self.sectionOrderKey)?.compactMap(Section.init(rawValue:)) ?? [])
         let seconds = defaults.integer(forKey: Self.intervalKey)
         self.refreshInterval = .seconds(seconds > 0 ? seconds : 120)
+    }
+
+    /// Drops unknown entries, removes duplicates and appends any section missing from the stored order.
+    private static func normalizedOrder(_ stored: [Section]) -> [Section] {
+        var seen = Set<Section>()
+        var order = stored.filter { seen.insert($0).inserted }
+        order += Section.allCases.filter { !seen.contains($0) }
+        return order
+    }
+
+    // MARK: Section order
+
+    func orderedSections(_ tab: Section.Tab) -> [Section] {
+        sectionOrder.filter { $0.tab == tab }
+    }
+
+
+    /// Drag-and-drop semantics, as SwiftUI's `onMove` reports them.
+    func moveSections(in tab: Section.Tab, from source: IndexSet, to destination: Int) {
+        var tabOrder = orderedSections(tab)
+        tabOrder.move(fromOffsets: source, toOffset: destination)
+        apply(tabOrder: tabOrder, for: tab)
+    }
+
+
+    func resetSectionsToDefault() {
+        sectionOrder = Section.allCases
+        visibleSections = Set(Section.allCases)
+        badgeSections = Section.defaultBadge
+    }
+
+    private func apply(tabOrder: [Section], for tab: Section.Tab) {
+        var iterator = tabOrder.makeIterator()
+        sectionOrder = sectionOrder.map { $0.tab == tab ? (iterator.next() ?? $0) : $0 }
     }
 
     private static func sections(in defaults: UserDefaults, key: String) -> Set<Section>? {
@@ -138,7 +179,7 @@ final class PRStore {
     /// Numbers on the tab picker: only what the visible sections would show.
     var mineTabCount: Int {
         let groups = mineGroups
-        return Section.mineSections.filter { visibleSections.contains($0) }.reduce(0) { $0 + groups[$1].count }
+        return orderedSections(.mine).filter { visibleSections.contains($0) }.reduce(0) { $0 + groups[$1].count }
     }
 
     /// Direct requests use the API total (there may be more than one page); team requests are not counted here.
