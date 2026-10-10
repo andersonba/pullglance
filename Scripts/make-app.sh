@@ -52,6 +52,8 @@ codesign --force --sign - --identifier "$BUNDLE_ID" "$OUT"
 if [[ "${1:-}" == "--install" ]]; then
   echo "==> installing to /Applications"
   osascript -e 'tell application "Pullglance" to quit' >/dev/null 2>&1 || true
+  # Give the old instance a moment to exit, otherwise `open` fails with -600.
+  for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x "$APP_NAME" >/dev/null || break; sleep 0.3; done
   rm -rf "/Applications/$APP_NAME.app"
   cp -R "$OUT" "/Applications/$APP_NAME.app"
   open "/Applications/$APP_NAME.app"

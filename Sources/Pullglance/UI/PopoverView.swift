@@ -90,18 +90,14 @@ struct PopoverView: View {
             EmptyStateView(kind: .allClear)
         } else {
             ForEach(shown) { section in
-                mineSection(section, groups[section], showHeader: mineFilter == nil)
+                mineSection(section, groups[section])
             }
         }
     }
 
-    @ViewBuilder private func mineSection(_ section: Section, _ prs: [PullRequest], showHeader: Bool) -> some View {
+    @ViewBuilder private func mineSection(_ section: Section, _ prs: [PullRequest]) -> some View {
         if !prs.isEmpty {
-            if showHeader {
-                SectionHeader(title: section.title, count: prs.count)
-            } else {
-                Spacer().frame(height: 4)
-            }
+            SectionHeader(title: section.title, count: prs.count)
             ForEach(prs) { pr in
                 PRRow(pr: pr, leading: .ci)
                 Divider().padding(.leading, 12)
@@ -122,11 +118,7 @@ struct PopoverView: View {
     }
 
     @ViewBuilder private var directSection: some View {
-        if reviewFilter == nil {
-            SectionHeader(title: Section.needsYourReview.title, count: store.direct.total)
-        } else {
-            Spacer().frame(height: 4)
-        }
+        SectionHeader(title: Section.needsYourReview.title, count: store.direct.total)
         if store.directList.isEmpty {
             Text("Nothing pending in reviews.", bundle: .app)
                 .font(.caption)
@@ -142,16 +134,12 @@ struct PopoverView: View {
     }
 
     @ViewBuilder private var teamSection: some View {
-        if reviewFilter == nil {
-            SectionHeader(
-                title: Section.needsTeamsReview.title,
-                count: store.viaTeamTotal,
-                expanded: $store.isViaTeamExpanded,
-                detail: store.isViaTeamExpanded ? String(localized: "\(20) most recent", bundle: .app) : nil
-            )
-        } else {
-            Spacer().frame(height: 4)
-        }
+        SectionHeader(
+            title: Section.needsTeamsReview.title,
+            count: store.viaTeamTotal,
+            expanded: $store.isViaTeamExpanded,
+            detail: store.isViaTeamExpanded ? String(localized: "\(20) most recent", bundle: .app) : nil
+        )
         if store.isViaTeamExpanded || reviewFilter == .needsTeamsReview {
             if store.viaTeam == nil, store.viaTeamError != nil {
                 HStack(spacing: 8) {

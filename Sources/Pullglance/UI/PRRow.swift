@@ -10,7 +10,7 @@ struct PRRow: View {
     var teamLabel: String? = nil
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 8) {
             switch leading {
             case .ci: CIDot(state: pr.ciState, url: pr.checksURL)
             case .author: AuthorInitial(login: pr.author)
@@ -61,14 +61,22 @@ struct CIDot: View {
             PopoverDismissal.open(url)
         } label: {
             ZStack {
-                Circle().fill(color).frame(width: 16, height: 16)
-                Image(systemName: symbol)
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(glyphColor)
+                Circle().fill(color).frame(width: 14, height: 14)
+                if state == .pending {
+                    // A small dark dot reads better than any glyph on yellow; the pulse says "still running".
+                    Image(systemName: "circle.fill")
+                        .font(.system(size: 5))
+                        .foregroundStyle(Color.black.opacity(0.75))
+                        .symbolEffect(.pulse, options: .repeating)
+                } else {
+                    Image(systemName: symbol)
+                        .font(.system(size: 7.5, weight: .bold))
+                        .foregroundStyle(.white)
+                }
             }
         }
         .buttonStyle(.plain)
-        .padding(.top, 2)
+        .padding(.top, 3)
         .help(Text("Open checks", bundle: .app))
     }
 
@@ -81,16 +89,12 @@ struct CIDot: View {
         }
     }
 
-    /// White on green/red/gray; a deep amber on yellow, where white washes out.
-    private var glyphColor: Color {
-        state == .pending ? Color(red: 0.45, green: 0.30, blue: 0.0) : .white
-    }
 
     private var symbol: String {
         switch state {
         case .success: "checkmark"
         case .failure: "xmark"
-        case .pending: "clock"
+        case .pending: "circle.fill"
         case .none: "minus"
         }
     }
@@ -101,11 +105,11 @@ struct AuthorInitial: View {
 
     var body: some View {
         Text(verbatim: String(login.prefix(1)).uppercased())
-            .font(.system(size: 9, weight: .bold))
+            .font(.system(size: 8.5, weight: .bold))
             .foregroundStyle(.white)
-            .frame(width: 16, height: 16)
+            .frame(width: 14, height: 14)
             .background(Circle().fill(color))
-            .padding(.top, 2)
+            .padding(.top, 3)
     }
 
     /// Stable hue per login so the same author always gets the same color.
@@ -150,8 +154,7 @@ struct PillView: View {
         case .ciRunning: .yellow
         case .approved, .readyToMerge: .green
         case .awaitingReview: .orange
-        case .behindBase: .gray
-        case .openThreads: .blue
+        case .behindBase, .openThreads: .gray
         }
     }
 }
