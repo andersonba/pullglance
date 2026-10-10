@@ -26,6 +26,24 @@ struct FooterView: View {
                 .foregroundStyle(.secondary)
                 .help(Text("Open log", bundle: .app))
             }
+            if !store.quickRepoFilter.isEmpty {
+                Button {
+                    store.quickRepoFilter = []
+                } label: {
+                    Label {
+                        Text(verbatim: quickFilterLabel)
+                    } icon: {
+                        Image(systemName: "folder.fill")
+                    }
+                    .font(.caption2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.accentColor.opacity(0.15), in: Capsule())
+                    .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .help(Text("Clear repository filter", bundle: .app))
+            }
             if !store.hiddenOwners.isEmpty {
                 Button {
                     open(tab: .filters)
@@ -55,6 +73,14 @@ struct FooterView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
         .background(.bar)
+    }
+
+    /// One repo: its short name; several: a count.
+    private var quickFilterLabel: String {
+        if store.quickRepoFilter.count == 1, let only = store.quickRepoFilter.first {
+            return only.split(separator: "/").last.map(String.init) ?? only
+        }
+        return String(localized: "\(store.quickRepoFilter.count) repos", bundle: .app)
     }
 
     private func reasonText(_ kind: ErrorKind) -> String {

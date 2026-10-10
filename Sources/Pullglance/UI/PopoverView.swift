@@ -15,7 +15,15 @@ struct PopoverView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TabPicker(selection: $tab, mineCount: store.mineTabCount, reviewCount: store.reviewTabCount)
+            HStack(spacing: 6) {
+                TabPicker(selection: $tab, mineCount: store.mineTabCount, reviewCount: store.reviewTabCount)
+                if store.hasAnyData, store.blockingError == nil {
+                    RepoFilterButton(store: store)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
 
             if store.hasAnyData, store.blockingError == nil {
                 let items = quickFilterItems(

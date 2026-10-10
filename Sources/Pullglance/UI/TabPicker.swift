@@ -15,9 +15,6 @@ struct TabPicker: View {
         }
         .padding(2)
         .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
-        .padding(.horizontal, 12)
-        .padding(.top, 10)
-        .padding(.bottom, 6)
     }
 
     private func segment(_ tab: PopoverView.Tab, _ label: Text, count: Int) -> some View {

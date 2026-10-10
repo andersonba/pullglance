@@ -54,7 +54,6 @@
 "(you)" = "(você)";
 "%lld open" = "%lld abertos";
 "Only" = "Só este";
-"Hidden owners are left out of both tabs and the badge. New owners show up checked." = "Donos ocultos ficam fora das duas abas e do contador. Donos novos aparecem marcados.";
 "Show all" = "Mostrar todos";
 "%lld hidden" = "%lld ocultos";
 
@@ -109,3 +108,14 @@
 "GraphQL" = "GraphQL";
 "Network" = "Rede";
 "Error" = "Erro";
+
+/* Repository filter */
+"Filter by repository" = "Filtrar por repositório";
+"Search repositories" = "Buscar repositórios";
+"No repositories match" = "Nenhum repositório encontrado";
+"Applies to both tabs. Not saved." = "Vale para as duas abas. Não é salvo.";
+"Clear repository filter" = "Limpar filtro de repositório";
+"%lld repos" = "%lld repos";
+"No repositories seen in your results yet" = "Nenhum repositório visto nos seus resultados ainda";
+"%lld of %lld hidden" = "%lld de %lld ocultos";
+"Hidden owners and repositories are left out of both tabs and the badge. New ones show up checked. Repositories listed are the ones seen in your results." = "Donos e repositórios ocultos ficam fora das duas abas e do contador. Novos aparecem marcados. Os repositórios listados são os vistos nos seus resultados.";

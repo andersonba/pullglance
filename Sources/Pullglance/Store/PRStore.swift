@@ -8,14 +8,25 @@ enum SearchQuery {
     static let direct = "is:pr is:open user-review-requested:@me \(suffix)"
     static let viaTeam = "is:pr is:open review-requested:@me \(suffix)"
 
-    static func mine(hiding owners: Set<String>) -> String { mine + exclusions(owners) }
-    static func direct(hiding owners: Set<String>) -> String { direct + exclusions(owners) }
-    static func viaTeam(hiding owners: Set<String>) -> String { viaTeam + exclusions(owners) }
+    static func mine(hiding owners: Set<String>, repos: Set<String> = []) -> String { mine + exclusions(owners, repos) }
+    static func direct(hiding owners: Set<String>, repos: Set<String> = []) -> String { direct + exclusions(owners, repos) }
+    static func viaTeam(hiding owners: Set<String>, repos: Set<String> = []) -> String { viaTeam + exclusions(owners, repos) }
 
-    /// `-user:` works for organizations and personal accounts alike, and several of them AND together.
-    private static func exclusions(_ owners: Set<String>) -> String {
-        owners.sorted().map { " -user:\($0)" }.joined()
+    /// `-user:` works for organizations and personal accounts alike; `-repo:` for single repositories.
+    /// Several of them AND together.
+    private static func exclusions(_ owners: Set<String>, _ repos: Set<String>) -> String {
+        owners.sorted().map { " -user:\($0)" }.joined() + repos.sorted().map { " -repo:\($0)" }.joined()
     }
+}
+
+/// A repository seen in the results (or hidden by the user), listed under its owner.
+struct RepoInfo: Equatable, Identifiable, Sendable {
+    let fullName: String
+    /// Open PRs currently loaded for it; 0 when hidden (nothing is fetched for it).
+    let openCount: Int
+    let isHidden: Bool
+    var id: String { fullName }
+    var name: String { fullName.split(separator: "/").last.map(String.init) ?? fullName }
 }
 
 /// An organization or account that can own pull requests shown by the app.
@@ -24,7 +35,9 @@ struct OwnerInfo: Equatable, Identifiable, Sendable {
     let isViewer: Bool
     /// Open PRs currently loaded for this owner; nil when hidden (nothing is fetched for it).
     let openCount: Int?
+    let repos: [RepoInfo]
     var id: String { login }
+    var hiddenRepoCount: Int { repos.filter(\.isHidden).count }
 }
 
 @Observable
@@ -33,6 +46,7 @@ final class PRStore {
     static let expandedKey = "viaTeamExpanded"
     static let intervalKey = "refreshIntervalSeconds"
     static let hiddenOwnersKey = "hiddenOwners"
+    static let hiddenReposKey = "hiddenRepos"
     static let visibleSectionsKey = "visibleSections"
     static let badgeSectionsKey = "badgeSections"
     static let sectionOrderKey = "sectionOrder"
@@ -68,6 +82,21 @@ final class PRStore {
             Task { await refresh() }
         }
     }
+
+    /// Repositories excluded from every search ("owner/name"). Stored per machine, like `hiddenOwners`.
+    var hiddenRepos: Set<String> {
+        didSet {
+            guard hiddenRepos != oldValue else { return }
+            defaults.set(hiddenRepos.sorted(), forKey: Self.hiddenReposKey)
+            viaTeam = nil
+            viaTeamError = nil
+            Task { await refresh() }
+        }
+    }
+
+    /// Session-only lens over the loaded lists: show only these repositories. Empty means no filter.
+    /// Does not touch the badge; the tab numbers follow it.
+    var quickRepoFilter: Set<String> = []
 
     /// Sections shown in the popover. Missing from defaults means all.
     var visibleSections: Set<Section> {
@@ -124,6 +153,7 @@ final class PRStore {
         self.now = now
         self.isViaTeamExpanded = defaults.bool(forKey: Self.expandedKey)
         self.hiddenOwners = Set(defaults.stringArray(forKey: Self.hiddenOwnersKey) ?? [])
+        self.hiddenRepos = Set(defaults.stringArray(forKey: Self.hiddenReposKey) ?? [])
         self.visibleSections = Self.sections(in: defaults, key: Self.visibleSectionsKey) ?? Set(Section.allCases)
         self.badgeSections = Self.sections(in: defaults, key: Self.badgeSectionsKey) ?? Section.defaultBadge
         self.sectionOrder = Self.normalizedOrder(defaults.stringArray(forKey: Self.sectionOrderKey)?.compactMap(Section.init(rawValue:)) ?? [])
@@ -172,10 +202,23 @@ final class PRStore {
 
     // MARK: Derived state for the UI
 
-    var mineGroups: MineGroups { groupMine(mine.value) }
-    var directList: [PullRequest] { sortedByRecency(direct.value) }
+    private func lens(_ prs: [PullRequest]) -> [PullRequest] {
+        quickRepoFilter.isEmpty ? prs : prs.filter { quickRepoFilter.contains($0.repo) }
+    }
+
+    var mineGroups: MineGroups { groupMine(lens(mine.value)) }
+    var directList: [PullRequest] { sortedByRecency(lens(direct.value)) }
     var viaTeamList: [PullRequest] {
-        filterViaTeam(all: viaTeam?.value ?? [], direct: direct.value, viewerLogin: viewerLogin)
+        filterViaTeam(all: lens(viaTeam?.value ?? []), direct: direct.value, viewerLogin: viewerLogin)
+    }
+
+    private var loadedPullRequests: [PullRequest] { mine.value + direct.value + (viaTeam?.value ?? []) }
+
+    /// Repositories present in the loaded lists, for the quick filter. Hidden ones never appear here.
+    var availableRepos: [RepoInfo] {
+        var counts: [String: Int] = [:]
+        for pr in loadedPullRequests { counts[pr.repo, default: 0] += 1 }
+        return counts.keys.sorted().map { RepoInfo(fullName: $0, openCount: counts[$0] ?? 0, isHidden: false) }
     }
     /// Approximate count for the header: team requests minus the ones already shown as direct.
     var viaTeamTotal: Int? { viaTeam.map { max(0, $0.total - direct.total) } }
@@ -187,25 +230,36 @@ final class PRStore {
         return orderedSections(.mine).filter { visibleSections.contains($0) }.reduce(0) { $0 + groups[$1].count }
     }
 
-    /// Direct requests use the API total (there may be more than one page); team requests are not counted here.
+    /// Direct requests use the API total (there may be more than one page) unless the quick repo filter
+    /// is on, in which case only the matching loaded rows count. Team requests are not counted here.
     var reviewTabCount: Int {
-        visibleSections.contains(.needsYourReview) ? direct.total : 0
+        guard visibleSections.contains(.needsYourReview) else { return 0 }
+        return quickRepoFilter.isEmpty ? direct.total : directList.count
     }
 
     /// Everything that can own a PR of yours: your account, your organizations, owners seen in results,
     /// and owners currently hidden (so they can be shown again). Sorted by login.
     var knownOwners: [OwnerInfo] {
         var counts: [String: Int] = [:]
-        for pr in mine.value + direct.value + (viaTeam?.value ?? []) {
+        var repoCounts: [String: Int] = [:]
+        for pr in loadedPullRequests {
             counts[pr.ownerLogin, default: 0] += 1
+            repoCounts[pr.repo, default: 0] += 1
         }
-        var logins = Set(counts.keys).union(viewerOrganizations).union(hiddenOwners)
+        let hiddenRepoOwners = hiddenRepos.compactMap { $0.split(separator: "/").first.map(String.init) }
+        var logins = Set(counts.keys).union(viewerOrganizations).union(hiddenOwners).union(hiddenRepoOwners)
         if let viewerLogin { logins.insert(viewerLogin) }
         return logins.sorted().map { login in
-            OwnerInfo(
+            let repoNames = Set(repoCounts.keys.filter { $0.hasPrefix(login + "/") })
+                .union(hiddenRepos.filter { $0.hasPrefix(login + "/") })
+            let repos = repoNames.sorted().map { full in
+                RepoInfo(fullName: full, openCount: repoCounts[full] ?? 0, isHidden: hiddenRepos.contains(full))
+            }
+            return OwnerInfo(
                 login: login,
                 isViewer: login == viewerLogin,
-                openCount: hiddenOwners.contains(login) ? nil : counts[login, default: 0]
+                openCount: hiddenOwners.contains(login) ? nil : counts[login, default: 0],
+                repos: repos
             )
         }
     }
@@ -264,8 +318,8 @@ final class PRStore {
     private func runCycle() async {
         phase = .loading
 
-        async let mineOutcome = client.search(SearchQuery.mine(hiding: hiddenOwners), includeMergeState: true)
-        async let directOutcome = client.search(SearchQuery.direct(hiding: hiddenOwners), includeMergeState: false)
+        async let mineOutcome = client.search(SearchQuery.mine(hiding: hiddenOwners, repos: hiddenRepos), includeMergeState: true)
+        async let directOutcome = client.search(SearchQuery.direct(hiding: hiddenOwners, repos: hiddenRepos), includeMergeState: false)
         let (m, d) = await (mineOutcome, directOutcome)
 
         var errors: [ErrorKind] = []
@@ -273,7 +327,7 @@ final class PRStore {
         if let error = apply(d, to: &direct, search: .direct) { errors.append(error) }
 
         if wantsTeamFetch {
-            let t = await client.search(SearchQuery.viaTeam(hiding: hiddenOwners), includeMergeState: false)
+            let t = await client.search(SearchQuery.viaTeam(hiding: hiddenOwners, repos: hiddenRepos), includeMergeState: false)
             var snapshot = viaTeam ?? Snapshot(value: [], total: 0, fetchedAt: nil)
             if let error = apply(t, to: &snapshot, search: .team) {
                 errors.append(error)
@@ -291,7 +345,7 @@ final class PRStore {
     func refreshViaTeam() async {
         isLoadingViaTeam = true
         defer { isLoadingViaTeam = false }
-        let outcome = await client.search(SearchQuery.viaTeam(hiding: hiddenOwners), includeMergeState: false)
+        let outcome = await client.search(SearchQuery.viaTeam(hiding: hiddenOwners, repos: hiddenRepos), includeMergeState: false)
         var snapshot = viaTeam ?? Snapshot(value: [], total: 0, fetchedAt: nil)
         if let error = apply(outcome, to: &snapshot, search: .team) {
             viaTeamError = error

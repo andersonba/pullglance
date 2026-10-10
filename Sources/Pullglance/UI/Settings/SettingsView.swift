@@ -98,22 +98,38 @@ struct GeneralSettingsView: View {
 
 struct FiltersSettingsView: View {
     @Bindable var store: PRStore
+    @State private var expanded: Set<String> = []
 
     var body: some View {
         Form {
             SwiftUI.Section {
                 ForEach(store.knownOwners) { owner in
-                    OwnerRow(owner: owner, store: store)
+                    OwnerRow(owner: owner, store: store, isExpanded: Binding(
+                        get: { expanded.contains(owner.login) },
+                        set: { on in if on { expanded.insert(owner.login) } else { expanded.remove(owner.login) } }
+                    ))
+                    if expanded.contains(owner.login) {
+                        if owner.repos.isEmpty {
+                            Text("No repositories seen in your results yet", bundle: .app)
+                                .font(.caption).foregroundStyle(.tertiary).padding(.leading, 44)
+                        }
+                        ForEach(owner.repos) { repo in
+                            RepoRow(repo: repo, store: store)
+                        }
+                    }
                 }
             } header: {
                 Text("Show pull requests from", bundle: .app)
             } footer: {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Hidden owners are left out of both tabs and the badge. New owners show up checked.", bundle: .app)
+                    Text("Hidden owners and repositories are left out of both tabs and the badge. New ones show up checked. Repositories listed are the ones seen in your results.", bundle: .app)
                         .foregroundStyle(.secondary)
                     Spacer()
-                    if !store.hiddenOwners.isEmpty {
-                        Button { store.hiddenOwners = [] } label: { Text("Show all", bundle: .app) }
+                    if !store.hiddenOwners.isEmpty || !store.hiddenRepos.isEmpty {
+                        Button {
+                            store.hiddenOwners = []
+                            store.hiddenRepos = []
+                        } label: { Text("Show all", bundle: .app) }
                             .controlSize(.small)
                     }
                 }
@@ -125,13 +141,49 @@ struct FiltersSettingsView: View {
     }
 }
 
+private struct RepoRow: View {
+    let repo: RepoInfo
+    @Bindable var store: PRStore
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Toggle(isOn: Binding(
+                get: { !store.hiddenRepos.contains(repo.fullName) },
+                set: { shown in
+                    if shown { store.hiddenRepos.remove(repo.fullName) } else { store.hiddenRepos.insert(repo.fullName) }
+                }
+            )) {
+                EmptyView()
+            }
+            .toggleStyle(.checkbox)
+            .labelsHidden()
+            Text(verbatim: repo.name).font(.system(size: 12))
+            Spacer()
+            if repo.isHidden {
+                Text(verbatim: "—").foregroundStyle(.tertiary)
+            } else {
+                Text("\(repo.openCount) open", bundle: .app).foregroundStyle(.secondary).monospacedDigit().font(.caption)
+            }
+        }
+        .padding(.leading, 34)
+    }
+}
+
 private struct OwnerRow: View {
     let owner: OwnerInfo
     @Bindable var store: PRStore
+    @Binding var isExpanded: Bool
     @State private var hovering = false
 
     var body: some View {
         HStack(spacing: 10) {
+            Button { isExpanded.toggle() } label: {
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 12)
+            }
+            .buttonStyle(.plain)
             Toggle(isOn: Binding(
                 get: { !store.hiddenOwners.contains(owner.login) },
                 set: { shown in
@@ -156,6 +208,10 @@ private struct OwnerRow: View {
                 }
                 .buttonStyle(.link)
                 .controlSize(.small)
+            }
+            if owner.hiddenRepoCount > 0 {
+                Text("\(owner.hiddenRepoCount) of \(owner.repos.count) hidden", bundle: .app)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             if let count = owner.openCount {
                 Text("\(count) open", bundle: .app).foregroundStyle(.secondary).monospacedDigit()
