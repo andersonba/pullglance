@@ -212,7 +212,11 @@ final class PRStore {
         filterViaTeam(all: lens(viaTeam?.value ?? []), direct: direct.value, viewerLogin: viewerLogin)
     }
 
-    private var loadedPullRequests: [PullRequest] { mine.value + direct.value + (viaTeam?.value ?? []) }
+    /// What the user can actually see or count. Team requests only join while their section is open or
+    /// counted; otherwise their repositories would show up in the filter lists without ever appearing.
+    private var loadedPullRequests: [PullRequest] {
+        mine.value + direct.value + (wantsTeamFetch ? (viaTeam?.value ?? []) : [])
+    }
 
     /// Repositories present in the loaded lists, for the quick filter. Hidden ones never appear here.
     var availableRepos: [RepoInfo] {

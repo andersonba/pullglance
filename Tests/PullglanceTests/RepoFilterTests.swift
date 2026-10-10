@@ -47,6 +47,19 @@ import Testing
         #expect(reloaded.hiddenRepos == ["acme/web"])
     }
 
+    @Test func teamOnlyReposAreListedOnlyWhileTheTeamSectionIsInUse() async throws {
+        let gh = try await gh()
+        await gh.set(.success(try fixture("search-team.json")), for: SearchQuery.viaTeam)
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() })
+        await store.refresh()
+        store.isViaTeamExpanded = true
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(store.availableRepos.contains { $0.fullName == "acme/tools" })
+        store.isViaTeamExpanded = false
+        #expect(store.availableRepos.contains { $0.fullName == "acme/tools" } == false)
+        #expect(store.knownOwners.first { $0.login == "acme" }?.repos.contains { $0.fullName == "acme/tools" } == false)
+    }
+
     @Test func quickRepoFilterNarrowsListsAndTabCountsButNotTheBadge() async throws {
         let store = PRStore(client: try await gh(), defaults: testDefaults(), now: { Date() })
         await store.refresh()
