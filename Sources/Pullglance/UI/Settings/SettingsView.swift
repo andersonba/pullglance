@@ -374,11 +374,13 @@ struct SectionsSettingsView: View {
         Form {
             SwiftUI.Section {
                 ReorderSectionGroup(store: store, tab: .mine)
+                SnoozedSectionRow(section: .snoozedMine, store: store)
             } header: {
                 ReorderSectionGroup.header(Text("My PRs", bundle: .app))
             }
             SwiftUI.Section {
                 ReorderSectionGroup(store: store, tab: .review)
+                SnoozedSectionRow(section: .snoozedReview, store: store)
             } header: {
                 ReorderSectionGroup.header(Text("To review", bundle: .app))
             } footer: {
@@ -394,6 +396,31 @@ struct SectionsSettingsView: View {
         }
         .formStyle(.grouped)
         .padding(.vertical, 4)
+    }
+}
+
+/// The tab's "Snoozed" section: always last, can be hidden, never counted.
+private struct SnoozedSectionRow: View {
+    let section: Section
+    @Bindable var store: PRStore
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Image(systemName: "moon.zzz").font(.system(size: 11)).foregroundStyle(.secondary).frame(width: ReorderSectionGroup.handleWidth)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: section.title).lineLimit(1)
+                Text(verbatim: section.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Toggle(isOn: Binding(
+                get: { store.visibleSections.contains(section) },
+                set: { on in if on { store.visibleSections.insert(section) } else { store.visibleSections.remove(section) } }
+            )) { EmptyView() }
+                .toggleStyle(.checkbox).labelsHidden().frame(width: ReorderSectionGroup.columnWidth)
+            Text(verbatim: "—").foregroundStyle(.tertiary).frame(width: ReorderSectionGroup.columnWidth)
+        }
+        .frame(height: ReorderSectionGroup.rowHeight)
+        .listRowInsets(EdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 10))
     }
 }
 

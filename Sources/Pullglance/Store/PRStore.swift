@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 import os
 
 enum SearchQuery {
@@ -58,6 +59,7 @@ final class PRStore {
     static let intervalKey = "refreshIntervalSeconds"
     static let hiddenOwnersKey = "hiddenOwners"
     static let repoRulesKey = "repoRules"
+    static let dormantKey = "dormant"
     static let visibleSectionsKey = "visibleSections"
     static let badgeSectionsKey = "badgeSections"
     static let sectionOrderKey = "sectionOrder"
@@ -77,6 +79,21 @@ final class PRStore {
     private(set) var badgeCount: Int? = nil
     private(set) var viewerLogin: String? = nil
     private(set) var viewerOrganizations: [String] = []
+    /// Snoozed PRs by id, with the state they had when snoozed. Stored per machine.
+    private(set) var dormant: [String: DormantMark] {
+        didSet {
+            guard dormant != oldValue else { return }
+            defaults.set(try? JSONEncoder().encode(dormant), forKey: Self.dormantKey)
+            recomputeBadge()
+        }
+    }
+    private var dormantIDs: Set<String> { Set(dormant.keys) }
+
+    /// Per-PR action state, so a row can show its own spinner, "merged", or a failure.
+    private(set) var actionStates: [String: ActionState] = [:]
+    /// How long a merged PR stays visible as "Merged" before leaving the list.
+    private let successLinger: Duration
+
     /// True while a cycle triggered by a settings change (owners, repository rules) is running, so the UI
     /// can show that the change is being applied rather than silently waiting for the search.
     private(set) var isApplyingSettingsChange = false
@@ -174,10 +191,11 @@ final class PRStore {
     private var pendingRefresh = false
     private var timerTask: Task<Void, Never>?
 
-    init(client: any GHRunning, defaults: UserDefaults = .standard, now: @escaping @Sendable () -> Date = { Date() }) {
+    init(client: any GHRunning, defaults: UserDefaults = .standard, now: @escaping @Sendable () -> Date = { Date() }, successLinger: Duration = .seconds(1)) {
         self.client = client
         self.defaults = defaults
         self.now = now
+        self.successLinger = successLinger
         self.isViaTeamExpanded = defaults.bool(forKey: Self.expandedKey)
         self.hiddenOwners = Set(defaults.stringArray(forKey: Self.hiddenOwnersKey) ?? [])
         var rules = (defaults.data(forKey: Self.repoRulesKey)).flatMap { try? JSONDecoder().decode([String: RepoRule].self, from: $0) } ?? [:]
@@ -192,6 +210,7 @@ final class PRStore {
             defaults.set(try? JSONEncoder().encode(rules), forKey: Self.repoRulesKey)
         }
         self.repoRules = rules
+        self.dormant = defaults.data(forKey: Self.dormantKey).flatMap { try? JSONDecoder().decode([String: DormantMark].self, from: $0) } ?? [:]
         self.visibleSections = Self.sections(in: defaults, key: Self.visibleSectionsKey) ?? Set(Section.allCases)
         self.badgeSections = Self.sections(in: defaults, key: Self.badgeSectionsKey) ?? Section.defaultBadge
         self.sectionOrder = Self.normalizedOrder(defaults.stringArray(forKey: Self.sectionOrderKey)?.compactMap(Section.init(rawValue:)) ?? [])
@@ -209,8 +228,9 @@ final class PRStore {
 
     // MARK: Section order
 
+    /// Work sections of a tab in display order. The snoozed section is not here: it is always rendered last.
     func orderedSections(_ tab: Section.Tab) -> [Section] {
-        sectionOrder.filter { $0.tab == tab }
+        sectionOrder.filter { $0.tab == tab && !$0.isSnoozed }
     }
 
 
@@ -284,11 +304,119 @@ final class PRStore {
         return quickRepoFilter.isEmpty ? base : base.filter { quickRepoFilter.contains($0.repo) }
     }
 
-    var mineGroups: MineGroups { groupMine(lens(mine.value)) }
-    var directList: [PullRequest] { sortedByRecency(lens(direct.value)) }
+    var mineGroups: MineGroups { groupMine(lens(mine.value), dormant: dormantIDs) }
+    var directList: [PullRequest] { sortedByRecency(lens(direct.value)).filter { !dormantIDs.contains($0.id) } }
     var viaTeamList: [PullRequest] {
-        filterViaTeam(all: lens(viaTeam?.value ?? []), direct: direct.value, viewerLogin: viewerLogin)
+        filterViaTeam(all: lens(viaTeam?.value ?? []), direct: direct.value, viewerLogin: viewerLogin).filter { !dormantIDs.contains($0.id) }
     }
+    /// Snoozed review requests, direct and team, newest first.
+    var snoozedReviewList: [PullRequest] {
+        let team = filterViaTeam(all: lens(viaTeam?.value ?? []), direct: direct.value, viewerLogin: viewerLogin, limit: .max)
+        return sortedByRecency((lens(direct.value) + team).filter { dormantIDs.contains($0.id) })
+    }
+
+    /// Where a PR would sit if it were not snoozed; shown on snoozed rows.
+    func originSection(of pr: PullRequest) -> Section {
+        if mine.value.contains(where: { $0.id == pr.id }) { return mineSection(for: pr) }
+        if direct.value.contains(where: { $0.id == pr.id }) { return .needsYourReview }
+        return .needsTeamsReview
+    }
+
+    // MARK: Dormancy
+
+    func isDormant(_ pr: PullRequest) -> Bool { dormant[pr.id] != nil }
+
+    // `dormant` is replaced wholesale rather than mutated in place: its didSet reads it back (badge), and an
+    // in-place subscript write would overlap that read in an exclusivity violation.
+    func snooze(_ pr: PullRequest) {
+        var marks = dormant
+        marks[pr.id] = DormantMark(pr)
+        dormant = marks
+    }
+
+    func wake(_ pr: PullRequest) {
+        var marks = dormant
+        marks[pr.id] = nil
+        dormant = marks
+    }
+
+    /// Called after every successful search: a snoozed PR with new activity wakes up by itself.
+    private func wakeChanged(in prs: [PullRequest]) {
+        var marks = dormant
+        for pr in prs where marks[pr.id]?.shouldWake(for: pr) == true { marks[pr.id] = nil }
+        dormant = marks
+    }
+
+    // MARK: Actions
+
+    func actionState(for pr: PullRequest) -> ActionState? { actionStates[pr.id] }
+
+    func clearActionState(for pr: PullRequest) {
+        var states = actionStates
+        states[pr.id] = nil
+        actionStates = states
+    }
+
+    private func setActionState(_ state: ActionState?, for pr: PullRequest) {
+        var states = actionStates
+        states[pr.id] = state
+        actionStates = states
+    }
+
+    /// Merges on GitHub, pinned to the commit we are showing. The row shows the progress: running, then
+    /// "merged" for `successLinger` (already out of the badge), then it leaves the list; the next cycle confirms.
+    /// Failures stay on the row until dismissed. They are not logged: they belong to the row, not to the Logs tab.
+    func merge(_ pr: PullRequest, method: MergeMethod, deleteBranch: Bool) async -> ActionResult {
+        setActionState(.running(.merge), for: pr)
+        let result = outcomeResult(await client.merge(url: pr.url, method: method, deleteBranch: deleteBranch, matchHeadCommit: pr.headRefOid))
+        switch result {
+        case .success:
+            setActionState(.succeeded(.merge), for: pr)
+            wake(pr)
+            recomputeBadge()
+            Task { [successLinger] in
+                try? await Task.sleep(for: successLinger)
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    removeLocally(pr)
+                    clearActionState(for: pr)
+                }
+            }
+        case .failure(let message):
+            setActionState(.failed(.merge, message), for: pr)
+        }
+        return result
+    }
+
+    func comment(_ pr: PullRequest, body: String) async -> ActionResult {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return .failure(String(localized: "Empty comment", bundle: .app)) }
+        setActionState(.running(.comment), for: pr)
+        let result = outcomeResult(await client.comment(url: pr.url, body: trimmed))
+        setActionState(nil, for: pr)
+        return result
+    }
+
+    private func outcomeResult(_ outcome: GHOutcome) -> ActionResult {
+        switch outcome {
+        case .success: .success
+        case .ghNotFound: .failure(String(localized: "gh CLI not found", bundle: .app))
+        case .notAuthenticated: .failure(String(localized: "gh is not logged in to github.com", bundle: .app))
+        case .failure(let message): .failure(message)
+        }
+    }
+
+    private func removeLocally(_ pr: PullRequest) {
+        mine.value.removeAll { $0.id == pr.id }
+        direct.value.removeAll { $0.id == pr.id }
+        viaTeam?.value.removeAll { $0.id == pr.id }
+        recomputeBadge()
+    }
+
+    /// A PR shown as "merged" is still in the lists for a moment, but must not count any more.
+    private var mergedIDs: Set<String> {
+        Set(actionStates.compactMap { key, state in state == .succeeded(.merge) ? key : nil })
+    }
+
 
     /// What the user can actually see or count. Team requests only join while their section is open or
     /// counted; otherwise their repositories would show up in the filter lists without ever appearing.
@@ -406,6 +534,8 @@ final class PRStore {
             }
         }
 
+        // After every snapshot is in place (no inout borrow left): snoozed PRs with new activity wake up.
+        wakeChanged(in: mine.value + direct.value + (viaTeam?.value ?? []))
         finish(errors: errors)
     }
 
@@ -429,6 +559,7 @@ final class PRStore {
         } else {
             viaTeam = snapshot
             viaTeamError = nil
+            wakeChanged(in: snapshot.value)
             recomputeBadge()
         }
     }
@@ -484,7 +615,7 @@ final class PRStore {
         if errors.isEmpty {
             lastError = nil
             phase = .ok(date)
-            badgeCount = computeBadgeCount(mine: allowed(mine.value), direct: allowed(direct.value), viaTeam: viaTeamList, counting: badgeSections)
+            badgeCount = computeBadgeCount(mine: allowed(mine.value), direct: allowed(direct.value), viaTeam: viaTeamList, counting: badgeSections, dormant: dormantIDs.union(mergedIDs))
         } else {
             let kind = mostSevere(errors)
             lastError = kind
@@ -495,7 +626,7 @@ final class PRStore {
     /// Only once a full cycle has succeeded; before that the badge stays nil on purpose.
     private func recomputeBadge() {
         guard badgeCount != nil else { return }
-        badgeCount = computeBadgeCount(mine: allowed(mine.value), direct: allowed(direct.value), viaTeam: viaTeamList, counting: badgeSections)
+        badgeCount = computeBadgeCount(mine: allowed(mine.value), direct: allowed(direct.value), viaTeam: viaTeamList, counting: badgeSections, dormant: dormantIDs.union(mergedIDs))
     }
 
     private func mostSevere(_ errors: [ErrorKind]) -> ErrorKind {

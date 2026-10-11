@@ -91,6 +91,9 @@ private struct PRNode: Decodable {
     let isDraft: Bool?
     let mergeable: String?
     let mergeStateStatus: String?
+    let baseRefName: String?
+    let headRefName: String?
+    let headRefOid: String?
     let updatedAt: Date?
     let repository: Repository?
     let author: Login?
@@ -99,7 +102,27 @@ private struct PRNode: Decodable {
     let reviewRequests: Requests?
     let commits: Commits?
 
-    struct Repository: Decodable { let nameWithOwner: String }
+    struct Repository: Decodable {
+        let nameWithOwner: String
+        let mergeCommitAllowed: Bool?
+        let squashMergeAllowed: Bool?
+        let rebaseMergeAllowed: Bool?
+        let deleteBranchOnMerge: Bool?
+        let viewerDefaultMergeMethod: String?
+
+        var mergeOptions: MergeOptions {
+            guard mergeCommitAllowed != nil || squashMergeAllowed != nil || rebaseMergeAllowed != nil else { return .permissive }
+            var allowed = Set<MergeMethod>()
+            if mergeCommitAllowed ?? false { allowed.insert(.merge) }
+            if squashMergeAllowed ?? false { allowed.insert(.squash) }
+            if rebaseMergeAllowed ?? false { allowed.insert(.rebase) }
+            return MergeOptions(
+                allowed: allowed,
+                defaultMethod: viewerDefaultMergeMethod.flatMap(MergeMethod.init(apiValue:)) ?? .merge,
+                deleteBranchOnMerge: deleteBranchOnMerge ?? false
+            )
+        }
+    }
     struct Login: Decodable {
         let login: String
         let avatarUrl: URL?
@@ -150,7 +173,11 @@ private struct PRNode: Decodable {
             requestedTeams: teams,
             hasConflicts: mergeable == "CONFLICTING",
             isBehindBase: mergeStateStatus == "BEHIND",
-            authorAvatarURL: author?.avatarUrl
+            authorAvatarURL: author?.avatarUrl,
+            baseRefName: baseRefName ?? "",
+            headRefName: headRefName ?? "",
+            headRefOid: headRefOid ?? "",
+            mergeOptions: repository.mergeOptions
         )
     }
 }

@@ -3,19 +3,25 @@ import SwiftUI
 
 struct PRRow: View {
     let pr: PullRequest
+    let section: Section
     /// Review tab: author name in the metadata and the author's initial on the right.
     var showAuthor = false
     var teamLabel: String? = nil
+    var isDormant = false
+    /// Where a snoozed PR came from; shown in its metadata.
+    var originSection: Section? = nil
+    var actionState: ActionState? = nil
+    var onAction: (PRAction) -> Void = { _ in }
+
+    private var isRunning: Bool { if case .running = actionState { return true }; return false }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            // CI status always on the left, on both tabs.
-            CIDot(state: pr.ciState, url: pr.checksURL)
+            leading
             VStack(alignment: .leading, spacing: 3) {
-                Text(pr.title)
+                title
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .foregroundStyle(.primary)
                     .help(Text(verbatim: pr.title))
                 HStack(spacing: 4) {
                     Text(verbatim: "\(pr.repoName) #\(pr.number)")
@@ -30,7 +36,7 @@ struct PRRow: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 let rowPills = pills(for: pr)
-                if !rowPills.isEmpty {
+                if !rowPills.isEmpty, !isDormant, actionState == nil {
                     HStack(spacing: 4) {
                         ForEach(rowPills, id: \.self) { PillView(pill: $0) }
                     }
@@ -44,8 +50,81 @@ struct PRRow: View {
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 12)
+        .opacity(isDormant ? 0.35 : 1)
         .contentShape(Rectangle())
-        .onTapGesture { PopoverDismissal.open(pr.url) }
+        .onTapGesture {
+            // A failed action reopens its modal; otherwise the row opens the PR.
+            if case .failed(let action, _) = actionState { onAction(action) } else { PopoverDismissal.open(pr.url) }
+        }
+        .contextMenu { menu }
+    }
+
+    /// Left column: CI dot normally; spinner, merged check or failure mark while an action is in play;
+    /// a moon for snoozed rows.
+    @ViewBuilder private var leading: some View {
+        switch actionState {
+        case .running:
+            ProgressView().controlSize(.mini).frame(width: 16, height: 16).padding(.top, 3)
+        case .succeeded:
+            StatusDot(color: Color(red: 0.51, green: 0.31, blue: 0.87), symbol: "checkmark")
+        case .failed:
+            StatusDot(color: .red, symbol: "exclamationmark")
+        case nil:
+            if isDormant {
+                Image(systemName: "moon.zzz").font(.system(size: 11)).foregroundStyle(.secondary).frame(width: 16, height: 16).padding(.top, 3)
+            } else {
+                CIDot(state: pr.ciState, url: pr.checksURL)
+            }
+        }
+    }
+
+    /// The title carries the action's status so the row needs no extra line.
+    private var title: Text {
+        switch actionState {
+        case .running(.merge): Text("Merging… ", bundle: .app).foregroundStyle(.secondary) + Text(verbatim: pr.title).foregroundStyle(.secondary)
+        case .running(.comment): Text("Posting comment… ", bundle: .app).foregroundStyle(.secondary) + Text(verbatim: pr.title).foregroundStyle(.secondary)
+        case .running: Text(verbatim: pr.title).foregroundStyle(.secondary)
+        case .succeeded(.merge): Text("Merged · ", bundle: .app).foregroundStyle(.secondary) + Text(verbatim: pr.title).foregroundStyle(.secondary)
+        case .succeeded: Text(verbatim: pr.title)
+        case .failed(.merge, let message): Text("Merge failed: \(MergeFailure(ghMessage: message).shortDescription)", bundle: .app).foregroundStyle(.red)
+        case .failed(_, let message): Text(verbatim: message).foregroundStyle(.red)
+        case nil: Text(verbatim: pr.title).foregroundStyle(.primary)
+        }
+    }
+
+    @ViewBuilder private var menu: some View {
+        if case .failed = actionState {
+            Button { onAction(.refresh) } label: {
+                Label { Text("Refresh now", bundle: .app) } icon: { Image(systemName: "arrow.clockwise") }
+            }
+            Divider()
+        }
+        ForEach(allActions(for: section), id: \.self) { action in
+            Button { onAction(action) } label: {
+                switch action {
+                case .merge: Label { Text("Merge…", bundle: .app) } icon: { Image(systemName: "arrow.triangle.merge") }
+                case .comment: Label { Text("Comment…", bundle: .app) } icon: { Image(systemName: "text.bubble") }
+                case .snooze: Label { Text(isDormant ? "Wake" : "Snooze", bundle: .app) } icon: { Image(systemName: isDormant ? "sun.max" : "moon.zzz") }
+                case .open: Label { Text("Open on GitHub", bundle: .app) } icon: { Image(systemName: "arrow.up.forward.square") }
+                case .copyLink: Label { Text("Copy link", bundle: .app) } icon: { Image(systemName: "link") }
+                case .refresh: EmptyView()
+                }
+            }
+            .disabled(isRunning && (action == .merge || action == .comment))
+        }
+    }
+}
+
+/// A plain colored circle with a white glyph, for action outcomes.
+struct StatusDot: View {
+    let color: Color
+    let symbol: String
+    var body: some View {
+        ZStack {
+            Circle().fill(color).frame(width: 14, height: 14)
+            Image(systemName: symbol).font(.system(size: 7.5, weight: .bold)).foregroundStyle(.white)
+        }
+        .padding(.top, 3)
     }
 }
 

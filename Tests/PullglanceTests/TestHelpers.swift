@@ -21,7 +21,9 @@ func makePR(
     requestedTeams: [String] = [],
     hasConflicts: Bool = false,
     isBehindBase: Bool = false,
-    authorAvatarURL: URL? = nil
+    authorAvatarURL: URL? = nil,
+    headRefOid: String = "abc1234",
+    mergeOptions: MergeOptions = MergeOptions(allowed: [.squash, .merge], defaultMethod: .squash, deleteBranchOnMerge: true)
 ) -> PullRequest {
     PullRequest(
         repo: repo, number: number, title: title,
@@ -30,7 +32,9 @@ func makePR(
         reviewDecision: reviewDecision, ciState: ciState,
         unresolvedThreads: unresolvedThreads, requestedTeams: requestedTeams,
         hasConflicts: hasConflicts, isBehindBase: isBehindBase,
-        authorAvatarURL: authorAvatarURL
+        authorAvatarURL: authorAvatarURL,
+        baseRefName: "main", headRefName: "feature", headRefOid: headRefOid,
+        mergeOptions: mergeOptions
     )
 }
 
@@ -42,11 +46,11 @@ func envelope(nodes: [String], issueCount: Int? = nil, viewer: String = "octocat
     return Data(body.utf8)
 }
 
-func node(number: Int, ci: String?, decision: String? = nil, draft: Bool = false, mergeable: String = "MERGEABLE", mergeState: String = "CLEAN") -> String {
+func node(number: Int, ci: String?, decision: String? = nil, draft: Bool = false, mergeable: String = "MERGEABLE", mergeState: String = "CLEAN", headRefOid: String = "abc1234", repoExtra: String = "\"mergeCommitAllowed\":false,\"squashMergeAllowed\":true,\"rebaseMergeAllowed\":false,\"deleteBranchOnMerge\":true,\"viewerDefaultMergeMethod\":\"SQUASH\"") -> String {
     let rollup = ci.map { "{\"state\":\"\($0)\"}" } ?? "null"
     let dec = decision.map { "\"\($0)\"" } ?? "null"
     return """
-    {"number":\(number),"title":"PR \(number)","url":"https://github.com/acme/web/pull/\(number)","isDraft":\(draft),"mergeable":"\(mergeable)","mergeStateStatus":"\(mergeState)","updatedAt":"2026-10-10T10:00:00Z","repository":{"nameWithOwner":"acme/web"},"author":{"login":"someone","avatarUrl":"https://example.com/someone.png"},"reviewDecision":\(dec),"reviewThreads":{"nodes":[]},"reviewRequests":{"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":\(rollup)}}]}}
+    {"number":\(number),"title":"PR \(number)","url":"https://github.com/acme/web/pull/\(number)","isDraft":\(draft),"mergeable":"\(mergeable)","mergeStateStatus":"\(mergeState)","baseRefName":"main","headRefName":"feature-\(number)","headRefOid":"\(headRefOid)","updatedAt":"2026-10-10T10:00:00Z","repository":{"nameWithOwner":"acme/web",\(repoExtra)},"author":{"login":"someone","avatarUrl":"https://example.com/someone.png"},"reviewDecision":\(dec),"reviewThreads":{"nodes":[]},"reviewRequests":{"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":\(rollup)}}]}}
     """
 }
 
@@ -57,8 +61,26 @@ actor FakeGH: GHRunning {
     private(set) var calls: [String] = []
     private(set) var mergeFlags: [String: Bool] = [:]
     private var repoSearches: [String: GHOutcome] = [:]
+    private var mergeOutcome: GHOutcome = .success(Data())
+    private var commentOutcome: GHOutcome = .success(Data())
+    private(set) var merges: [(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?)] = []
+    private(set) var comments: [(url: URL, body: String)] = []
 
     func setRepoSearch(_ outcome: GHOutcome, for query: String) { repoSearches[query] = outcome }
+    func setMergeOutcome(_ outcome: GHOutcome) { mergeOutcome = outcome }
+    func setCommentOutcome(_ outcome: GHOutcome) { commentOutcome = outcome }
+
+    func merge(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?) async -> GHOutcome {
+        merges.append((url, method, deleteBranch, matchHeadCommit))
+        if delay > .zero { try? await Task.sleep(for: delay) }
+        return mergeOutcome
+    }
+
+    func comment(url: URL, body: String) async -> GHOutcome {
+        comments.append((url, body))
+        if delay > .zero { try? await Task.sleep(for: delay) }
+        return commentOutcome
+    }
 
     func searchRepos(query: String) async -> GHOutcome {
         repoSearches[query] ?? .failure("no scripted repo search for \(query)")

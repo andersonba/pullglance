@@ -30,6 +30,13 @@ import Testing
         #expect(items.map(\.section) == [nil, .drafts, .needsAction, .readyToMerge, .waitingForReview])
     }
 
+    @Test func snoozedSectionsNeverGetAChip() throws {
+        let prs = try parseSearchResponse(fixture("search-mine.json")).pullRequests
+        let items = quickFilterItems(sections: Section.allCases.filter { $0.tab == .mine }, visible: Set(Section.allCases), mine: groupMine(prs, dormant: ["acme/api#102"]), directTotal: 0, teamTotal: nil)
+        #expect(items.map(\.section).contains(.snoozedMine) == false)
+        #expect(items.first?.count == 4, "the All chip does not count snoozed rows")
+    }
+
     @Test func singleVisibleSectionNeedsNoChips() {
         let items = quickFilterItems(sections: Section.reviewSections, visible: [.needsYourReview], mine: MineGroups(), directTotal: 26, teamTotal: nil)
         #expect(items.isEmpty)

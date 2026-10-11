@@ -8,6 +8,10 @@ struct PopoverView: View {
     /// Quick filter per tab. Not persisted: the popover always opens on "All".
     @State private var mineFilter: Section? = nil
     @State private var reviewFilter: Section? = nil
+    @State private var merging: PullRequest? = nil
+    @State private var commenting: PullRequest? = nil
+    @State private var toast: String? = nil
+    @State private var toastTask: Task<Void, Never>? = nil
 
     static let maxListHeight: CGFloat = 480
 
@@ -43,13 +47,39 @@ struct PopoverView: View {
 
             ZStack(alignment: .top) {
                 content
-                    .opacity(store.isApplyingSettingsChange ? 0.45 : 1)
-                    .allowsHitTesting(!store.isApplyingSettingsChange)
+                    .opacity(store.isApplyingSettingsChange || merging != nil || commenting != nil ? 0.45 : 1)
+                    .allowsHitTesting(!store.isApplyingSettingsChange && merging == nil && commenting == nil)
                 if store.isApplyingSettingsChange {
                     ProgressView().progressViewStyle(.linear).controlSize(.mini).padding(.horizontal, 12)
                 }
+                if let pr = merging {
+                    MergeConfirmView(pr: pr, store: store, previousFailure: previousFailure(of: pr)) { options in
+                        merging = nil
+                        store.clearActionState(for: pr)
+                        guard let options else { return }
+                        Task { _ = await store.merge(pr, method: options.method, deleteBranch: options.deleteBranch) }
+                    }
+                    .padding(.top, 24)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                }
+                if let pr = commenting {
+                    CommentView(pr: pr, store: store) { result in
+                        commenting = nil
+                        if result == .success { show(toast: String(localized: "Comment posted on #\(pr.number)", bundle: .app)) }
+                    }
+                    .padding(.top, 24)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if let toast {
+                    ToastView(text: toast).padding(.bottom, 8).transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
             .animation(.easeInOut(duration: 0.2), value: store.isApplyingSettingsChange)
+            .animation(.easeInOut(duration: 0.18), value: merging?.id)
+            .animation(.easeInOut(duration: 0.18), value: commenting?.id)
+            .animation(.easeInOut(duration: 0.2), value: toast)
 
             FooterView(store: store)
         }
@@ -82,7 +112,69 @@ struct PopoverView: View {
             .scrollIndicators(.never)
             .background(OverlayScrollerStyle())
             .frame(height: min(max(listHeight, 1), Self.maxListHeight))
-            .transaction { $0.animation = nil }
+            // Only the measured height must not animate (it caused a visible jump); row changes may.
+            .animation(nil, value: listHeight)
+        }
+    }
+
+    private func show(toast text: String) {
+        toastTask?.cancel()
+        toast = text
+        toastTask = Task {
+            try? await Task.sleep(for: .seconds(2.5))
+            guard !Task.isCancelled else { return }
+            toast = nil
+        }
+    }
+
+    private func previousFailure(of pr: PullRequest) -> String? {
+        if case .failed(.merge, let message) = store.actionState(for: pr) { return message }
+        return nil
+    }
+
+    private func handle(_ action: PRAction, for pr: PullRequest) {
+        switch action {
+        case .merge: merging = pr
+        case .comment: commenting = pr
+        case .snooze: store.isDormant(pr) ? store.wake(pr) : store.snooze(pr)
+        case .open: PopoverDismissal.open(pr.url)
+        case .copyLink:
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(pr.url.absoluteString, forType: .string)
+            show(toast: String(localized: "Link copied", bundle: .app))
+        case .refresh:
+            store.clearActionState(for: pr)
+            Task { await store.refresh() }
+        }
+    }
+
+    private func row(_ pr: PullRequest, section: Section, showAuthor: Bool = false, teamLabel: String? = nil) -> some View {
+        let dormant = store.isDormant(pr)
+        return rowView(pr, section: section, showAuthor: showAuthor, teamLabel: teamLabel, dormant: dormant)
+            .transition(.asymmetric(insertion: .opacity, removal: .opacity.combined(with: .scale(scale: 0.97, anchor: .leading))))
+    }
+
+    private func rowView(_ pr: PullRequest, section: Section, showAuthor: Bool, teamLabel: String?, dormant: Bool) -> some View {
+        PRRow(
+            pr: pr,
+            section: dormant ? store.originSection(of: pr) : section,
+            showAuthor: showAuthor,
+            teamLabel: teamLabel,
+            isDormant: dormant,
+            originSection: dormant ? store.originSection(of: pr) : nil,
+            actionState: store.actionState(for: pr),
+            onAction: { handle($0, for: pr) }
+        )
+    }
+
+    /// The tab's snoozed PRs, always last, only when there are any and the section is visible.
+    @ViewBuilder private func snoozedSection(_ section: Section, _ prs: [PullRequest], showAuthor: Bool) -> some View {
+        if store.visibleSections.contains(section), !prs.isEmpty {
+            SectionHeader(title: section.title, count: prs.count)
+            ForEach(prs) { pr in
+                row(pr, section: section, showAuthor: showAuthor)
+                Divider().padding(.leading, 12)
+            }
         }
     }
 
@@ -97,11 +189,14 @@ struct PopoverView: View {
     @ViewBuilder private var mineList: some View {
         let groups = store.mineGroups
         let shown = store.orderedSections(.mine).filter { store.visibleSections.contains($0) && (mineFilter == nil || mineFilter == $0) }
-        if shown.allSatisfy({ groups[$0].isEmpty }) {
+        if shown.allSatisfy({ groups[$0].isEmpty }), groups.snoozed.isEmpty {
             EmptyStateView(kind: .allClear)
         } else {
             ForEach(shown) { section in
                 mineSection(section, groups[section])
+            }
+            if mineFilter == nil {
+                snoozedSection(.snoozedMine, groups.snoozed, showAuthor: false)
             }
         }
     }
@@ -110,7 +205,7 @@ struct PopoverView: View {
         if !prs.isEmpty {
             SectionHeader(title: section.title, count: prs.count)
             ForEach(prs) { pr in
-                PRRow(pr: pr)
+                row(pr, section: section)
                 Divider().padding(.leading, 12)
             }
         }
@@ -129,6 +224,9 @@ struct PopoverView: View {
         if store.visibleSections.isDisjoint(with: Section.reviewSections) {
             EmptyStateView(kind: .allClear)
         }
+        if reviewFilter == nil {
+            snoozedSection(.snoozedReview, store.snoozedReviewList, showAuthor: true)
+        }
     }
 
     @ViewBuilder private var directSection: some View {
@@ -142,7 +240,7 @@ struct PopoverView: View {
                 .padding(.vertical, 8)
         }
         ForEach(store.directList) { pr in
-            PRRow(pr: pr, showAuthor: true)
+            row(pr, section: .needsYourReview, showAuthor: true)
             Divider().padding(.leading, 12)
         }
     }
@@ -168,7 +266,7 @@ struct PopoverView: View {
                 ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding()
             } else {
                 ForEach(store.viaTeamList) { pr in
-                    PRRow(pr: pr, showAuthor: true, teamLabel: pr.requestedTeams.first)
+                    row(pr, section: .needsTeamsReview, showAuthor: true, teamLabel: pr.requestedTeams.first)
                     Divider().padding(.leading, 12)
                 }
                 Button {

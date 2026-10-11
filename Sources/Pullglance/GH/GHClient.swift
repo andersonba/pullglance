@@ -60,6 +60,25 @@ struct GHClient: GHRunning {
         await run(["api", "graphql", "-f", "query=\(Self.repoSearchQuery)", "-f", "q=\(query)"])
     }
 
+    static func mergeArguments(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?) -> [String] {
+        var args = ["pr", "merge", url.absoluteString, method.ghFlag]
+        if deleteBranch { args.append("--delete-branch") }
+        if let matchHeadCommit, !matchHeadCommit.isEmpty { args += ["--match-head-commit", matchHeadCommit] }
+        return args
+    }
+
+    static func commentArguments(url: URL, body: String) -> [String] {
+        ["pr", "comment", url.absoluteString, "--body", body]
+    }
+
+    func merge(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?) async -> GHOutcome {
+        await run(Self.mergeArguments(url: url, method: method, deleteBranch: deleteBranch, matchHeadCommit: matchHeadCommit))
+    }
+
+    func comment(url: URL, body: String) async -> GHOutcome {
+        await run(Self.commentArguments(url: url, body: body))
+    }
+
     private func run(_ arguments: [String]) async -> GHOutcome {
         guard let executable = locator() else { return .ghNotFound }
         do {

@@ -11,7 +11,7 @@ struct QuickFilterItem: Equatable, Identifiable, Sendable {
 /// Chips for a tab, honoring the sections the user keeps visible. Fewer than two sections means no chips:
 /// there is nothing to isolate.
 func quickFilterItems(sections ordered: [Section], visible: Set<Section>, mine: MineGroups, directTotal: Int, teamTotal: Int?) -> [QuickFilterItem] {
-    let sections = ordered.filter { visible.contains($0) }
+    let sections = ordered.filter { visible.contains($0) && !$0.isSnoozed }
     guard sections.count >= 2, let tab = sections.first?.tab else { return [] }
     switch tab {
     case .mine:
@@ -35,6 +35,7 @@ extension Section {
         case .drafts: String(localized: "Drafts", bundle: .app)
         case .needsYourReview: String(localized: "Yours", bundle: .app)
         case .needsTeamsReview: String(localized: "Teams", bundle: .app)
+        case .snoozedMine, .snoozedReview: String(localized: "Snoozed", bundle: .app)
         }
     }
 }

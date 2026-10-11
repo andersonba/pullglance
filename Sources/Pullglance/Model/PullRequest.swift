@@ -1,12 +1,12 @@
 import Foundation
 
-enum ReviewDecision: String, Sendable, Equatable {
+enum ReviewDecision: String, Sendable, Equatable, Codable {
     case approved = "APPROVED"
     case changesRequested = "CHANGES_REQUESTED"
     case reviewRequired = "REVIEW_REQUIRED"
 }
 
-enum CIState: Sendable, Equatable {
+enum CIState: String, Sendable, Equatable, Codable {
     case success
     case failure
     case pending
@@ -31,6 +31,12 @@ struct PullRequest: Sendable, Equatable, Identifiable {
     let isBehindBase: Bool
     /// GitHub avatar of the author; nil for deleted users or when the field is missing.
     let authorAvatarURL: URL?
+    let baseRefName: String
+    let headRefName: String
+    /// Last commit on the PR branch. Passed to `gh pr merge --match-head-commit`, and the first thing that
+    /// wakes a snoozed PR.
+    let headRefOid: String
+    let mergeOptions: MergeOptions
 
     var id: String { "\(repo)#\(number)" }
     var checksURL: URL { url.appendingPathComponent("checks") }

@@ -4,10 +4,13 @@ query($q: String!, $withMerge: Boolean!) {
     issueCount
     nodes {
       ... on PullRequest {
-        number title url isDraft updatedAt
+        number title url isDraft updatedAt baseRefName headRefName headRefOid
         mergeable @include(if: $withMerge)
         mergeStateStatus @include(if: $withMerge)
-        repository { nameWithOwner }
+        repository {
+          nameWithOwner
+          mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed deleteBranchOnMerge viewerDefaultMergeMethod
+        }
         author { login avatarUrl }
         reviewDecision
         reviewThreads(first: 50) { nodes { isResolved } }

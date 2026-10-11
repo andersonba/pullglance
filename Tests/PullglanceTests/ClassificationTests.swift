@@ -86,6 +86,23 @@ import Testing
         #expect(filterViaTeam(all: prs, direct: [], viewerLogin: nil).count == 2)
     }
 
+    @Test func snoozedSectionsArePinnedLastAndNeverCounted() {
+        #expect(Section.snoozedMine.tab == .mine)
+        #expect(Section.snoozedReview.tab == .review)
+        #expect(Section.snoozedMine.isSnoozed && Section.snoozedReview.isSnoozed)
+        #expect(Section.allCases.suffix(2) == [.snoozedMine, .snoozedReview])
+        #expect(Section.defaultBadge.contains(.snoozedMine) == false)
+        #expect(Section.reviewSections == [.needsYourReview, .needsTeamsReview])
+    }
+
+    @Test func groupMinePutsDormantPRsInTheSnoozedSection() throws {
+        let prs = try parseSearchResponse(fixture("search-mine.json")).pullRequests
+        let groups = groupMine(prs, dormant: ["acme/api#102"])
+        #expect(groups.readyToMerge.map(\.number) == [103])
+        #expect(groups.snoozed.map(\.number) == [102])
+        #expect(groups[.snoozedMine].map(\.number) == [102])
+    }
+
     @Test func defaultBadgeCountsActionReadyAndDirect() throws {
         let mine = try parseSearchResponse(fixture("search-mine.json")).pullRequests
         let direct = try parseSearchResponse(fixture("search-direct.json")).pullRequests

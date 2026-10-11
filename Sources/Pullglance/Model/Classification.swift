@@ -18,6 +18,7 @@ struct MineGroups: Sendable, Equatable {
     var readyToMerge: [PullRequest] = []
     var waitingForReview: [PullRequest] = []
     var drafts: [PullRequest] = []
+    var snoozed: [PullRequest] = []
 
     subscript(section: Section) -> [PullRequest] {
         switch section {
@@ -25,7 +26,8 @@ struct MineGroups: Sendable, Equatable {
         case .readyToMerge: readyToMerge
         case .waitingForReview: waitingForReview
         case .drafts: drafts
-        case .needsYourReview, .needsTeamsReview: []
+        case .snoozedMine: snoozed
+        case .needsYourReview, .needsTeamsReview, .snoozedReview: []
         }
     }
 }
@@ -34,15 +36,17 @@ func sortedByRecency(_ prs: [PullRequest]) -> [PullRequest] {
     prs.sorted { $0.updatedAt > $1.updatedAt }
 }
 
-func groupMine(_ prs: [PullRequest]) -> MineGroups {
+/// Snoozed PRs leave their section for the tab's "Snoozed" one.
+func groupMine(_ prs: [PullRequest], dormant: Set<String> = []) -> MineGroups {
     var groups = MineGroups()
     for pr in sortedByRecency(prs) {
+        if dormant.contains(pr.id) { groups.snoozed.append(pr); continue }
         switch mineSection(for: pr) {
         case .needsAction: groups.needsAction.append(pr)
         case .readyToMerge: groups.readyToMerge.append(pr)
         case .waitingForReview: groups.waitingForReview.append(pr)
         case .drafts: groups.drafts.append(pr)
-        case .needsYourReview, .needsTeamsReview: break
+        case .needsYourReview, .needsTeamsReview, .snoozedMine, .snoozedReview: break
         }
     }
     return groups
@@ -58,14 +62,15 @@ func filterViaTeam(all: [PullRequest], direct: [PullRequest], viewerLogin: Strin
     )
 }
 
-/// `viaTeam` is the already filtered team list (see `filterViaTeam`).
-func computeBadgeCount(mine: [PullRequest], direct: [PullRequest], viaTeam: [PullRequest], counting sections: Set<Section>) -> Int {
-    let groups = groupMine(mine)
+/// `viaTeam` is the already filtered team list (see `filterViaTeam`). Snoozed PRs never count.
+func computeBadgeCount(mine: [PullRequest], direct: [PullRequest], viaTeam: [PullRequest], counting sections: Set<Section>, dormant: Set<String> = []) -> Int {
+    let awake = { (prs: [PullRequest]) in prs.filter { !dormant.contains($0.id) } }
+    let groups = groupMine(awake(mine))
     var total = 0
     for section in sections {
         switch section.tab {
         case .mine: total += groups[section].count
-        case .review: total += section == .needsYourReview ? direct.count : viaTeam.count
+        case .review: total += section == .needsYourReview ? awake(direct).count : awake(viaTeam).count
         }
     }
     return total
