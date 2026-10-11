@@ -50,6 +50,7 @@ private func tempDir() -> URL {
         #expect(ghLogLabel(["api", "graphql", "-f", "query=q", "-f", "q=is:pr is:open author:@me archived:false sort:updated-desc"]) == "gh api graphql [is:pr is:open author:@me archived:false…]")
         #expect(ghLogLabel(["pr", "merge", "https://github.com/acme/web/pull/7", "--squash"]) == "gh pr merge https://github.com/acme/web/pull/7")
         #expect(ghLogLabel(["--version"]) == "gh --version")
+        #expect(ghLogLabel(["api", "graphql", "-f", "query=query($owner: String!) {\n}", "-f", "owner=acme", "-f", "name=web", "-F", "number=7"]) == "gh api graphql acme/web#7")
     }
 }
 

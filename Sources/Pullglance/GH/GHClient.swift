@@ -38,6 +38,7 @@ struct GHClient: GHRunning {
 
     static let searchQuery = document("search")
     static let repoSearchQuery = document("repo-search")
+    static let pullRequestQuery = document("pull-request")
 
     private static func document(_ name: String) -> String {
         guard let url = Bundle.app.url(forResource: name, withExtension: "graphql"),
@@ -54,6 +55,14 @@ struct GHClient: GHRunning {
 
     func search(_ query: String, includeMergeState: Bool) async -> GHOutcome {
         await run(Self.arguments(for: query, includeMergeState: includeMergeState))
+    }
+
+    static func pullRequestArguments(owner: String, name: String, number: Int, includeMergeState: Bool) -> [String] {
+        ["api", "graphql", "-f", "query=\(pullRequestQuery)", "-f", "owner=\(owner)", "-f", "name=\(name)", "-F", "number=\(number)", "-F", "withMerge=\(includeMergeState)"]
+    }
+
+    func pullRequest(owner: String, name: String, number: Int, includeMergeState: Bool) async -> GHOutcome {
+        await run(Self.pullRequestArguments(owner: owner, name: name, number: number, includeMergeState: includeMergeState))
     }
 
     func searchRepos(query: String) async -> GHOutcome {

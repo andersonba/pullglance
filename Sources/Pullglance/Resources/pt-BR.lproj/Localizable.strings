@@ -88,6 +88,8 @@
 /* Footer & Diagnostics */
 "Updated now" = "Atualizado agora";
 "Refresh in %@" = "Atualiza em %@";
+"Refresh" = "Atualizar";
+"Refresh failed: %@" = "Falha ao atualizar: %@";
 "Refresh now" = "Atualizar agora";
 "Failed to refresh" = "Falha ao atualizar";
 "Showing data from %@" = "Mostrando dados de %@";

@@ -604,6 +604,63 @@ final class PRStore {
         }
     }
 
+    /// Fetches this one pull request again and puts the answer in place: the row moves section if its
+    /// state changed, leaves if it was merged or closed, and counts follow. Much cheaper than a full
+    /// refresh, which is what makes it worth a menu item ("did CI finish yet?").
+    func refreshOne(_ pr: PullRequest) async -> ActionResult {
+        setActionState(.running(.refresh), for: pr)
+        let parts = pr.repo.split(separator: "/", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { return fail(pr, "bad repository name") }
+        let inMine = mine.value.contains { $0.id == pr.id }
+        let outcome = await client.pullRequest(owner: parts[0], name: parts[1], number: pr.number, includeMergeState: inMine)
+        switch outcome {
+        case .success(let data):
+            do {
+                switch try parsePullRequestResponse(data) {
+                case .open(let fresh):
+                    replaceLocally(fresh)
+                    wakeChanged(in: [fresh])
+                    recomputeBadge()
+                    appLog.info("refresh \(pr.id): ok")
+                case .closed, .notFound:
+                    appLog.info("refresh \(pr.id): gone")
+                    withAnimation(.easeInOut(duration: 0.3)) { removeLocally(pr) }
+                }
+                clearActionState(for: pr)
+                return .success()
+            } catch DecodingFailure.noData(let errors) {
+                return fail(pr, errors.first ?? "no data")
+            } catch {
+                return fail(pr, String(describing: error))
+            }
+        case .ghNotFound, .notAuthenticated, .failure:
+            if case .failure(let message) = outcomeResult(outcome) { return fail(pr, message) }
+            return fail(pr, "unknown error")
+        }
+    }
+
+    private func fail(_ pr: PullRequest, _ message: String) -> ActionResult {
+        appLog.info("refresh \(pr.id): failed (\(message))")
+        setActionState(.failed(.refresh, message), for: pr)
+        return .failure(message)
+    }
+
+    /// Whole-value assignments on purpose: writing through `viaTeam?.value` while reading `viaTeam` on the
+    /// right-hand side is an exclusivity violation (it crashed), as it was once with `dormant`.
+    private func replaceLocally(_ fresh: PullRequest) {
+        let swap = { (prs: [PullRequest]) in prs.map { $0.id == fresh.id ? fresh : $0 } }
+        var mineSnapshot = mine
+        mineSnapshot.value = swap(mine.value)
+        mine = mineSnapshot
+        var directSnapshot = direct
+        directSnapshot.value = swap(direct.value)
+        direct = directSnapshot
+        if var teamSnapshot = viaTeam {
+            teamSnapshot.value = swap(teamSnapshot.value)
+            viaTeam = teamSnapshot
+        }
+    }
+
     private func removeLocally(_ pr: PullRequest) {
         mine.value.removeAll { $0.id == pr.id }
         direct.value.removeAll { $0.id == pr.id }

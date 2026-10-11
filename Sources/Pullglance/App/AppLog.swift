@@ -73,9 +73,12 @@ final class AppLog: @unchecked Sendable {
 /// search, the start of its query. `gh api graphql [is:pr is:open author:@me archived:false…]`.
 func ghLogLabel(_ arguments: [String]) -> String {
     var label = "gh " + arguments.prefix(2).joined(separator: " ")
-    if let query = arguments.first(where: { $0.hasPrefix("q=") })?.dropFirst(2) {
+    let value = { (key: String) in arguments.first { $0.hasPrefix(key + "=") }?.dropFirst(key.count + 1) }
+    if let query = value("q") {
         label += " [" + (query.count > 40 ? query.prefix(40).trimmingCharacters(in: .whitespaces) + "…" : String(query)) + "]"
-    } else if arguments.count > 2, let target = arguments.dropFirst(2).first(where: { $0.hasPrefix("https://") || !$0.hasPrefix("-") }) {
+    } else if let owner = value("owner"), let name = value("name"), let number = value("number") {
+        label += " \(owner)/\(name)#\(number)"
+    } else if arguments.count > 2, let target = arguments.dropFirst(2).first(where: { $0.hasPrefix("https://") || !($0.hasPrefix("-") || $0.contains("=")) }) {
         label += " " + target
     }
     return label

@@ -1,0 +1,19 @@
+query($owner: String!, $name: String!, $number: Int!, $withMerge: Boolean!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      state
+      number title url isDraft updatedAt baseRefName headRefName headRefOid
+      mergeable @include(if: $withMerge)
+      mergeStateStatus @include(if: $withMerge)
+      repository {
+        nameWithOwner
+        mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed deleteBranchOnMerge viewerDefaultMergeMethod
+      }
+      author { login avatarUrl }
+      reviewDecision
+      reviewThreads(first: 50) { nodes { isResolved } }
+      reviewRequests(first: 10) { nodes { requestedReviewer { __typename ... on Team { slug } } } }
+      commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+    }
+  }
+}

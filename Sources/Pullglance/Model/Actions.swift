@@ -57,7 +57,7 @@ func quickActions(for section: Section, dormant: Bool = false) -> [PRAction] {
 /// The full context menu, per section.
 func allActions(for section: Section, dormant: Bool = false) -> [PRAction] {
     let merge: [PRAction] = section == .readyToMerge ? [.merge] : []
-    return dormant ? [.snooze] + merge + [.comment, .open, .copyLink] : merge + [.comment, .snooze, .open, .copyLink]
+    return (dormant ? [.snooze] + merge + [.comment, .open, .copyLink] : merge + [.comment, .snooze, .open, .copyLink]) + [.refresh]
 }
 
 /// Why a merge did not happen, in words a person can act on. Built from `gh pr merge` output.

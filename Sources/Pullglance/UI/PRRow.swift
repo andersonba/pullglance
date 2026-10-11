@@ -40,11 +40,14 @@ struct PRRow: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 let rowPills = pills(for: pr)
-                if !rowPills.isEmpty, !isDormant, actionState == nil {
+                // Kept in place while an action runs or has failed, only dimmed: dropping them changed the
+                // row's height and shifted everything below for the duration of a refresh.
+                if !rowPills.isEmpty, !isDormant {
                     HStack(spacing: 4) {
                         ForEach(rowPills, id: \.self) { PillView(pill: $0) }
                     }
                     .lineLimit(1)
+                    .opacity(actionState == nil ? 1 : 0.35)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -100,6 +103,7 @@ struct PRRow: View {
         case .succeeded(.merge): Text("Merged · ", bundle: .app).foregroundStyle(.secondary) + Text(verbatim: pr.title).foregroundStyle(.secondary)
         case .succeeded: Text(verbatim: pr.title)
         case .failed(.merge, let message): Text("Merge failed: \(MergeFailure(ghMessage: message).shortDescription)", bundle: .app).foregroundStyle(.red)
+        case .failed(.refresh, let message): Text("Refresh failed: \(message)", bundle: .app).foregroundStyle(.red)
         case .failed(_, let message): Text(verbatim: message).foregroundStyle(.red)
         case nil: Text(verbatim: pr.title).foregroundStyle(.primary)
         }
@@ -117,12 +121,6 @@ struct PRRowMenu: View {
     private var isRunning: Bool { if case .running = actionState { return true }; return false }
 
     var body: some View {
-        if case .failed = actionState {
-            Button { onAction(.refresh) } label: {
-                Label { Text("Refresh now", bundle: .app) } icon: { Image(systemName: "arrow.clockwise") }
-            }
-            Divider()
-        }
         ForEach(allActions(for: section, dormant: isDormant), id: \.self) { action in
             Button { onAction(action) } label: {
                 switch action {
@@ -131,10 +129,10 @@ struct PRRowMenu: View {
                 case .snooze: Label { Text(isDormant ? "Wake" : "Snooze", bundle: .app) } icon: { Image(systemName: isDormant ? "sun.max" : "moon.zzz") }
                 case .open: Label { Text("Open on GitHub", bundle: .app) } icon: { Image(systemName: "arrow.up.forward.square") }
                 case .copyLink: Label { Text("Copy link", bundle: .app) } icon: { Image(systemName: "link") }
-                case .refresh: EmptyView()
+                case .refresh: Label { Text("Refresh", bundle: .app) } icon: { Image(systemName: "arrow.clockwise") }
                 }
             }
-            .disabled(isRunning && (action == .merge || action == .comment))
+            .disabled(isRunning && (action == .merge || action == .comment || action == .refresh))
         }
     }
 }

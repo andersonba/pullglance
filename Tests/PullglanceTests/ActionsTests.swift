@@ -31,6 +31,9 @@ import Testing
         #expect(GHClient.mergeArguments(url: url, method: .merge, deleteBranch: false, matchHeadCommit: nil) ==
                 ["pr", "merge", "https://github.com/acme/web/pull/7", "--merge"])
         #expect(GHClient.mergeArguments(url: url, method: .rebase, deleteBranch: false, matchHeadCommit: nil).contains("--rebase"))
+        let lookup = GHClient.pullRequestArguments(owner: "acme", name: "web", number: 7, includeMergeState: true)
+        #expect(Array(lookup.suffix(8)) == ["-f", "owner=acme", "-f", "name=web", "-F", "number=7", "-F", "withMerge=true"])
+        #expect(lookup[3].hasPrefix("query=query($owner: String!"))
         #expect(GHClient.openPullRequestsArguments(repo: "acme/web", base: "feat/base") ==
                 ["pr", "list", "--repo", "acme/web", "--base", "feat/base", "--state", "open", "--json", "number", "--limit", "100"])
     }
@@ -63,11 +66,11 @@ import Testing
         // A snoozed row leads with Wake, whatever its origin section.
         #expect(quickActions(for: .readyToMerge, dormant: true) == [.snooze, .open])
         #expect(quickActions(for: .needsAction, dormant: true) == [.snooze, .open])
-        #expect(allActions(for: .readyToMerge) == [.merge, .comment, .snooze, .open, .copyLink])
+        #expect(allActions(for: .readyToMerge) == [.merge, .comment, .snooze, .open, .copyLink, .refresh])
         #expect(allActions(for: .drafts).contains(.merge) == false)
         // A snoozed row leads with Wake in the menu too.
-        #expect(allActions(for: .readyToMerge, dormant: true) == [.snooze, .merge, .comment, .open, .copyLink])
-        #expect(allActions(for: .needsAction, dormant: true) == [.snooze, .comment, .open, .copyLink])
+        #expect(allActions(for: .readyToMerge, dormant: true) == [.snooze, .merge, .comment, .open, .copyLink, .refresh])
+        #expect(allActions(for: .needsAction, dormant: true) == [.snooze, .comment, .open, .copyLink, .refresh])
     }
 }
 
@@ -272,5 +275,94 @@ private extension Data {
         #expect(mergePreflight(makePR(reviewDecision: .changesRequested, ciState: .success)) == .reviewRequired)
         // Pending checks and a missing review are warnings for the modal, not blocks: branch protection decides.
         #expect(mergePreflight(makePR(reviewDecision: .reviewRequired, ciState: .pending)) == nil)
+    }
+}
+
+@Suite struct PullRequestLookupTests {
+    @Test func decodesAnOpenPullRequest() throws {
+        let lookup = try parsePullRequestResponse(pullRequestEnvelope(node(number: 7, ci: "SUCCESS", decision: "APPROVED")))
+        guard case .open(let pr) = lookup else { Issue.record("expected open"); return }
+        #expect(pr.id == "acme/web#7")
+        #expect(pr.ciState == .success)
+    }
+
+    @Test func mergedClosedAndMissingAreNotOpen() throws {
+        #expect(try parsePullRequestResponse(pullRequestEnvelope(node(number: 7, ci: nil), state: "MERGED")) == .closed)
+        #expect(try parsePullRequestResponse(pullRequestEnvelope(node(number: 7, ci: nil), state: "CLOSED")) == .closed)
+        #expect(try parsePullRequestResponse(pullRequestEnvelope(nil)) == .notFound)
+        let gone = Data(#"{"data":{"repository":null},"errors":[{"message":"Could not resolve to a Repository with the name 'acme/web'."}]}"#.utf8)
+        #expect(try parsePullRequestResponse(gone) == .notFound)
+    }
+
+    @Test func errorsWithoutDataThrow() {
+        let data = Data(#"{"data":null,"errors":[{"message":"rate limited"}]}"#.utf8)
+        #expect(throws: DecodingFailure.noData(errors: ["rate limited"])) { try parsePullRequestResponse(data) }
+    }
+}
+
+@MainActor
+@Suite struct RefreshOneTests {
+    private func store() async throws -> (PRStore, FakeGH) {
+        let gh = FakeGH()
+        await gh.set(.success(try fixture("search-mine.json")), for: SearchQuery.mine)
+        await gh.set(.success(try fixture("search-direct.json")), for: SearchQuery.direct)
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() })
+        await store.refresh()
+        return (store, gh)
+    }
+
+    @Test func aRefreshedPullRequestMovesToItsNewSection() async throws {
+        let (store, gh) = try await store()
+        let pr = try #require(store.mine.value.first { $0.repo == "acme/web" && mineSection(for: $0) != .readyToMerge })
+        await gh.setPullRequest(.success(pullRequestEnvelope(node(number: pr.number, ci: "SUCCESS", decision: "APPROVED"))), number: pr.number)
+        #expect(await store.refreshOne(pr) == .success())
+        #expect(store.mineGroups.readyToMerge.contains { $0.id == pr.id })
+        #expect(store.actionState(for: pr) == nil)
+        let lookup = try #require(await gh.lookups.first)
+        #expect(lookup.owner == "acme" && lookup.name == "web" && lookup.number == pr.number && lookup.includeMergeState)
+        #expect(await gh.callCount(for: SearchQuery.mine) == 1, "no full refresh")
+    }
+
+    @Test func aMergedPullRequestLeavesTheList() async throws {
+        let (store, gh) = try await store()
+        let pr = store.mineGroups.readyToMerge[0]
+        await gh.setPullRequest(.success(pullRequestEnvelope(node(number: pr.number, ci: nil), state: "MERGED")), number: pr.number)
+        #expect(await store.refreshOne(pr) == .success())
+        #expect(!store.mine.value.contains { $0.id == pr.id })
+    }
+
+    @Test func aFailedLookupStaysOnTheRow() async throws {
+        let (store, gh) = try await store()
+        let pr = store.mineGroups.readyToMerge[0]
+        await gh.setPullRequest(.failure("boom"), number: pr.number)
+        #expect(await store.refreshOne(pr) == .failure("boom"))
+        #expect(store.actionState(for: pr) == .failed(.refresh, "boom"))
+        #expect(store.mine.value.contains { $0.id == pr.id })
+    }
+
+    /// Regression: replacing a PR while the team list was loaded crashed on an exclusivity conflict.
+    @Test func refreshingWithTheTeamListLoadedDoesNotTrap() async throws {
+        let gh = FakeGH()
+        await gh.set(.success(try fixture("search-mine.json")), for: SearchQuery.mine)
+        await gh.set(.success(try fixture("search-direct.json")), for: SearchQuery.direct)
+        await gh.set(.success(try fixture("search-team.json")), for: SearchQuery.viaTeam)
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() })
+        store.isViaTeamExpanded = true
+        await store.refresh()
+        #expect(store.viaTeam != nil)
+        let pr = store.mineGroups.readyToMerge[0]
+        await gh.setPullRequest(.success(pullRequestEnvelope(node(number: pr.number, ci: "SUCCESS", decision: "APPROVED"))), number: pr.number)
+        #expect(await store.refreshOne(pr) == .success())
+        let team = try #require(store.viaTeamList.first)
+        await gh.setPullRequest(.success(pullRequestEnvelope(node(number: team.number, ci: "FAILURE"))), number: team.number)
+        _ = await store.refreshOne(team)
+    }
+
+    @Test func reviewRequestsAreLookedUpWithoutMergeFields() async throws {
+        let (store, gh) = try await store()
+        let pr = store.directList[0]
+        await gh.setPullRequest(.success(pullRequestEnvelope(node(number: pr.number, ci: "SUCCESS"))), number: pr.number)
+        _ = await store.refreshOne(pr)
+        #expect(await gh.lookups.first?.includeMergeState == false)
     }
 }

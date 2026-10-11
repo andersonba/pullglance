@@ -182,8 +182,7 @@ struct PopoverView: View {
             NSPasteboard.general.setString(pr.url.absoluteString, forType: .string)
             show(toast: String(localized: "Link copied", bundle: .app))
         case .refresh:
-            store.clearActionState(for: pr)
-            Task { await store.refresh() }
+            Task { _ = await store.refreshOne(pr) }
         }
     }
 

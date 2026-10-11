@@ -46,6 +46,12 @@ func envelope(nodes: [String], issueCount: Int? = nil, viewer: String = "octocat
     return Data(body.utf8)
 }
 
+/// One `pull-request.graphql` response around a node from `node(...)`, or a null pull request.
+func pullRequestEnvelope(_ node: String?, state: String = "OPEN") -> Data {
+    let body = node.map { "{\"state\":\"" + state + "\"," + $0.dropFirst() } ?? "null"
+    return Data(("{\"data\":{\"repository\":{\"pullRequest\":" + body + "}}}").utf8)
+}
+
 func node(number: Int, ci: String?, decision: String? = nil, draft: Bool = false, mergeable: String = "MERGEABLE", mergeState: String = "CLEAN", headRefOid: String = "abc1234", repoExtra: String = "\"mergeCommitAllowed\":false,\"squashMergeAllowed\":true,\"rebaseMergeAllowed\":false,\"deleteBranchOnMerge\":true,\"viewerDefaultMergeMethod\":\"SQUASH\"") -> String {
     let rollup = ci.map { "{\"state\":\"\($0)\"}" } ?? "null"
     let dec = decision.map { "\"\($0)\"" } ?? "null"
@@ -65,6 +71,14 @@ actor FakeGH: GHRunning {
     private var commentOutcome: GHOutcome = .success(Data())
     private(set) var merges: [(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?)] = []
     private(set) var comments: [(url: URL, body: String)] = []
+    private var pullRequestOutcomes: [Int: GHOutcome] = [:]
+    private(set) var lookups: [(owner: String, name: String, number: Int, includeMergeState: Bool)] = []
+    func setPullRequest(_ outcome: GHOutcome, number: Int) { pullRequestOutcomes[number] = outcome }
+    func pullRequest(owner: String, name: String, number: Int, includeMergeState: Bool) async -> GHOutcome {
+        lookups.append((owner, name, number, includeMergeState))
+        return pullRequestOutcomes[number] ?? .failure("no scripted pull request \(number)")
+    }
+
     private var openPullRequestsOutcome: GHOutcome = .success(Data("[]".utf8))
     private(set) var dependentQueries: [(repo: String, base: String)] = []
 

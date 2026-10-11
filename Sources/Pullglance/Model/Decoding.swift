@@ -43,6 +43,39 @@ func parseSearchResponse(_ data: Data) throws -> SearchPage {
     )
 }
 
+/// What `pull-request.graphql` says about one pull request.
+enum PullRequestLookup: Equatable, Sendable {
+    case open(PullRequest)
+    /// Merged or closed since it was shown.
+    case closed
+    /// Deleted, or the repository is gone or no longer visible.
+    case notFound
+}
+
+func parsePullRequestResponse(_ data: Data) throws -> PullRequestLookup {
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    let envelope: Envelope
+    do {
+        envelope = try decoder.decode(Envelope.self, from: data)
+    } catch {
+        throw DecodingFailure.malformed(String(describing: error))
+    }
+    let errors = envelope.errors?.map(\.message) ?? []
+    let unresolved = errors.contains { $0.localizedCaseInsensitiveContains("could not resolve") }
+    guard let repository = envelope.data?.repository else {
+        if unresolved { return .notFound }
+        throw DecodingFailure.noData(errors: errors)
+    }
+    guard let node = repository.pullRequest?.value else {
+        if !errors.isEmpty, !unresolved { throw DecodingFailure.noData(errors: errors) }
+        return .notFound
+    }
+    if let state = node.state, state != "OPEN" { return .closed }
+    guard let pullRequest = node.pullRequest else { throw DecodingFailure.malformed("pull request without its required fields") }
+    return .open(pullRequest)
+}
+
 /// Decodes to nil instead of failing the enclosing array when the element is null or malformed.
 struct Lossy<Wrapped: Decodable>: Decodable {
     let value: Wrapped?
@@ -69,6 +102,11 @@ private struct GraphQLError: Decodable {
 private struct Payload: Decodable {
     let viewer: Viewer?
     let search: SearchConnection?
+    let repository: RepositoryPayload?
+}
+
+private struct RepositoryPayload: Decodable {
+    let pullRequest: Lossy<PRNode>?
 }
 
 private struct Viewer: Decodable {
@@ -85,6 +123,7 @@ private struct SearchConnection: Decodable {
 }
 
 private struct PRNode: Decodable {
+    let state: String?
     let number: Int?
     let title: String?
     let url: URL?

@@ -88,6 +88,8 @@
 /* Footer & Diagnostics */
 "Updated now" = "Updated now";
 "Refresh in %@" = "Refresh in %@";
+"Refresh" = "Refresh";
+"Refresh failed: %@" = "Refresh failed: %@";
 "Refresh now" = "Refresh now";
 "Failed to refresh" = "Failed to refresh";
 "Showing data from %@" = "Showing data from %@";
