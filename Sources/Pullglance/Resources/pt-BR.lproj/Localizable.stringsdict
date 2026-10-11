@@ -34,5 +34,21 @@
       <string>%lld arquivos</string>
     </dict>
   </dict>
+  <key>Branch kept: %lld open pull requests are based on it</key>
+  <dict>
+    <key>NSStringLocalizedFormatKey</key>
+    <string>%#@prs@</string>
+    <key>prs</key>
+    <dict>
+      <key>NSStringFormatSpecTypeKey</key>
+      <string>NSStringPluralRuleType</string>
+      <key>NSStringFormatValueTypeKey</key>
+      <string>lld</string>
+      <key>one</key>
+      <string>Branch mantida: %lld pull request aberto é baseado nela</string>
+      <key>other</key>
+      <string>Branch mantida: %lld pull requests abertos são baseados nela</string>
+    </dict>
+  </dict>
 </dict>
 </plist>

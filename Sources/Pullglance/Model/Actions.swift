@@ -116,8 +116,22 @@ func mergePreflight(_ pr: PullRequest) -> MergeFailure? {
 }
 
 enum ActionResult: Equatable, Sendable {
-    case success
+    /// `note` is something worth telling the user even though the action went through, e.g. a branch
+    /// that was kept after all.
+    case success(note: String? = nil)
     case failure(String)
+}
+
+/// Number of entries in `gh pr list --json number` output; nil when it is not that.
+func parseOpenPullRequestCount(_ data: Data) -> Int? {
+    (try? JSONSerialization.jsonObject(with: data) as? [Any])?.count
+}
+
+/// Whether to pass `--delete-branch`. Never when the repository deletes merged branches itself: GitHub then
+/// also retargets the pull requests stacked on the branch, while an explicit deletion right after the
+/// merge closes them instead (cli/cli#14223).
+func requestedBranchDeletion(options: MergeOptions, toggle: Bool) -> Bool {
+    toggle && !options.deleteBranchOnMerge
 }
 
 /// What a row shows about an action: spinner, a brief "done", or a failure that stays until dismissed.

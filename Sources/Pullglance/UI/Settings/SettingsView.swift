@@ -5,7 +5,7 @@ enum SettingsTab: String, Hashable, CaseIterable {
     case general
     case sections
     case filters
-    case logs
+    case diagnostics
 }
 
 /// Which tab the Settings window should show; set before calling `openSettings`.
@@ -54,9 +54,9 @@ struct SettingsView: View {
             FiltersSettingsView(store: store)
                 .tabItem { Label { Text("Filters", bundle: .app) } icon: { Image(systemName: "line.3.horizontal.decrease.circle") } }
                 .tag(SettingsTab.filters)
-            LogsSettingsView(store: store)
-                .tabItem { Label { Text("Logs", bundle: .app) } icon: { Image(systemName: "doc.text") } }
-                .tag(SettingsTab.logs)
+            DiagnosticsSettingsView(store: store)
+                .tabItem { Label { Text("Diagnostics", bundle: .app) } icon: { Image(systemName: "stethoscope") } }
+                .tag(SettingsTab.diagnostics)
         }
         .frame(width: 520)
     }
@@ -560,7 +560,7 @@ private struct ReorderSectionGroup: View {
     }
 }
 
-struct LogsSettingsView: View {
+struct DiagnosticsSettingsView: View {
     @Bindable var store: PRStore
     var avatars: AvatarCache = .shared
 

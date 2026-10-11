@@ -71,6 +71,14 @@ struct GHClient: GHRunning {
         ["pr", "comment", url.absoluteString, "--body", body]
     }
 
+    static func openPullRequestsArguments(repo: String, base: String) -> [String] {
+        ["pr", "list", "--repo", repo, "--base", base, "--state", "open", "--json", "number", "--limit", "100"]
+    }
+
+    func openPullRequests(repo: String, base: String) async -> GHOutcome {
+        await run(Self.openPullRequestsArguments(repo: repo, base: base))
+    }
+
     func merge(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?) async -> GHOutcome {
         await run(Self.mergeArguments(url: url, method: method, deleteBranch: deleteBranch, matchHeadCommit: matchHeadCommit))
     }

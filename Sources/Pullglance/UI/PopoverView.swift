@@ -60,7 +60,11 @@ struct PopoverView: View {
                         merging = nil
                         store.clearActionState(for: pr)
                         guard let options else { return }
-                        Task { _ = await store.merge(pr, method: options.method, deleteBranch: options.deleteBranch) }
+                        Task {
+                            if case .success(let note?) = await store.merge(pr, method: options.method, deleteBranch: options.deleteBranch) {
+                                show(toast: note)
+                            }
+                        }
                     }
                     .padding(.top, 24)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
@@ -68,7 +72,7 @@ struct PopoverView: View {
                 if let pr = commenting {
                     CommentView(pr: pr, store: store) { result in
                         commenting = nil
-                        if result == .success { show(toast: String(localized: "Comment posted on #\(pr.number)", bundle: .app)) }
+                        if case .success = result { show(toast: String(localized: "Comment posted on #\(pr.number)", bundle: .app)) }
                     }
                     .padding(.top, 24)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))

@@ -18,7 +18,7 @@ struct MergeConfirmView: View {
         self.store = store
         self.onDone = onDone
         _method = State(initialValue: pr.mergeOptions.preselected)
-        _deleteBranch = State(initialValue: pr.mergeOptions.deleteBranchOnMerge)
+        _deleteBranch = State(initialValue: false)
         _failure = State(initialValue: mergePreflight(pr) ?? previousFailure.map(MergeFailure.init(ghMessage:)))
     }
 
@@ -41,9 +41,17 @@ struct MergeConfirmView: View {
             )
             .disabled(running)
 
-            Toggle(isOn: $deleteBranch) { Text("Delete branch after merge", bundle: .app) }
-                .toggleStyle(.checkbox)
-                .disabled(running)
+            if pr.mergeOptions.deleteBranchOnMerge {
+                // GitHub deletes it and retargets anything stacked on it; asking gh to delete it too would
+                // close those pull requests instead.
+                Label { Text("The repository deletes the branch after merge.", bundle: .app) } icon: { Image(systemName: "arrow.triangle.branch") }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Toggle(isOn: $deleteBranch) { Text("Delete branch after merge", bundle: .app) }
+                    .toggleStyle(.checkbox)
+                    .disabled(running)
+            }
 
             if let failure {
                 Label {
@@ -60,7 +68,7 @@ struct MergeConfirmView: View {
                 Spacer()
                 Button { onDone(nil) } label: { Text("Cancel", bundle: .app) }
                     .keyboardShortcut(.cancelAction)
-                Button { onDone((method, deleteBranch)) } label: { Text(verbatim: confirmLabel) }
+                Button { onDone((method, requestedBranchDeletion(options: pr.mergeOptions, toggle: deleteBranch))) } label: { Text(verbatim: confirmLabel) }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
                     .tint(.green)
@@ -171,7 +179,7 @@ struct CommentView: View {
             let result = await store.comment(pr, body: body_)
             running = false
             switch result {
-            case .success: onDone(.success)
+            case .success: onDone(.success())
             case .failure(let message): error = message
             }
         }

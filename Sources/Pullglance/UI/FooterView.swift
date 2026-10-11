@@ -18,13 +18,13 @@ struct FooterView: View {
             Spacer(minLength: 0)
             if store.lastError != nil {
                 Button {
-                    open(tab: .logs)
+                    open(tab: .diagnostics)
                 } label: {
                     Image(systemName: "arrow.up.forward.square")
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help(Text("Open log", bundle: .app))
+                .help(Text("Open diagnostics", bundle: .app))
             }
             if !store.quickRepoFilter.isEmpty {
                 Button {

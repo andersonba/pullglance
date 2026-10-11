@@ -375,7 +375,25 @@ final class PRStore {
     /// Failures stay on the row until dismissed. They are not logged: they belong to the row, not to the Logs tab.
     func merge(_ pr: PullRequest, method: MergeMethod, deleteBranch: Bool) async -> ActionResult {
         setActionState(.running(.merge), for: pr)
-        let result = outcomeResult(await client.merge(url: pr.url, method: method, deleteBranch: deleteBranch, matchHeadCommit: pr.headRefOid))
+        // Deleting a branch that other open pull requests are based on closes them (GitHub does not retarget
+        // when the deletion comes right after the merge). Keep the branch in that case, or when unsure.
+        var deleting = deleteBranch
+        var note: String? = nil
+        if deleteBranch {
+            switch await client.openPullRequests(repo: pr.repo, base: pr.headRefName) {
+            case .success(let data):
+                let count = parseOpenPullRequestCount(data)
+                if count == nil || count! > 0 {
+                    deleting = false
+                    note = count.map { String(format: String(localized: "Branch kept: %lld open pull requests are based on it", bundle: .app), $0) }
+                        ?? String(localized: "Branch kept: could not check for pull requests based on it", bundle: .app)
+                }
+            default:
+                deleting = false
+                note = String(localized: "Branch kept: could not check for pull requests based on it", bundle: .app)
+            }
+        }
+        let result = outcomeResult(await client.merge(url: pr.url, method: method, deleteBranch: deleting, matchHeadCommit: pr.headRefOid))
         switch result {
         case .success:
             setActionState(.succeeded(.merge), for: pr)
@@ -388,6 +406,7 @@ final class PRStore {
                     clearActionState(for: pr)
                 }
             }
+            return .success(note: note)
         case .failure(let message):
             setActionState(.failed(.merge, message), for: pr)
         }
@@ -405,7 +424,7 @@ final class PRStore {
 
     private func outcomeResult(_ outcome: GHOutcome) -> ActionResult {
         switch outcome {
-        case .success: .success
+        case .success: .success()
         case .ghNotFound: .failure(String(localized: "gh CLI not found", bundle: .app))
         case .notAuthenticated: .failure(String(localized: "gh is not logged in to github.com", bundle: .app))
         case .failure(let message): .failure(message)

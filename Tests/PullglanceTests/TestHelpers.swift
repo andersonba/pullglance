@@ -65,6 +65,14 @@ actor FakeGH: GHRunning {
     private var commentOutcome: GHOutcome = .success(Data())
     private(set) var merges: [(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?)] = []
     private(set) var comments: [(url: URL, body: String)] = []
+    private var openPullRequestsOutcome: GHOutcome = .success(Data("[]".utf8))
+    private(set) var dependentQueries: [(repo: String, base: String)] = []
+
+    func setOpenPullRequests(_ outcome: GHOutcome) { openPullRequestsOutcome = outcome }
+    func openPullRequests(repo: String, base: String) async -> GHOutcome {
+        dependentQueries.append((repo, base))
+        return openPullRequestsOutcome
+    }
 
     func setRepoSearch(_ outcome: GHOutcome, for query: String) { repoSearches[query] = outcome }
     func setMergeOutcome(_ outcome: GHOutcome) { mergeOutcome = outcome }

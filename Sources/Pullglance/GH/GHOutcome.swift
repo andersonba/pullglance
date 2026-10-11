@@ -17,4 +17,6 @@ protocol GHRunning: Sendable {
     func merge(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?) async -> GHOutcome
     /// `gh pr comment`.
     func comment(url: URL, body: String) async -> GHOutcome
+    /// `gh pr list --base`: the open pull requests stacked on a branch. JSON array of `{number}`.
+    func openPullRequests(repo: String, base: String) async -> GHOutcome
 }

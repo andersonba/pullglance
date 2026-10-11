@@ -85,14 +85,14 @@
 "Reset to default" = "Reset to default";
 "Drag to reorder" = "Drag to reorder";
 
-/* Footer & Logs */
+/* Footer & Diagnostics */
 "Updated now" = "Updated now";
 "Refresh in %@" = "Refresh in %@";
 "Refresh now" = "Refresh now";
 "Failed to refresh" = "Failed to refresh";
 "Showing data from %@" = "Showing data from %@";
-"Open log" = "Open log";
-"Logs" = "Logs";
+"Open diagnostics" = "Open diagnostics";
+"Diagnostics" = "Diagnostics";
 "No failures so far" = "No failures so far";
 "Copy all" = "Copy all";
 "Avatar cache" = "Avatar cache";
@@ -141,6 +141,8 @@
 "Applying… the lists and the badge update when the search returns." = "Applying… the lists and the badge update when the search returns.";
 "Empty comment" = "Empty comment";
 "Merge #%lld?" = "Merge #%lld?";
+"The repository deletes the branch after merge." = "The repository deletes the branch after merge.";
+"Branch kept: could not check for pull requests based on it" = "Branch kept: could not check for pull requests based on it";
 "Delete branch after merge" = "Delete branch after merge";
 "Retry" = "Retry";
 "Merge" = "Merge";

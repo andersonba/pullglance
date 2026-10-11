@@ -31,6 +31,28 @@ import Testing
         #expect(GHClient.mergeArguments(url: url, method: .merge, deleteBranch: false, matchHeadCommit: nil) ==
                 ["pr", "merge", "https://github.com/acme/web/pull/7", "--merge"])
         #expect(GHClient.mergeArguments(url: url, method: .rebase, deleteBranch: false, matchHeadCommit: nil).contains("--rebase"))
+        #expect(GHClient.openPullRequestsArguments(repo: "acme/web", base: "feat/base") ==
+                ["pr", "list", "--repo", "acme/web", "--base", "feat/base", "--state", "open", "--json", "number", "--limit", "100"])
+    }
+
+    @Test func countsOpenPullRequestsFromGhJSON() {
+        #expect(parseOpenPullRequestCount(Data("[{\"number\":8},{\"number\":9}]".utf8)) == 2)
+        #expect(parseOpenPullRequestCount(Data("[]".utf8)) == 0)
+        #expect(parseOpenPullRequestCount(Data("nope".utf8)) == nil)
+    }
+
+    /// When the repository deletes merged branches itself, GitHub also retargets the pull requests stacked
+    /// on them. Passing --delete-branch on top of that closes those pull requests instead (cli/cli#14223).
+    @Test func neverAsksGhToDeleteWhenTheRepositoryAlreadyDoes() {
+        let auto = MergeOptions(allowed: [.squash], defaultMethod: .squash, deleteBranchOnMerge: true)
+        let manual = MergeOptions(allowed: [.squash], defaultMethod: .squash, deleteBranchOnMerge: false)
+        #expect(requestedBranchDeletion(options: auto, toggle: true) == false)
+        #expect(requestedBranchDeletion(options: manual, toggle: true) == true)
+        #expect(requestedBranchDeletion(options: manual, toggle: false) == false)
+    }
+
+    @Test func commentArgumentsMatchTheGhCLI() {
+        let url = URL(string: "https://github.com/acme/web/pull/7")!
         #expect(GHClient.commentArguments(url: url, body: "LGTM\nthanks") == ["pr", "comment", "https://github.com/acme/web/pull/7", "--body", "LGTM\nthanks"])
     }
 
@@ -108,12 +130,14 @@ import Testing
         let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() }, successLinger: .milliseconds(150))
         await store.refresh()
         let pr = store.mineGroups.readyToMerge[0]
+        await gh.setOpenPullRequests(.success(Data("[]".utf8)))
         let result = await store.merge(pr, method: .squash, deleteBranch: true)
-        #expect(result == .success)
+        #expect(result == .success())
         let call = try #require(await gh.merges.first)
         #expect(call.url == pr.url)
         #expect(call.method == .squash)
         #expect(call.deleteBranch == true)
+        #expect(await gh.dependentQueries.map(\.base) == [pr.headRefName])
         #expect(call.matchHeadCommit == pr.headRefOid)
         // Right after: shown as merged, still in the list, already out of the badge.
         #expect(store.actionState(for: pr) == .succeeded(.merge))
@@ -122,6 +146,39 @@ import Testing
         try await Task.sleep(for: .milliseconds(300))
         #expect(store.mine.value.contains(pr) == false)
         #expect(store.actionState(for: pr) == nil)
+    }
+
+    @Test func keepsTheBranchWhenOpenPullRequestsAreBasedOnIt() async throws {
+        let gh = try await gh()
+        await gh.setOpenPullRequests(.success(Data("[{\"number\":8},{\"number\":9}]".utf8)))
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() }, successLinger: .milliseconds(150))
+        await store.refresh()
+        let pr = store.mineGroups.readyToMerge[0]
+        let result = await store.merge(pr, method: .squash, deleteBranch: true)
+        guard case .success(let note?) = result else { Issue.record("expected a note, got \(result)"); return }
+        #expect(note.contains("2"))
+        #expect(await gh.merges.first?.deleteBranch == false)
+    }
+
+    @Test func keepsTheBranchWhenTheDependentsCheckFails() async throws {
+        let gh = try await gh()
+        await gh.setOpenPullRequests(.failure("boom"))
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() }, successLinger: .milliseconds(150))
+        await store.refresh()
+        let pr = store.mineGroups.readyToMerge[0]
+        let result = await store.merge(pr, method: .squash, deleteBranch: true)
+        guard case .success(let note?) = result else { Issue.record("expected a note, got \(result)"); return }
+        #expect(note.isEmpty == false)
+        #expect(await gh.merges.first?.deleteBranch == false)
+    }
+
+    @Test func mergingWithoutDeletionDoesNotLookForDependents() async throws {
+        let gh = try await gh()
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() }, successLinger: .milliseconds(150))
+        await store.refresh()
+        let pr = store.mineGroups.readyToMerge[0]
+        _ = await store.merge(pr, method: .squash, deleteBranch: false)
+        #expect(await gh.dependentQueries.isEmpty)
     }
 
     @Test func mergeFailureStaysOnTheRowUntilDismissed() async throws {
@@ -175,7 +232,7 @@ import Testing
         let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() })
         await store.refresh()
         let pr = store.mineGroups.readyToMerge[0]
-        #expect(await store.comment(pr, body: "Looks good") == .success)
+        #expect(await store.comment(pr, body: "Looks good") == ActionResult.success())
         #expect(await gh.comments.first?.body == "Looks good")
         #expect(await store.comment(pr, body: "   ") == .failure("Empty comment"))
     }
