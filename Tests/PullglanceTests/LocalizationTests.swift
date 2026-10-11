@@ -24,6 +24,9 @@ import Testing
         #expect(String.localizedStringWithFormat(enFormat, 4) == "4 open threads")
         #expect(String.localizedStringWithFormat(ptFormat, 1) == "1 thread aberta")
         #expect(String.localizedStringWithFormat(ptFormat, 4) == "4 threads abertas")
+        let ptFiles = pt.localizedString(forKey: "%lld files", value: nil, table: nil)
+        #expect(String.localizedStringWithFormat(ptFiles, 1) == "1 arquivo")
+        #expect(String.localizedStringWithFormat(ptFiles, 3) == "3 arquivos")
     }
 
     /// Every key in English must have a Portuguese entry, so a new string cannot ship untranslated.

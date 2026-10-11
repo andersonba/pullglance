@@ -562,6 +562,7 @@ private struct ReorderSectionGroup: View {
 
 struct LogsSettingsView: View {
     @Bindable var store: PRStore
+    var avatars: AvatarCache = .shared
 
     private static let timestamp: Date.FormatStyle = .dateTime.year().month(.twoDigits).day().hour().minute().second()
 
@@ -601,8 +602,28 @@ struct LogsSettingsView: View {
             .controlSize(.small)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
+            Divider()
+            HStack {
+                Text("Avatar cache", bundle: .app)
+                Text(verbatim: "·").foregroundStyle(.tertiary)
+                Text(avatarUsage).foregroundStyle(.secondary)
+                Spacer()
+                Button { Task { await avatars.clear() } } label: { Text("Clear cache", bundle: .app) }
+                    .disabled(avatars.usage.files == 0)
+            }
+            .font(.caption)
+            .controlSize(.small)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
         }
-        .frame(height: 360)
+        .frame(height: 400)
+        .task { await avatars.refreshUsage() }
+    }
+
+    private var avatarUsage: String {
+        let files = String(format: String(localized: "%lld files", bundle: .app), avatars.usage.files)
+        let size = ByteCountFormatStyle(style: .file).format(Int64(avatars.usage.bytes))
+        return "\(files) · \(size)"
     }
 
     private func copyAll() {

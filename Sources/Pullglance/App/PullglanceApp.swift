@@ -16,6 +16,7 @@ struct PullglanceApp: App {
     var body: some Scene {
         MenuBarExtra {
             PopoverView(store: store)
+        Task { await AvatarCache.shared.pruneDisk() }
         } label: {
             MenuBarLabel(badgeCount: store.badgeCount, isError: store.lastError != nil)
         }

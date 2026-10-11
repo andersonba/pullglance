@@ -176,22 +176,25 @@ struct CIDot: View {
     }
 }
 
-/// The author's GitHub picture, loaded through the shared URL cache; a neutral initial until it arrives
-/// or when there is none (deleted account, offline).
+/// The author's GitHub picture from `AvatarCache`; a neutral initial until it arrives or when there is none
+/// (deleted account, offline). Reading the cache in `body` keeps a redrawn row from flashing the initial.
 struct AuthorAvatar: View {
     let login: String
     let url: URL?
 
     var body: some View {
-        AsyncImage(url: url?.appending(queryItems: [URLQueryItem(name: "s", value: "40")])) { phase in
-            if let image = phase.image {
-                image.resizable().scaledToFill()
+        Group {
+            if let sizedURL, let image = cache.cachedImage(sizedURL) {
+                Image(nsImage: image).resizable().scaledToFill()
             } else {
                 initial
             }
         }
         .frame(width: 16, height: 16)
         .clipShape(Circle())
+    var cache: AvatarCache = .shared
+
+    private var sizedURL: URL? { url?.appending(queryItems: [URLQueryItem(name: "s", value: "40")]) }
         .padding(.top, 3)
         .help(Text(verbatim: login))
     }
@@ -205,6 +208,10 @@ struct AuthorAvatar: View {
     }
 }
 
+        .task(id: sizedURL) {
+            guard let sizedURL else { return }
+            _ = await cache.image(for: sizedURL)
+        }
 struct PillView: View {
     let pill: Pill
 
