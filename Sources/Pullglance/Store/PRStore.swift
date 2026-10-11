@@ -19,7 +19,8 @@ enum SearchQuery {
     }
 }
 
-/// A repository seen in the results (or hidden by the user), listed under its owner.
+/// A repository listed under its owner in Settings → Filters: contributed to, seen in results, pinned from a
+/// search, or hidden by the user.
 struct RepoInfo: Equatable, Identifiable, Sendable {
     let fullName: String
     /// Open PRs currently loaded for it; 0 when hidden (nothing is fetched for it).
@@ -202,6 +203,18 @@ final class PRStore {
 
     // MARK: Derived state for the UI
 
+    // MARK: Repository search (to hide a repository that has not shown up yet)
+
+    func searchRepos(owner: String, term: String) async -> RepoSearchResult? {
+        guard case .success(let data) = await client.searchRepos(query: RepoSearchQuery.string(owner: owner, term: term)) else { return nil }
+        return try? parseRepoSearch(data)
+    }
+
+    func hide(repos: Set<String>) {
+        hiddenRepos.formUnion(repos)
+    }
+
+    /// The session quick filter: what the lists show.
     private func lens(_ prs: [PullRequest]) -> [PullRequest] {
         quickRepoFilter.isEmpty ? prs : prs.filter { quickRepoFilter.contains($0.repo) }
     }
@@ -250,12 +263,14 @@ final class PRStore {
             counts[pr.ownerLogin, default: 0] += 1
             repoCounts[pr.repo, default: 0] += 1
         }
-        let hiddenRepoOwners = hiddenRepos.compactMap { $0.split(separator: "/").first.map(String.init) }
-        var logins = Set(counts.keys).union(viewerOrganizations).union(hiddenOwners).union(hiddenRepoOwners)
+        let extraRepos = hiddenRepos
+        var logins = Set(repoCounts.keys.compactMap { $0.split(separator: "/").first.map(String.init) })
+            .union(viewerOrganizations).union(hiddenOwners)
+            .union(extraRepos.compactMap { $0.split(separator: "/").first.map(String.init) })
         if let viewerLogin { logins.insert(viewerLogin) }
         return logins.sorted().map { login in
             let repoNames = Set(repoCounts.keys.filter { $0.hasPrefix(login + "/") })
-                .union(hiddenRepos.filter { $0.hasPrefix(login + "/") })
+                .union(extraRepos.filter { $0.hasPrefix(login + "/") })
             let repos = repoNames.sorted().map { full in
                 RepoInfo(fullName: full, openCount: repoCounts[full] ?? 0, isHidden: hiddenRepos.contains(full))
             }
@@ -267,7 +282,6 @@ final class PRStore {
             )
         }
     }
-    var isRefreshing: Bool { phase == .loading }
     var lastGoodDate: Date? {
         [mine.fetchedAt, direct.fetchedAt].compactMap { $0 }.max()
     }
@@ -283,11 +297,6 @@ final class PRStore {
     // MARK: Lifecycle
 
     func start() { restartTimer() }
-
-    func stop() {
-        timerTask?.cancel()
-        timerTask = nil
-    }
 
     private func restartTimer() {
         timerTask?.cancel()

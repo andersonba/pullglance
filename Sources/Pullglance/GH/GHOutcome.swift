@@ -11,4 +11,6 @@ protocol GHRunning: Sendable {
     /// `includeMergeState` asks for `mergeable`/`mergeStateStatus`, which GitHub computes on demand and
     /// refuses for large pages ("Resource limits for this query exceeded"). Only your own PRs need it.
     func search(_ query: String, includeMergeState: Bool) async -> GHOutcome
+    /// Repository search with a full search string (`repo-search.graphql`).
+    func searchRepos(query: String) async -> GHOutcome
 }

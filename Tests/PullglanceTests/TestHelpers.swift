@@ -56,6 +56,13 @@ actor FakeGH: GHRunning {
     private var delay: Duration = .zero
     private(set) var calls: [String] = []
     private(set) var mergeFlags: [String: Bool] = [:]
+    private var repoSearches: [String: GHOutcome] = [:]
+
+    func setRepoSearch(_ outcome: GHOutcome, for query: String) { repoSearches[query] = outcome }
+
+    func searchRepos(query: String) async -> GHOutcome {
+        repoSearches[query] ?? .failure("no scripted repo search for \(query)")
+    }
 
     func set(_ outcome: GHOutcome, for query: String) { outcomes[query] = outcome }
     func setDelay(_ value: Duration) { delay = value }

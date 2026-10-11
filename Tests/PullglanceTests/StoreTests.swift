@@ -106,7 +106,7 @@ import Testing
         await gh.setDelay(.milliseconds(300))
         let task = Task { await store.refresh() }
         try await Task.sleep(for: .milliseconds(50))
-        #expect(store.isRefreshing)
+        #expect(store.phase == .loading)
         #expect(store.blockingError == .ghNotFound)
         #expect(store.lastError == .ghNotFound)
         await task.value
@@ -232,7 +232,7 @@ import Testing
     @Test func sectionOrderDefaultsToGitHubOrderAndPersists() async throws {
         let defaults = testDefaults()
         let store = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })
-        #expect(store.orderedSections(.mine) == Section.mineSections)
+        #expect(store.orderedSections(.mine) == [Section.needsAction, .readyToMerge, .waitingForReview, .drafts])
         #expect(store.orderedSections(.review) == Section.reviewSections)
         store.moveSections(in: .mine, from: IndexSet(integer: 3), to: 2)
         #expect(store.orderedSections(.mine) == [.needsAction, .readyToMerge, .drafts, .waitingForReview])
@@ -266,7 +266,7 @@ import Testing
         store.visibleSections = [.drafts]
         store.badgeSections = []
         store.resetSectionsToDefault()
-        #expect(store.orderedSections(.mine) == Section.mineSections)
+        #expect(store.orderedSections(.mine) == [Section.needsAction, .readyToMerge, .waitingForReview, .drafts])
         #expect(store.visibleSections == Set(Section.allCases))
         #expect(store.badgeSections == Section.defaultBadge)
     }
@@ -286,7 +286,5 @@ import Testing
         #expect(defaults.integer(forKey: PRStore.intervalKey) == 300)
         let reloaded = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })
         #expect(reloaded.refreshInterval == .seconds(300))
-        store.stop()
-        reloaded.stop()
     }
 }

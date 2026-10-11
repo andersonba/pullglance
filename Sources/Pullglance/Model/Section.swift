@@ -21,7 +21,6 @@ enum Section: String, CaseIterable, Sendable, Identifiable {
         }
     }
 
-    static let mineSections: [Section] = [.needsAction, .readyToMerge, .waitingForReview, .drafts]
     static let reviewSections: [Section] = [.needsYourReview, .needsTeamsReview]
 
     /// Everything that depends on you: fix it, merge it, or review it.

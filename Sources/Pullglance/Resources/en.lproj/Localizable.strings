@@ -116,6 +116,15 @@
 "Applies to both tabs. Not saved." = "Applies to both tabs. Not saved.";
 "Clear repository filter" = "Clear repository filter";
 "%lld repos" = "%lld repos";
-"No repositories seen in your results yet" = "No repositories seen in your results yet";
 "%lld of %lld hidden" = "%lld of %lld hidden";
-"Hidden owners and repositories are left out of both tabs and the badge. New ones show up checked. Repositories listed are the ones seen in your results." = "Hidden owners and repositories are left out of both tabs and the badge. New ones show up checked. Repositories listed are the ones seen in your results.";
+"No match" = "No match";
+"Search repositories (2+ characters)" = "Search repositories (2+ characters)";
+"archived" = "archived";
+"Showing %lld of %lld; refine the search" = "Showing %lld of %lld; refine the search";
+"Type to search the organization's repositories." = "Type to search the organization's repositories.";
+"Cancel" = "Cancel";
+"Hide another repository…" = "Hide another repository…";
+"Hide repositories from %@" = "Hide repositories from %@";
+"Hide %lld" = "Hide %lld";
+"No repositories seen in your results yet" = "No repositories seen in your results yet";
+"Hidden owners and repositories are left out of both tabs and the badge. Every repository is shown unless you hide it; the list has the ones seen in your results and the ones you hid." = "Hidden owners and repositories are left out of both tabs and the badge. Every repository is shown unless you hide it; the list has the ones seen in your results and the ones you hid.";

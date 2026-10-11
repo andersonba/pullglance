@@ -1,0 +1,6 @@
+query($q: String!) {
+  search(query: $q, type: REPOSITORY, first: 25) {
+    repositoryCount
+    nodes { ... on Repository { nameWithOwner isArchived } }
+  }
+}

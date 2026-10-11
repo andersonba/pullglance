@@ -36,13 +36,16 @@ struct GHClient: GHRunning {
         return .failure(stderr.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
-    static let searchQuery: String = {
-        guard let url = Bundle.app.url(forResource: "search", withExtension: "graphql"),
+    static let searchQuery = document("search")
+    static let repoSearchQuery = document("repo-search")
+
+    private static func document(_ name: String) -> String {
+        guard let url = Bundle.app.url(forResource: name, withExtension: "graphql"),
               let text = try? String(contentsOf: url, encoding: .utf8) else {
-            fatalError("search.graphql is missing from the resource bundle")
+            fatalError("\(name).graphql is missing from the resource bundle")
         }
         return text
-    }()
+    }
 
     /// `-F` sends a typed value, so `withMerge` reaches GraphQL as a Boolean.
     static func arguments(for query: String, includeMergeState: Bool) -> [String] {
@@ -50,8 +53,15 @@ struct GHClient: GHRunning {
     }
 
     func search(_ query: String, includeMergeState: Bool) async -> GHOutcome {
+        await run(Self.arguments(for: query, includeMergeState: includeMergeState))
+    }
+
+    func searchRepos(query: String) async -> GHOutcome {
+        await run(["api", "graphql", "-f", "query=\(Self.repoSearchQuery)", "-f", "q=\(query)"])
+    }
+
+    private func run(_ arguments: [String]) async -> GHOutcome {
         guard let executable = locator() else { return .ghNotFound }
-        let arguments = Self.arguments(for: query, includeMergeState: includeMergeState)
         do {
             let result = try await runProcess(executable: executable, arguments: arguments, timeout: Self.timeout)
             return Self.interpret(

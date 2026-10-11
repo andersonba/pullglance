@@ -99,6 +99,7 @@ struct GeneralSettingsView: View {
 struct FiltersSettingsView: View {
     @Bindable var store: PRStore
     @State private var expanded: Set<String> = []
+    @State private var hidingFor: String? = nil
 
     var body: some View {
         Form {
@@ -109,20 +110,14 @@ struct FiltersSettingsView: View {
                         set: { on in if on { expanded.insert(owner.login) } else { expanded.remove(owner.login) } }
                     ))
                     if expanded.contains(owner.login) {
-                        if owner.repos.isEmpty {
-                            Text("No repositories seen in your results yet", bundle: .app)
-                                .font(.caption).foregroundStyle(.tertiary).padding(.leading, 44)
-                        }
-                        ForEach(owner.repos) { repo in
-                            RepoRow(repo: repo, store: store)
-                        }
+                        ownerDetails(owner)
                     }
                 }
             } header: {
                 Text("Show pull requests from", bundle: .app)
             } footer: {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Hidden owners and repositories are left out of both tabs and the badge. New ones show up checked. Repositories listed are the ones seen in your results.", bundle: .app)
+                    Text("Hidden owners and repositories are left out of both tabs and the badge. Every repository is shown unless you hide it; the list has the ones seen in your results and the ones you hid.", bundle: .app)
                         .foregroundStyle(.secondary)
                     Spacer()
                     if !store.hiddenOwners.isEmpty || !store.hiddenRepos.isEmpty {
@@ -138,7 +133,34 @@ struct FiltersSettingsView: View {
         }
         .formStyle(.grouped)
         .padding(.vertical, 4)
+        .sheet(item: Binding(
+            get: { hidingFor.map(OwnerLogin.init) },
+            set: { hidingFor = $0?.login }
+        )) { owner in
+            HideRepositoriesSheet(owner: owner.login, store: store)
+        }
     }
+
+    @ViewBuilder private func ownerDetails(_ owner: OwnerInfo) -> some View {
+        if owner.repos.isEmpty {
+            Text("No repositories seen in your results yet", bundle: .app)
+                .font(.caption).foregroundStyle(.tertiary).padding(.leading, 44)
+        }
+        ForEach(owner.repos) { repo in
+            RepoRow(repo: repo, store: store)
+        }
+        HStack {
+            Spacer()
+            Button { hidingFor = owner.login } label: { Text("Hide another repository…", bundle: .app) }
+                .controlSize(.small)
+        }
+        .padding(.leading, 34)
+    }
+}
+
+private struct OwnerLogin: Identifiable {
+    let login: String
+    var id: String { login }
 }
 
 private struct RepoRow: View {
@@ -161,11 +183,94 @@ private struct RepoRow: View {
             Spacer()
             if repo.isHidden {
                 Text(verbatim: "—").foregroundStyle(.tertiary)
-            } else {
+            } else if repo.openCount > 0 {
                 Text("\(repo.openCount) open", bundle: .app).foregroundStyle(.secondary).monospacedDigit().font(.caption)
             }
         }
         .padding(.leading, 34)
+    }
+}
+
+/// Search the owner's repositories on GitHub to hide ones that have not shown up in your results yet.
+private struct HideRepositoriesSheet: View {
+    let owner: String
+    @Bindable var store: PRStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var term = ""
+    @State private var result: RepoSearchResult? = nil
+    @State private var searching = false
+    @State private var picked: Set<String> = []
+    @State private var searchTask: Task<Void, Never>? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Hide repositories from \(owner)", bundle: .app).font(.headline)
+            TextField(text: $term, prompt: Text("Search repositories (2+ characters)", bundle: .app)) { EmptyView() }
+                .textFieldStyle(.roundedBorder)
+                .onChange(of: term) { _, new in schedule(new) }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    if let result {
+                        ForEach(result.repos) { repo in
+                            Toggle(isOn: Binding(
+                                get: { picked.contains(repo.fullName) },
+                                set: { on in if on { picked.insert(repo.fullName) } else { picked.remove(repo.fullName) } }
+                            )) {
+                                HStack {
+                                    Text(verbatim: repo.name)
+                                    if repo.isArchived { Text("archived", bundle: .app).font(.caption2).foregroundStyle(.tertiary) }
+                                    Spacer()
+                                }
+                            }
+                            .toggleStyle(.checkbox)
+                        }
+                        if result.repos.isEmpty {
+                            Text("No match", bundle: .app).foregroundStyle(.secondary)
+                        } else if result.total > result.repos.count {
+                            Text("Showing \(result.repos.count) of \(result.total); refine the search", bundle: .app)
+                                .font(.caption).foregroundStyle(.tertiary)
+                        }
+                    } else if searching {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text("Type to search the organization's repositories.", bundle: .app).foregroundStyle(.tertiary)
+                    }
+                }
+                .font(.system(size: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(height: 220)
+            HStack {
+                Spacer()
+                Button { dismiss() } label: { Text("Cancel", bundle: .app) }
+                    .keyboardShortcut(.cancelAction)
+                Button {
+                    store.hide(repos: picked)
+                    dismiss()
+                } label: {
+                    Text("Hide \(picked.count)", bundle: .app)
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(picked.isEmpty)
+            }
+        }
+        .padding(16)
+        .frame(width: 420)
+    }
+
+    private func schedule(_ text: String) {
+        searchTask?.cancel()
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        guard trimmed.count >= 2 else { result = nil; searching = false; return }
+        searching = true
+        searchTask = Task {
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            let found = await store.searchRepos(owner: owner, term: trimmed)
+            guard !Task.isCancelled else { return }
+            result = found ?? RepoSearchResult(total: 0, repos: [])
+            searching = false
+        }
     }
 }
 
