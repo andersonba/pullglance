@@ -60,6 +60,7 @@ final class PRStore {
     static let hiddenOwnersKey = "hiddenOwners"
     static let repoRulesKey = "repoRules"
     static let dormantKey = "dormant"
+    static let manualOrdersKey = "manualOrders"
     static let hiddenSectionsKey = "hiddenSections"
     static let badgeSectionsKey = "badgeSections"
     static let dualBadgeFirstKey = "dualBadgeFirst"
@@ -91,6 +92,26 @@ final class PRStore {
     private(set) var viewerLogin: String? = nil
     private(set) var viewerOrganizations: [String] = []
     /// Snoozed PRs by id, with the state they had when snoozed. Stored per machine.
+    /// Hand-made row orders, by section raw value; see `applyManualOrder`.
+    private(set) var manualOrders: [String: [String]] {
+        didSet { defaults.set(try? JSONEncoder().encode(manualOrders), forKey: Self.manualOrdersKey) }
+    }
+
+    func isManuallyOrdered(_ section: Section) -> Bool { manualOrders[section.rawValue] != nil }
+
+    func setManualOrder(_ ids: [String], for section: Section) {
+        manualOrders[section.rawValue] = ids.isEmpty ? nil : ids
+    }
+
+    /// Back to newest first.
+    func resetManualOrder(for section: Section) {
+        manualOrders[section.rawValue] = nil
+    }
+
+    private func manuallyOrdered(_ prs: [PullRequest], _ section: Section) -> [PullRequest] {
+        applyManualOrder(prs, ids: manualOrders[section.rawValue] ?? [])
+    }
+
     private(set) var dormant: [String: DormantMark] {
         didSet {
             guard dormant != oldValue else { return }
@@ -292,6 +313,7 @@ final class PRStore {
         }
         self.repoRules = rules
         self.dormant = defaults.data(forKey: Self.dormantKey).flatMap { try? JSONDecoder().decode([String: DormantMark].self, from: $0) } ?? [:]
+        self.manualOrders = defaults.data(forKey: Self.manualOrdersKey).flatMap { try? JSONDecoder().decode([String: [String]].self, from: $0) } ?? [:]
         if let legacyVisible = Self.sections(in: defaults, key: "visibleSections") {
             // Older builds stored the visible set, before the Snoozed sections existed; those must not come up hidden.
             let hidden = Set(Section.allCases).subtracting(legacyVisible).filter { !$0.isSnoozed }
@@ -398,8 +420,17 @@ final class PRStore {
         return quickRepoFilter.isEmpty ? base : base.filter { quickRepoFilter.contains($0.repo) }
     }
 
-    var mineGroups: MineGroups { groupMine(lens(mine.value), dormant: dormantIDs) }
-    var directList: [PullRequest] { sortedByRecency(lens(direct.value)).filter { !dormantIDs.contains($0.id) } }
+    var mineGroups: MineGroups {
+        var groups = groupMine(lens(mine.value), dormant: dormantIDs)
+        groups.needsAction = manuallyOrdered(groups.needsAction, .needsAction)
+        groups.readyToMerge = manuallyOrdered(groups.readyToMerge, .readyToMerge)
+        groups.waitingForReview = manuallyOrdered(groups.waitingForReview, .waitingForReview)
+        groups.drafts = manuallyOrdered(groups.drafts, .drafts)
+        return groups
+    }
+    var directList: [PullRequest] {
+        manuallyOrdered(sortedByRecency(lens(direct.value)).filter { !dormantIDs.contains($0.id) }, .needsYourReview)
+    }
     var viaTeamList: [PullRequest] {
         filterViaTeam(all: lens(viaTeam?.value ?? []), direct: direct.value, viewerLogin: viewerLogin).filter { !dormantIDs.contains($0.id) }
     }
@@ -592,6 +623,9 @@ final class PRStore {
 
     // MARK: Lifecycle
 
+    /// While true the timer skips its cycles (the list must not move under a drag). Manual refresh still works.
+    var holdsAutoRefresh = false
+
     func start() { restartTimer() }
 
     private func restartTimer() {
@@ -599,7 +633,7 @@ final class PRStore {
         timerTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
-                await self.refresh()
+                if !self.holdsAutoRefresh { await self.refresh() }
                 let interval = self.refreshInterval
                 try? await Task.sleep(for: interval)
             }
@@ -730,6 +764,9 @@ final class PRStore {
             phase = .ok(date)
             badgeCount = 0
             recomputeBadge()
+            let present = Set((mine.value + direct.value).map(\.id))
+            let pruned = pruneManualOrders(manualOrders, keeping: present)
+            if pruned != manualOrders { manualOrders = pruned }
         } else {
             let kind = mostSevere(errors)
             lastError = kind

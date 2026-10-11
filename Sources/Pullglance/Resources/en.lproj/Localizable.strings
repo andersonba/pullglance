@@ -200,3 +200,9 @@
 "The badge adds up the sections checked below." = "The badge adds up the sections checked below.";
 "Each section counts toward the first number, the second, or neither." = "Each section counts toward the first number, the second, or neither.";
 "Counts toward the first number, the second, or neither" = "Counts toward the first number, the second, or neither";
+
+/* Manual order */
+"Sort by update" = "Sort by update";
+"Reorder" = "Reorder";
+"Done" = "Done";
+"Drag rows to reorder" = "Drag rows to reorder";

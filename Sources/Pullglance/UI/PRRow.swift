@@ -12,6 +12,10 @@ struct PRRow: View {
     var originSection: Section? = nil
     var actionState: ActionState? = nil
     var onAction: (PRAction) -> Void = { _ in }
+    /// Reorder mode has no clicks; the row's tap stays off there.
+    var handlesTap = true
+    /// Reorder mode: a grip on the trailing edge, the content sliding over to make room.
+    var showsGrip = false
 
     private var isRunning: Bool { if case .running = actionState { return true }; return false }
 
@@ -47,12 +51,21 @@ struct PRRow: View {
             if showAuthor {
                 AuthorAvatar(login: pr.author, url: pr.authorAvatarURL)
             }
+            if showsGrip {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16)
+                    .padding(.top, 2)
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+            }
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 12)
         .opacity(isDormant ? 0.35 : 1)
         .contentShape(Rectangle())
         .onTapGesture {
+            guard handlesTap else { return }
             // A failed action reopens its modal; otherwise the row opens the PR.
             if case .failed(let action, _) = actionState { onAction(action) } else { PopoverDismissal.open(pr.url) }
         }

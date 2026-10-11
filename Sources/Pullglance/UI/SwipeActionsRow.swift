@@ -14,6 +14,8 @@ struct SwipeActionsRow<Content: View, MenuContent: View>: View {
     @Binding var openRow: PullRequest.ID?
     var isDormant = false
     var isRunning = false
+    /// Reorder mode: no swiping.
+    var isLocked = false
     let onAction: (PRAction) -> Void
     @ViewBuilder let menu: () -> MenuContent
     @ViewBuilder let content: () -> Content
@@ -55,6 +57,7 @@ struct SwipeActionsRow<Content: View, MenuContent: View>: View {
         // With legacy scrollers SwiftUI would reserve the horizontal bar's height under every row;
         // PullglanceApp forces overlay scrollers app-wide (AppleShowScrollBars) so this stays the row's height.
         .scrollIndicators(.hidden)
+        .scrollDisabled(isLocked)
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         .scrollTargetBehavior(SwipeSnapBehavior(openWidth: openWidth))
         .scrollPosition($position)

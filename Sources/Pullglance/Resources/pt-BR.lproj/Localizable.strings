@@ -200,3 +200,9 @@
 "The badge adds up the sections checked below." = "O contador soma as seções marcadas abaixo.";
 "Each section counts toward the first number, the second, or neither." = "Cada seção conta no primeiro número, no segundo, ou em nenhum.";
 "Counts toward the first number, the second, or neither" = "Conta no primeiro número, no segundo, ou em nenhum";
+
+/* Manual order */
+"Sort by update" = "Ordenar por atualização";
+"Reorder" = "Reordenar";
+"Done" = "Concluir";
+"Drag rows to reorder" = "Arraste as linhas para reordenar";

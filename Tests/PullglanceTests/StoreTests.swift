@@ -314,6 +314,19 @@ import Testing
         #expect(defaults.bool(forKey: PRStore.expandedKey) == true)
     }
 
+    @Test func holdingAutoRefreshSkipsTimerCyclesUntilReleased() async throws {
+        let gh = try await happyGH()
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() })
+        store.refreshInterval = .milliseconds(30)
+        store.holdsAutoRefresh = true
+        store.start()
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(await gh.callCount(for: SearchQuery.mine) == 0)
+        store.holdsAutoRefresh = false
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(await gh.callCount(for: SearchQuery.mine) > 0)
+    }
+
     @Test func refreshIntervalDefaultsTo120sAndPersists() async throws {
         let defaults = testDefaults()
         let store = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })

@@ -14,6 +14,14 @@ struct PopoverView: View {
     @State private var toastTask: Task<Void, Never>? = nil
     /// The row whose swipe actions are showing, if any. One at a time, like Mail.
     @State private var openRow: PullRequest.ID? = nil
+    /// Reorder mode: rows only drag within their section; no swipe, no click. See `ReorderRow`.
+    @State private var reordering = false
+    /// The drag in flight inside reorder mode.
+    @State private var rowDrag: RowDrag? = nil
+    /// Row frames in the list's coordinate space, refreshed only while nothing is being dragged.
+    @State private var rowFrames: [PullRequest.ID: CGRect] = [:]
+    private static let listSpace = "list"
+    static let holdToReorder: Double = 0.5
 
     static let maxListHeight: CGFloat = 480
 
@@ -88,7 +96,11 @@ struct PopoverView: View {
             .animation(.easeInOut(duration: 0.18), value: commenting?.id)
             .animation(.easeInOut(duration: 0.2), value: toast)
 
-            FooterView(store: store)
+            if reordering {
+                ReorderFooter { setReordering(false) }
+            } else {
+                FooterView(store: store)
+            }
         }
         .frame(width: 380)
         .onAppear { SettingsOpener.bringSettingsForwardIfOpen() }
@@ -96,8 +108,12 @@ struct PopoverView: View {
             mineFilter = nil
             reviewFilter = nil
             openRow = nil
+            setReordering(false)
         }
-        .onChange(of: tab) { _, _ in openRow = nil }
+        .onChange(of: tab) { _, _ in
+            openRow = nil
+            setReordering(false)
+        }
     }
 
     @ViewBuilder private var content: some View {
@@ -116,6 +132,7 @@ struct PopoverView: View {
                     }
                 }
                 .padding(.bottom, 6)
+                .coordinateSpace(name: Self.listSpace)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
             }
             .scrollIndicators(.never)
@@ -165,13 +182,88 @@ struct PopoverView: View {
         }
     }
 
-    private func row(_ pr: PullRequest, section: Section, showAuthor: Bool = false, teamLabel: String? = nil) -> some View {
+    /// Sections whose rows the user can order by hand. Snoozed and the team sample are read-only.
+    private static func isReorderable(_ section: Section) -> Bool {
+        !section.isSnoozed && section != .needsTeamsReview
+    }
+
+    private func setReordering(_ on: Bool) {
+        guard reordering != on else { return }
+        openRow = nil
+        rowDrag = nil
+        withAnimation(.easeInOut(duration: 0.18)) { reordering = on }
+        store.holdsAutoRefresh = on
+    }
+
+    /// The same row in both modes, so entering reorder mode changes nothing but the grip and the footer.
+    /// In reorder mode the layout keeps the original order during a drag: the lifted row follows the
+    /// pointer, rows it has passed shift by its height, release saves. Frames are read only between
+    /// drags, so a moving row never feeds back into its own position.
+    private func row(_ pr: PullRequest, section: Section, showAuthor: Bool = false, teamLabel: String? = nil, among: [PullRequest] = []) -> some View {
         let dormant = store.isDormant(pr)
-        return rowView(pr, section: section, showAuthor: showAuthor, teamLabel: teamLabel, dormant: dormant)
+        let reorderable = Self.isReorderable(section) && !dormant
+        let lifted = rowDrag?.id == pr.id
+        return rowView(pr, section: section, showAuthor: showAuthor, teamLabel: teamLabel, dormant: dormant, reorderable: reorderable, among: among)
+            .opacity(reordering && !reorderable ? 0.4 : 1)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.listSpace)) } action: { if rowDrag == nil { rowFrames[pr.id] = $0 } }
+            .background(lifted ? AnyShapeStyle(.regularMaterial) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 8))
+            .offset(y: dragOffset(for: pr.id))
+            .shadow(color: .black.opacity(lifted ? 0.25 : 0), radius: 10, y: 4)
+            .zIndex(lifted ? 1 : 0)
+            .animation(.easeInOut(duration: 0.15), value: rowDrag?.order)
             .transition(.asymmetric(insertion: .opacity, removal: .collapse))
     }
 
-    private func rowView(_ pr: PullRequest, section: Section, showAuthor: Bool, teamLabel: String?, dormant: Bool) -> some View {
+    private func dragOffset(for id: PullRequest.ID) -> CGFloat {
+        guard let rowDrag else { return 0 }
+        if rowDrag.id == id { return rowDrag.translation }
+        guard let mine = rowDrag.original.firstIndex(of: id),
+              let from = rowDrag.original.firstIndex(of: rowDrag.id),
+              let to = rowDrag.order.firstIndex(of: rowDrag.id)
+        else { return 0 }
+        if from < to, mine > from, mine <= to { return -rowDrag.liftedHeight }
+        if from > to, mine >= to, mine < from { return rowDrag.liftedHeight }
+        return 0
+    }
+
+    private func reorderDrag(for pr: PullRequest, in section: Section, among prs: [PullRequest]) -> some Gesture {
+        DragGesture(minimumDistance: 2, coordinateSpace: .named(Self.listSpace))
+            .onChanged { value in
+                if rowDrag == nil {
+                    rowDrag = RowDrag(id: pr.id, section: section, original: prs.map(\.id), frames: rowFrames)
+                }
+                guard var session = rowDrag, session.id == pr.id else { return }
+                session.translation = value.translation.height
+                let center = session.startMinY + session.translation + session.liftedHeight / 2
+                let others = session.original.filter { $0 != pr.id }
+                let slot = others.filter { (session.frames[$0]?.midY ?? .infinity) < center }.count
+                var order = others
+                order.insert(pr.id, at: min(slot, others.count))
+                session.order = order
+                rowDrag = session
+            }
+            .onEnded { _ in
+                guard let session = rowDrag else { return }
+                if session.order != session.original {
+                    store.setManualOrder(session.order, for: session.section)
+                }
+                withAnimation(.easeOut(duration: 0.15)) { rowDrag = nil }
+            }
+    }
+
+    /// Header action: "Reorder" to enter the mode; inside it, "Sort by update" on hand-ordered sections.
+    private func headerAction(for section: Section) -> SectionHeader.HoverAction? {
+        guard Self.isReorderable(section) else { return nil }
+        if reordering {
+            guard store.isManuallyOrdered(section) else { return nil }
+            return .init(title: String(localized: "Sort by update", bundle: .app), alwaysVisible: true) {
+                withAnimation(.easeInOut(duration: 0.25)) { store.resetManualOrder(for: section) }
+            }
+        }
+        return .init(title: String(localized: "Reorder", bundle: .app)) { setReordering(true) }
+    }
+
+    private func rowView(_ pr: PullRequest, section: Section, showAuthor: Bool, teamLabel: String?, dormant: Bool, reorderable: Bool, among: [PullRequest]) -> some View {
         let actionSection = dormant ? store.originSection(of: pr) : section
         let actionState = store.actionState(for: pr)
         let running: Bool = { if case .running = actionState { return true }; return false }()
@@ -181,6 +273,7 @@ struct PopoverView: View {
             openRow: $openRow,
             isDormant: dormant,
             isRunning: running,
+            isLocked: reordering,
             onAction: { handle($0, for: pr) },
             menu: { PRRowMenu(section: actionSection, isDormant: dormant, actionState: actionState, onAction: { handle($0, for: pr) }) }
         ) {
@@ -192,7 +285,19 @@ struct PopoverView: View {
                 isDormant: dormant,
                 originSection: dormant ? store.originSection(of: pr) : nil,
                 actionState: actionState,
-                onAction: { handle($0, for: pr) }
+                onAction: { handle($0, for: pr) },
+                handlesTap: !reordering,
+                showsGrip: reordering && reorderable
+            )
+            // In reorder mode nothing inside the row is clickable; the whole row is the drag handle.
+            .allowsHitTesting(!reordering)
+            .contentShape(Rectangle())
+            .gesture(reorderDrag(for: pr, in: section, among: among), including: reordering && reorderable ? .all : .none)
+            // Hold a moment to enter reorder mode. Simultaneous, so a quick click still opens the PR; once
+            // the mode is on the tap is off, so the release does not open anything.
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: Self.holdToReorder, maximumDistance: 6).onEnded { _ in setReordering(true) },
+                including: reorderable && !reordering ? .all : .none
             )
         }
     }
@@ -233,9 +338,9 @@ struct PopoverView: View {
 
     @ViewBuilder private func mineSection(_ section: Section, _ prs: [PullRequest]) -> some View {
         if !prs.isEmpty {
-            SectionHeader(title: section.title, count: prs.count)
+            SectionHeader(title: section.title, count: prs.count, hoverAction: headerAction(for: section))
             ForEach(prs) { pr in
-                row(pr, section: section)
+                row(pr, section: section, among: prs)
                 Divider()
             }
         }
@@ -260,8 +365,9 @@ struct PopoverView: View {
     }
 
     @ViewBuilder private var directSection: some View {
-        SectionHeader(title: Section.needsYourReview.title, count: store.direct.total)
-        if store.directList.isEmpty {
+        let direct = store.directList
+        SectionHeader(title: Section.needsYourReview.title, count: store.direct.total, hoverAction: headerAction(for: .needsYourReview))
+        if direct.isEmpty {
             Text("Nothing pending in reviews.", bundle: .app)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -269,8 +375,8 @@ struct PopoverView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
         }
-        ForEach(store.directList) { pr in
-            row(pr, section: .needsYourReview, showAuthor: true)
+        ForEach(direct) { pr in
+            row(pr, section: .needsYourReview, showAuthor: true, among: direct)
             Divider()
         }
     }
@@ -330,4 +436,26 @@ private struct CollapseModifier: ViewModifier, @preconcurrency Animatable {
 
 extension AnyTransition {
     static var collapse: AnyTransition { .modifier(active: CollapseModifier(progress: 0), identity: CollapseModifier(progress: 1)) }
+}
+
+/// One drag inside reorder mode. `frames` is the layout at lift time; it holds because rows only move by
+/// transforms until release.
+private struct RowDrag: Equatable {
+    let id: PullRequest.ID
+    let section: Section
+    let original: [PullRequest.ID]
+    var order: [PullRequest.ID]
+    let frames: [PullRequest.ID: CGRect]
+    var translation: CGFloat = 0
+
+    var startMinY: CGFloat { frames[id]?.minY ?? 0 }
+    var liftedHeight: CGFloat { frames[id]?.height ?? 0 }
+
+    init(id: PullRequest.ID, section: Section, original: [PullRequest.ID], frames: [PullRequest.ID: CGRect]) {
+        self.id = id
+        self.section = section
+        self.original = original
+        self.order = original
+        self.frames = frames
+    }
 }
