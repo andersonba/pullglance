@@ -121,6 +121,15 @@ struct FiltersSettingsView: View {
             } header: {
                 Text("Show pull requests from", bundle: .app)
             } footer: {
+                if store.isApplyingSettingsChange {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Applying… the lists and the badge update when the search returns.", bundle: .app)
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.caption)
+                    .padding(.bottom, 6)
+                }
                 HStack(alignment: .firstTextBaseline) {
                     Text("Unchecked owners are left out entirely. Per owner, \"All except…\" hides the listed repositories and new ones show up; \"Only…\" shows just the listed repositories and new ones stay out.", bundle: .app)
                         .foregroundStyle(.secondary)

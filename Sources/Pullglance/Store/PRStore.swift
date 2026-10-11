@@ -77,6 +77,11 @@ final class PRStore {
     private(set) var badgeCount: Int? = nil
     private(set) var viewerLogin: String? = nil
     private(set) var viewerOrganizations: [String] = []
+    /// True while a cycle triggered by a settings change (owners, repository rules) is running, so the UI
+    /// can show that the change is being applied rather than silently waiting for the search.
+    private(set) var isApplyingSettingsChange = false
+    private var applyingCount = 0
+
     /// When the timer will run the next cycle; nil before the first one completes.
     private(set) var nextRefreshAt: Date? = nil
     /// Newest first, capped at `failureLogLimit`. In memory only.
@@ -90,7 +95,7 @@ final class PRStore {
             defaults.set(hiddenOwners.sorted(), forKey: Self.hiddenOwnersKey)
             viaTeam = nil
             viaTeamError = nil
-            Task { await refresh() }
+            Task { await refreshForSettingsChange() }
         }
     }
 
@@ -103,7 +108,7 @@ final class PRStore {
             if exceptChanged {
                 viaTeam = nil
                 viaTeamError = nil
-                Task { await refresh() }
+                Task { await refreshForSettingsChange() }
             } else {
                 recomputeBadge()
             }
@@ -402,6 +407,15 @@ final class PRStore {
         }
 
         finish(errors: errors)
+    }
+
+    /// A refresh caused by a settings change; flagged until that cycle (and any coalesced follow-up) ends.
+    func refreshForSettingsChange() async {
+        applyingCount += 1
+        isApplyingSettingsChange = true
+        await refresh()
+        applyingCount -= 1
+        isApplyingSettingsChange = applyingCount > 0
     }
 
     /// Fetches only the team section, outside the regular cycle. Does not touch `phase`.

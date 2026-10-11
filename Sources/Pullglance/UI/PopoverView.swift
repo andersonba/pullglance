@@ -41,7 +41,15 @@ struct PopoverView: View {
                 }
             }
 
-            content
+            ZStack(alignment: .top) {
+                content
+                    .opacity(store.isApplyingSettingsChange ? 0.45 : 1)
+                    .allowsHitTesting(!store.isApplyingSettingsChange)
+                if store.isApplyingSettingsChange {
+                    ProgressView().progressViewStyle(.linear).controlSize(.mini).padding(.horizontal, 12)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: store.isApplyingSettingsChange)
 
             FooterView(store: store)
         }

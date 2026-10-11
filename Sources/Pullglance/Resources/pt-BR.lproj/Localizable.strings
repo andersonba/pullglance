@@ -136,3 +136,4 @@
 "Choose repositories to hide" = "Escolher repositórios para ocultar";
 "All except %lld" = "Tudo exceto %lld";
 "Only %lld" = "Somente %lld";
+"Applying… the lists and the badge update when the search returns." = "Aplicando… as listas e o contador atualizam quando a busca voltar.";

@@ -271,6 +271,27 @@ import Testing
         #expect(store.badgeSections == Section.defaultBadge)
     }
 
+    /// A settings change that needs a new search is flagged until that cycle ends, so the UI can say "applying".
+    @Test func settingsChangesAreFlaggedUntilTheirCycleCompletes() async throws {
+        let gh = try await happyGH()
+        await gh.set(.success(envelope(nodes: [], issueCount: 0)), for: SearchQuery.mine(hiding: ["acme"]))
+        await gh.set(.success(envelope(nodes: [], issueCount: 0)), for: SearchQuery.direct(hiding: ["acme"]))
+        await gh.setDelay(.milliseconds(300))
+        let store = makeStore(gh)
+        await store.refresh()
+        #expect(store.isApplyingSettingsChange == false)
+        store.hiddenOwners = ["acme"]
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(store.isApplyingSettingsChange == true)
+        try await Task.sleep(for: .milliseconds(700))
+        #expect(store.isApplyingSettingsChange == false)
+        // A plain timer/manual refresh is not a settings change.
+        let plain = Task { await store.refresh() }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(store.isApplyingSettingsChange == false)
+        await plain.value
+    }
+
     @Test func viaTeamExpansionPersistsInDefaults() async throws {
         let defaults = testDefaults()
         let store = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })

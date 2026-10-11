@@ -21,11 +21,11 @@ struct SectionHeader: View {
                 Text(verbatim: detail).fontWeight(.regular)
             }
         }
-        .font(.system(size: 10.5, weight: .semibold))
-        .foregroundStyle(.secondary)
+        .font(.system(size: 11, weight: .bold))
+        .foregroundStyle(Color.primary.opacity(0.6))
         .padding(.horizontal, 12)
-        .padding(.top, 10)
-        .padding(.bottom, 4)
+        .padding(.top, 16)
+        .padding(.bottom, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .onTapGesture { expanded?.wrappedValue.toggle() }
