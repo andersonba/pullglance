@@ -122,6 +122,16 @@ enum ActionResult: Equatable, Sendable {
     case failure(String)
 }
 
+extension ActionResult {
+    /// One word for the log, plus the reason on failure.
+    var logDescription: String {
+        switch self {
+        case .success: "ok"
+        case .failure(let message): "failed (\(message))"
+        }
+    }
+}
+
 /// Number of entries in `gh pr list --json number` output; nil when it is not that.
 func parseOpenPullRequestCount(_ data: Data) -> Int? {
     (try? JSONSerialization.jsonObject(with: data) as? [Any])?.count

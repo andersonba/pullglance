@@ -61,6 +61,7 @@ final class PRStore {
     static let repoRulesKey = "repoRules"
     static let dormantKey = "dormant"
     static let manualOrdersKey = "manualOrders"
+    static let verboseLoggingKey = "verboseLogging"
     static let hiddenSectionsKey = "hiddenSections"
     static let badgeSectionsKey = "badgeSections"
     static let dualBadgeFirstKey = "dualBadgeFirst"
@@ -141,6 +142,7 @@ final class PRStore {
     var hiddenOwners: Set<String> {
         didSet {
             guard hiddenOwners != oldValue else { return }
+            appLog.info("hidden owners: \(hiddenOwners.count)")
             defaults.set(hiddenOwners.sorted(), forKey: Self.hiddenOwnersKey)
             viaTeam = nil
             viaTeamError = nil
@@ -279,12 +281,56 @@ final class PRStore {
 
     var refreshInterval: Duration {
         didSet {
+            appLog.info("refresh interval \(refreshInterval.components.seconds) s")
             defaults.set(Int(refreshInterval.components.seconds), forKey: Self.intervalKey)
             if timerTask != nil { restartTimer() }
         }
     }
 
     private let client: any GHRunning
+    /// The rolling file log; see `AppLog`.
+    let appLog: AppLog
+
+    /// DEBUG lines in the file log (gh commands and timings). Persisted; takes effect at once.
+    var verboseLogging: Bool {
+        didSet {
+            defaults.set(verboseLogging, forKey: Self.verboseLoggingKey)
+            appLog.isVerbose = verboseLogging
+            appLog.info("verbose logging \(verboseLogging ? "on" : "off")")
+        }
+    }
+
+    /// Facts for a bug report. Asks gh for its version and login state; neither output is stored.
+    func diagnosticsReport() async -> DiagnosticsReport {
+        let version: String? = {
+            if case .success(let data) = $0 { return String(decoding: data, as: UTF8.self).split(separator: "\n").first.map(String.init) }
+            return nil
+        }(await client.version())
+        let authenticated: Bool? = {
+            switch $0 {
+            case .success: return true
+            case .notAuthenticated: return false
+            case .ghNotFound, .failure: return nil
+            }
+        }(await client.authStatus())
+        let os = ProcessInfo.processInfo.operatingSystemVersion
+        return DiagnosticsReport(
+            appVersion: AppInfo.version,
+            macOSVersion: "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)",
+            ghVersion: version,
+            ghAuthenticated: authenticated,
+            refreshIntervalSeconds: Int(refreshInterval.components.seconds),
+            badgeMode: badgeMode.rawValue,
+            visibleSections: sectionOrder.filter(visibleSections.contains).map(\.rawValue),
+            badgeSections: sectionOrder.filter((badgeMode == .dual ? dualBadgeFirst.union(dualBadgeSecond) : badgeSections).contains).map(\.rawValue),
+            hiddenOwnerCount: hiddenOwners.count,
+            repoRuleCount: repoRules.count,
+            lastGoodDate: lastGoodDate,
+            lastError: lastError.map { String(describing: $0) },
+            failureCount: failureLog.count,
+            verbose: verboseLogging
+        )
+    }
     private let defaults: UserDefaults
     private let now: @Sendable () -> Date
     private let logger = Logger(subsystem: AppInfo.bundleID, category: "store")
@@ -293,11 +339,15 @@ final class PRStore {
     private var pendingRefresh = false
     private var timerTask: Task<Void, Never>?
 
-    init(client: any GHRunning, defaults: UserDefaults = .standard, now: @escaping @Sendable () -> Date = { Date() }, successLinger: Duration = .seconds(1)) {
+    init(client: any GHRunning, defaults: UserDefaults = .standard, now: @escaping @Sendable () -> Date = { Date() }, successLinger: Duration = .seconds(1), log: AppLog = .shared) {
         self.client = client
         self.defaults = defaults
         self.now = now
         self.successLinger = successLinger
+        self.appLog = log
+        let verbose = defaults.bool(forKey: Self.verboseLoggingKey)
+        self.verboseLogging = verbose
+        log.isVerbose = verbose
         self.isViaTeamExpanded = defaults.bool(forKey: Self.expandedKey)
         self.hiddenOwners = Set(defaults.stringArray(forKey: Self.hiddenOwnersKey) ?? [])
         var rules = (defaults.data(forKey: Self.repoRulesKey)).flatMap { try? JSONDecoder().decode([String: RepoRule].self, from: $0) } ?? [:]
@@ -382,6 +432,7 @@ final class PRStore {
 
     /// A rule without repositories is no rule at all: it falls back to "all repositories" in either mode.
     func setRule(_ rule: RepoRule, for owner: String) {
+        appLog.info("repository rule for \(owner): \(rule.repos.isEmpty ? "all" : "\(rule.mode) \(rule.repos.count)")")
         repoRules[owner] = rule.repos.isEmpty ? nil : rule
     }
 
@@ -454,12 +505,14 @@ final class PRStore {
     // `dormant` is replaced wholesale rather than mutated in place: its didSet reads it back (badge), and an
     // in-place subscript write would overlap that read in an exclusivity violation.
     func snooze(_ pr: PullRequest) {
+        appLog.info("snooze \(pr.id)")
         var marks = dormant
         marks[pr.id] = DormantMark(pr)
         dormant = marks
     }
 
     func wake(_ pr: PullRequest) {
+        if dormant[pr.id] != nil { appLog.info("wake \(pr.id)") }
         var marks = dormant
         marks[pr.id] = nil
         dormant = marks
@@ -512,6 +565,7 @@ final class PRStore {
             }
         }
         let result = outcomeResult(await client.merge(url: pr.url, method: method, deleteBranch: deleting, matchHeadCommit: pr.headRefOid))
+        appLog.info("merge \(pr.id) \(method.ghFlag) delete-branch=\(deleting): \(result.logDescription)")
         switch result {
         case .success:
             setActionState(.succeeded(.merge), for: pr)
@@ -536,6 +590,7 @@ final class PRStore {
         guard !trimmed.isEmpty else { return .failure(String(localized: "Empty comment", bundle: .app)) }
         setActionState(.running(.comment), for: pr)
         let result = outcomeResult(await client.comment(url: pr.url, body: trimmed))
+        appLog.info("comment \(pr.id): \(result.logDescription)")
         setActionState(nil, for: pr)
         return result
     }
@@ -660,6 +715,8 @@ final class PRStore {
 
     private func runCycle() async {
         phase = .loading
+        cycleStarted = now()
+        appLog.debug("refresh start; hidden owners \(hiddenOwners.count), excluded repos \(excludedRepos.count), team \(wantsTeamFetch)")
 
         async let mineOutcome = client.search(SearchQuery.mine(hiding: hiddenOwners, repos: excludedRepos), includeMergeState: true)
         async let directOutcome = client.search(SearchQuery.direct(hiding: hiddenOwners, repos: excludedRepos), includeMergeState: false)
@@ -716,6 +773,7 @@ final class PRStore {
     }
 
     private func log(_ kind: ErrorKind, search: SearchKind) {
+        appLog.info("search \(search.rawValue) failed: \(kind)")
         failureLog.insert(LogEntry(date: now(), search: search, kind: kind), at: 0)
         if failureLog.count > Self.failureLogLimit { failureLog.removeLast(failureLog.count - Self.failureLogLimit) }
     }
@@ -756,8 +814,16 @@ final class PRStore {
         }
     }
 
+    private var cycleStarted: Date?
+
     private func finish(errors: [ErrorKind]) {
         let date = now()
+        let elapsed = cycleStarted.map { Int(date.timeIntervalSince($0) * 1000) } ?? 0
+        if errors.isEmpty {
+            appLog.info("refresh ok in \(elapsed) ms: mine \(mine.value.count), direct \(direct.value.count), team \(viaTeam?.value.count ?? 0)")
+        } else {
+            appLog.info("refresh failed in \(elapsed) ms: \(errors.map { String(describing: $0) }.joined(separator: "; "))")
+        }
         nextRefreshAt = date.addingTimeInterval(TimeInterval(refreshInterval.components.seconds))
         if errors.isEmpty {
             lastError = nil

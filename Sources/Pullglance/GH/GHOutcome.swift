@@ -19,4 +19,13 @@ protocol GHRunning: Sendable {
     func comment(url: URL, body: String) async -> GHOutcome
     /// `gh pr list --base`: the open pull requests stacked on a branch. JSON array of `{number}`.
     func openPullRequests(repo: String, base: String) async -> GHOutcome
+    /// `gh --version`, for the diagnostics summary.
+    func version() async -> GHOutcome
+    /// `gh auth status`; success means logged in. Output is never stored.
+    func authStatus() async -> GHOutcome
+}
+
+extension GHRunning {
+    func version() async -> GHOutcome { .failure("unavailable") }
+    func authStatus() async -> GHOutcome { .failure("unavailable") }
 }

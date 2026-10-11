@@ -3,4 +3,4 @@
 set -e
 cd "$(dirname "$0")/.."
 swift build 2>&1 | grep -E "error|warning: unre" || true
-.build/debug/Pullglance --snapshot "${1:-/tmp/pullglance-snapshots}"
+.build/debug/Pullglance --snapshot ${1:+"$1"}

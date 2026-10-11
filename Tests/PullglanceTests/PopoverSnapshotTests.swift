@@ -51,6 +51,7 @@ import Testing
         #expect(SnapshotOptions.parse(["Pullglance", "--snapshot"])?.directory == SnapshotOptions.defaultDirectory)
         #expect(SnapshotOptions.parse(["Pullglance", "--snapshot", "/tmp/x"])?.directory.path == "/tmp/x")
         #expect(SnapshotOptions.parse(["Pullglance", "--snapshot", "-NSOther"])?.directory == SnapshotOptions.defaultDirectory)
+        #expect(SnapshotOptions.defaultDirectory.path.hasPrefix(FileManager.default.temporaryDirectory.path))
     }
 }
 

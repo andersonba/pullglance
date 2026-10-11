@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum SettingsTab: String, Hashable, CaseIterable {
     case general
@@ -607,6 +608,8 @@ private struct ReorderSectionGroup: View {
 struct DiagnosticsSettingsView: View {
     @Bindable var store: PRStore
     var avatars: AvatarCache = .shared
+    @State private var includeScreenshots = false
+    @State private var exporting = false
 
     private static let timestamp: Date.FormatStyle = .dateTime.year().month(.twoDigits).day().hour().minute().second()
 
@@ -647,6 +650,24 @@ struct DiagnosticsSettingsView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             Divider()
+            HStack(spacing: 10) {
+                Toggle(isOn: $store.verboseLogging) { Text("Verbose logging", bundle: .app) }
+                    .toggleStyle(.checkbox)
+                    .help(Text("Also records gh commands and timings in the log file", bundle: .app))
+                Spacer()
+                Toggle(isOn: $includeScreenshots) { Text("Include screenshots", bundle: .app) }
+                    .toggleStyle(.checkbox)
+                    .help(Text("Pictures of the popover; they show pull request titles", bundle: .app))
+                Button { NSWorkspace.shared.activateFileViewerSelecting([store.appLog.fileURL]) } label: { Text("Show in Finder", bundle: .app) }
+                    .disabled(!FileManager.default.fileExists(atPath: store.appLog.fileURL.path))
+                Button { exportDiagnostics() } label: { Text("Export diagnostics…", bundle: .app) }
+                    .disabled(exporting)
+            }
+            .font(.caption)
+            .controlSize(.small)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            Divider()
             HStack {
                 Text("Avatar cache", bundle: .app)
                 Text(verbatim: "·").foregroundStyle(.tertiary)
@@ -660,8 +681,30 @@ struct DiagnosticsSettingsView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
         }
-        .frame(height: 400)
+        .frame(height: 440)
         .task { await avatars.refreshUsage() }
+    }
+
+    private func exportDiagnostics() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = DiagnosticsExporter.suggestedFileName
+        panel.allowedContentTypes = [.zip]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+        exporting = true
+        Task {
+            defer { exporting = false }
+            do {
+                try await DiagnosticsExport.run(store: store, to: destination, includeScreenshots: includeScreenshots)
+                NSWorkspace.shared.activateFileViewerSelecting([destination])
+            } catch {
+                store.appLog.info("diagnostics export failed: \(error)")
+                let alert = NSAlert()
+                alert.messageText = String(localized: "Could not export diagnostics", bundle: .app)
+                alert.informativeText = String(describing: error)
+                alert.runModal()
+            }
+        }
     }
 
     private var avatarUsage: String {

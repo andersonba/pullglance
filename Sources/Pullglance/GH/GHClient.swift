@@ -79,6 +79,9 @@ struct GHClient: GHRunning {
         await run(Self.openPullRequestsArguments(repo: repo, base: base))
     }
 
+    func version() async -> GHOutcome { await run(["--version"]) }
+    func authStatus() async -> GHOutcome { await run(["auth", "status"]) }
+
     func merge(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?) async -> GHOutcome {
         await run(Self.mergeArguments(url: url, method: method, deleteBranch: deleteBranch, matchHeadCommit: matchHeadCommit))
     }
@@ -89,8 +92,12 @@ struct GHClient: GHRunning {
 
     private func run(_ arguments: [String]) async -> GHOutcome {
         guard let executable = locator() else { return .ghNotFound }
+        let started = Date()
+        let label = ghLogLabel(arguments)
+        AppLog.shared.debug("\(label): \(redactedForLog(arguments))")
         do {
             let result = try await runProcess(executable: executable, arguments: arguments, timeout: Self.timeout)
+            AppLog.shared.debug("\(label): exit \(result.exitCode) in \(Int(Date().timeIntervalSince(started) * 1000)) ms, \(result.stdout.count) bytes")
             return Self.interpret(
                 exitCode: result.exitCode,
                 stdout: result.stdout,

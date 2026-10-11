@@ -133,7 +133,9 @@ import Testing
         await gh.setDelay(.milliseconds(300))
         let store = makeStore(gh)
         let first = Task { await store.refresh() }
-        try await Task.sleep(for: .milliseconds(50))
+        // Wait for the first cycle to be in flight, not for a fixed time: under load 50 ms was not enough,
+        // and the filter change then started its own cycle before this one, making two filtered searches.
+        for _ in 0..<100 where await gh.calls.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
         store.hiddenOwners = ["acme"]
         await first.value
         try await Task.sleep(for: .milliseconds(700))

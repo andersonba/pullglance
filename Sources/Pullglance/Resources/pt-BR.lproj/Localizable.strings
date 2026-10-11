@@ -206,3 +206,12 @@
 "Reorder" = "Reordenar";
 "Done" = "Concluir";
 "Drag rows to reorder" = "Arraste as linhas para reordenar";
+
+/* Diagnostics export */
+"Verbose logging" = "Log detalhado";
+"Also records gh commands and timings in the log file" = "Grava também os comandos do gh e os tempos no arquivo de log";
+"Include screenshots" = "Incluir capturas";
+"Pictures of the popover; they show pull request titles" = "Imagens do popover; mostram títulos de pull requests";
+"Show in Finder" = "Mostrar no Finder";
+"Export diagnostics…" = "Exportar diagnóstico…";
+"Could not export diagnostics" = "Não foi possível exportar o diagnóstico";

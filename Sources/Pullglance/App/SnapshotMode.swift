@@ -5,7 +5,8 @@ import SwiftUI
 /// real `gh`, renders the popover (both tabs, light and dark) and every Settings tab to PNG files, prints
 /// their paths and exits. For looking at the UI without a screen recording permission.
 struct SnapshotOptions: Equatable {
-    static let defaultDirectory = URL(fileURLWithPath: "/tmp/pullglance-snapshots")
+    /// Per-user temporary directory, not the shared /tmp.
+    static let defaultDirectory = FileManager.default.temporaryDirectory.appending(path: "pullglance-snapshots", directoryHint: .isDirectory)
     let directory: URL
 
     static func parse(_ arguments: [String]) -> SnapshotOptions? {
@@ -63,7 +64,7 @@ enum SnapshotRunner {
         func write(_ name: String, _ make: () async throws -> Data) async {
             do {
                 let url = options.directory.appending(path: "\(name).png")
-                try await make().write(to: url)
+                try await make().write(to: url, options: .atomic)
                 written.append(url)
                 print(url.path)
             } catch {
