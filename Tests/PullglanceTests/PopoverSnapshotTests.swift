@@ -44,3 +44,22 @@ import Testing
         #expect(fractional.isEmpty, "row scroll views on fractional pixels: \(fractional)")
     }
 }
+
+@Suite struct SnapshotOptionsTests {
+    @Test func parsesTheFlagWithAndWithoutADirectory() {
+        #expect(SnapshotOptions.parse(["Pullglance"]) == nil)
+        #expect(SnapshotOptions.parse(["Pullglance", "--snapshot"])?.directory == SnapshotOptions.defaultDirectory)
+        #expect(SnapshotOptions.parse(["Pullglance", "--snapshot", "/tmp/x"])?.directory.path == "/tmp/x")
+        #expect(SnapshotOptions.parse(["Pullglance", "--snapshot", "-NSOther"])?.directory == SnapshotOptions.defaultDirectory)
+    }
+}
+
+@MainActor
+@Suite struct ViewSnapshotTests {
+    @Test func rendersAViewToARetinaPNG() async throws {
+        let data = try await ViewSnapshot.png(Text(verbatim: "hello").padding(), width: 120, settle: .milliseconds(60))
+        let rep = try #require(NSBitmapImageRep(data: data))
+        #expect(rep.pixelsWide >= 120)
+        #expect(rep.pixelsHigh > 0)
+    }
+}

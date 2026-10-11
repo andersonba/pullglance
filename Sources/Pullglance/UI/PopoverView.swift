@@ -27,6 +27,11 @@ struct PopoverView: View {
 
     enum Tab: Hashable { case mine, review }
 
+    init(store: PRStore, tab: Tab = .mine) {
+        self.store = store
+        _tab = State(initialValue: tab)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
