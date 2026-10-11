@@ -373,6 +373,9 @@ struct SectionsSettingsView: View {
     var body: some View {
         Form {
             SwiftUI.Section {
+                BadgeModeRow(store: store)
+            }
+            SwiftUI.Section {
                 ReorderSectionGroup(store: store, tab: .mine)
                 SnoozedSectionRow(section: .snoozedMine, store: store)
             } header: {
@@ -417,7 +420,7 @@ private struct SnoozedSectionRow: View {
                 set: { on in if on { store.visibleSections.insert(section) } else { store.visibleSections.remove(section) } }
             )) { EmptyView() }
                 .toggleStyle(.checkbox).labelsHidden().frame(width: ReorderSectionGroup.columnWidth)
-            Text(verbatim: "—").foregroundStyle(.tertiary).frame(width: ReorderSectionGroup.columnWidth)
+            Text(verbatim: "—").foregroundStyle(.tertiary).frame(width: ReorderSectionGroup.badgeColumnWidth)
         }
         .frame(height: ReorderSectionGroup.rowHeight)
         .listRowInsets(EdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 10))
@@ -440,8 +443,12 @@ private struct ReorderSectionGroup: View {
     static let rowHeight: CGFloat = 44
     static let handleWidth: CGFloat = 26
     static let columnWidth: CGFloat = 56
+    /// Wide enough for the three-state picker of dual mode.
+    static let badgeColumnWidth: CGFloat = 78
 
-    private var stableItems: [Section] { Section.allCases.filter { $0.tab == tab } }
+    /// Snoozed has its own fixed row below the group; inside it, with no position in the order, it would
+    /// land on index 0 and be drawn over the first row.
+    private var stableItems: [Section] { Section.reorderable(in: tab) }
     private var currentOrder: [Section] { store.orderedSections(tab) }
     private var displayedOrder: [Section] {
         guard let session, session.original == currentOrder else { return currentOrder }
@@ -454,7 +461,7 @@ private struct ReorderSectionGroup: View {
             title
             Spacer()
             Text("Show", bundle: .app).frame(width: columnWidth)
-            Text("Badge", bundle: .app).frame(width: columnWidth)
+            Text("Badge", bundle: .app).frame(width: badgeColumnWidth)
         }
         .font(.caption)
         .textCase(nil)
@@ -505,8 +512,24 @@ private struct ReorderSectionGroup: View {
             Spacer(minLength: 8)
             Toggle(isOn: membership(section, \.visibleSections)) { EmptyView() }
                 .toggleStyle(.checkbox).labelsHidden().frame(width: Self.columnWidth)
-            Toggle(isOn: membership(section, \.badgeSections)) { EmptyView() }
-                .toggleStyle(.checkbox).labelsHidden().frame(width: Self.columnWidth)
+            Group {
+                if store.badgeMode == .dual {
+                    Picker(selection: slot(section)) {
+                        Text(verbatim: "–").tag(SlotChoice.none)
+                        Text(verbatim: "1").tag(SlotChoice.first)
+                        Text(verbatim: "2").tag(SlotChoice.second)
+                    } label: { EmptyView() }
+                    .pickerStyle(.segmented)
+                    .controlSize(.mini)
+                    .labelsHidden()
+                    .fixedSize()
+                    .help(Text("Counts toward the first number, the second, or neither", bundle: .app))
+                } else {
+                    Toggle(isOn: membership(section, \.badgeSections)) { EmptyView() }
+                        .toggleStyle(.checkbox).labelsHidden()
+                }
+            }
+            .frame(width: Self.badgeColumnWidth)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityAction(named: Text("Move up")) { moveAccessibly(section, by: -1) }
@@ -548,6 +571,27 @@ private struct ReorderSectionGroup: View {
         guard let source = order.firstIndex(of: section), order.indices.contains(source + delta) else { return }
         let pending = ReorderSession(original: order, source: source, destination: source + delta)
         store.moveSections(in: tab, from: IndexSet(integer: source), to: pending.insertionOffset)
+    }
+
+    private enum SlotChoice: Hashable { case none, first, second }
+
+    private func slot(_ section: Section) -> Binding<SlotChoice> {
+        Binding(
+            get: {
+                switch store.badgeSlot(for: section) {
+                case .first: .first
+                case .second: .second
+                case nil: .none
+                }
+            },
+            set: { choice in
+                switch choice {
+                case .first: store.setBadgeSlot(.first, for: section)
+                case .second: store.setBadgeSlot(.second, for: section)
+                case .none: store.setBadgeSlot(nil, for: section)
+                }
+            }
+        )
     }
 
     private func membership(_ section: Section, _ keyPath: ReferenceWritableKeyPath<PRStore, Set<Section>>) -> Binding<Bool> {
@@ -632,5 +676,45 @@ struct DiagnosticsSettingsView: View {
         }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
+    }
+}
+
+/// "Badge shows: One number | Two numbers", with a live preview of the menu bar item so the effect of the
+/// choices below is visible right here.
+private struct BadgeModeRow: View {
+    @Bindable var store: PRStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Text("Badge shows", bundle: .app)
+                SegmentedControl(
+                    selection: $store.badgeMode,
+                    segments: [
+                        .init(value: .single, title: Text("One number", bundle: .app)),
+                        .init(value: .dual, title: Text("Two numbers", bundle: .app)),
+                    ],
+                    fontSize: 12
+                )
+                Spacer()
+                preview
+            }
+            Text(store.badgeMode == .dual
+                 ? "Each section counts toward the first number, the second, or neither."
+                 : "The badge adds up the sections checked below.", bundle: .app)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
+    }
+
+    /// The menu bar item as it looks right now, on a dark strip so it reads the same in both appearances.
+    private var preview: some View {
+        MenuBarLabel(text: store.badgeText, hasData: store.badgeCount != nil, isError: false)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(Color(white: 0.16), in: RoundedRectangle(cornerRadius: 6))
+            .help(Text(verbatim: store.badgeDescription ?? ""))
     }
 }

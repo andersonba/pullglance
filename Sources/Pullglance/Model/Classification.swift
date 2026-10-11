@@ -63,6 +63,28 @@ func filterViaTeam(all: [PullRequest], direct: [PullRequest], viewerLogin: Strin
 }
 
 /// `viaTeam` is the already filtered team list (see `filterViaTeam`). Snoozed PRs never count.
+/// How the menu bar number is built: one total, or two numbers each adding up its own sections.
+enum BadgeMode: String, Codable, Sendable, CaseIterable {
+    case single, dual
+}
+
+/// Which of the two numbers a section counts toward.
+enum BadgeSlot: Sendable, Equatable {
+    case first, second
+}
+
+/// The menu bar text. Two numbers keep both positions ("2 · 0") so the eye learns where each lives;
+/// nothing is shown when everything is zero.
+func badgeText(first: Int, second: Int?, mode: BadgeMode) -> String? {
+    switch mode {
+    case .single:
+        return first > 0 ? "\(first)" : nil
+    case .dual:
+        let second = second ?? 0
+        return first == 0 && second == 0 ? nil : "\(first) · \(second)"
+    }
+}
+
 func computeBadgeCount(mine: [PullRequest], direct: [PullRequest], viaTeam: [PullRequest], counting sections: Set<Section>, dormant: Set<String> = []) -> Int {
     let awake = { (prs: [PullRequest]) in prs.filter { !dormant.contains($0.id) } }
     let groups = groupMine(awake(mine))

@@ -23,7 +23,8 @@ struct PullglanceApp: App {
         MenuBarExtra {
             PopoverView(store: store)
         } label: {
-            MenuBarLabel(badgeCount: store.badgeCount, isError: store.lastError != nil)
+            MenuBarLabel(text: store.badgeText, hasData: store.badgeCount != nil, isError: store.lastError != nil)
+                .help(Text(verbatim: store.badgeDescription ?? ""))
         }
         .menuBarExtraStyle(.window)
 

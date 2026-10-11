@@ -62,6 +62,9 @@ final class PRStore {
     static let dormantKey = "dormant"
     static let hiddenSectionsKey = "hiddenSections"
     static let badgeSectionsKey = "badgeSections"
+    static let dualBadgeFirstKey = "dualBadgeFirst"
+    static let dualBadgeSecondKey = "dualBadgeSecond"
+    static let badgeModeKey = "badgeMode"
     static let sectionOrderKey = "sectionOrder"
 
     private(set) var mine = Snapshot<[PullRequest]>(value: [], total: 0, fetchedAt: nil)
@@ -77,6 +80,14 @@ final class PRStore {
     private(set) var lastError: ErrorKind? = nil
     /// nil until the first fully successful refresh; kept on later failures.
     private(set) var badgeCount: Int? = nil
+    /// The second number in dual mode; nil in single mode or before the first successful refresh.
+    private(set) var badgeSecondCount: Int? = nil
+
+    /// What the menu bar shows next to the icon, once there is data.
+    var badgeText: String? {
+        guard let badgeCount else { return nil }
+        return Pullglance.badgeText(first: badgeCount, second: badgeSecondCount, mode: badgeMode)
+    }
     private(set) var viewerLogin: String? = nil
     private(set) var viewerOrganizations: [String] = []
     /// Snoozed PRs by id, with the state they had when snoozed. Stored per machine.
@@ -164,8 +175,77 @@ final class PRStore {
         }
     }
 
+    /// Tooltip for the menu bar item: which sections are behind each number.
+    var badgeDescription: String? {
+        guard let badgeCount else { return nil }
+        let names = { (sections: Set<Section>) in
+            self.sectionOrder.filter(sections.contains).map(\.title).joined(separator: ", ")
+        }
+        switch badgeMode {
+        case .single: return "\(badgeCount) · \(names(badgeSections))"
+        case .dual: return "\(badgeCount) · \(names(dualBadgeFirst))\n\(badgeSecondCount ?? 0) · \(names(dualBadgeSecond))"
+        }
+    }
+
+    /// Dual mode has its own configuration, so switching modes brings back what each one had.
+    /// `badgeSections` belongs to single mode; these two, disjoint, to dual mode.
+    static let defaultDualFirst: Set<Section> = [.needsAction, .readyToMerge]
+    static let defaultDualSecond: Set<Section> = [.needsYourReview]
+
+    private(set) var dualBadgeFirst: Set<Section> {
+        didSet { defaults.set(dualBadgeFirst.map(\.rawValue).sorted(), forKey: Self.dualBadgeFirstKey); badgeSetsChanged() }
+    }
+
+    private(set) var dualBadgeSecond: Set<Section> {
+        didSet { defaults.set(dualBadgeSecond.map(\.rawValue).sorted(), forKey: Self.dualBadgeSecondKey); badgeSetsChanged() }
+    }
+
+    private func badgeSetsChanged() {
+        recomputeBadge()
+        if wantsTeamFetch, viaTeam == nil, !isLoadingViaTeam {
+            Task { await refreshViaTeam() }
+        }
+    }
+
+    var badgeMode: BadgeMode {
+        didSet {
+            defaults.set(badgeMode.rawValue, forKey: Self.badgeModeKey)
+            badgeSetsChanged()
+        }
+    }
+
+    /// Dual mode: which number a section counts toward.
+    func badgeSlot(for section: Section) -> BadgeSlot? {
+        if dualBadgeFirst.contains(section) { return .first }
+        if dualBadgeSecond.contains(section) { return .second }
+        return nil
+    }
+
+    /// Dual mode: moves a section to one number, the other, or out. A section never counts twice.
+    func setBadgeSlot(_ slot: BadgeSlot?, for section: Section) {
+        var first = dualBadgeFirst
+        var second = dualBadgeSecond
+        first.remove(section)
+        second.remove(section)
+        switch slot {
+        case .first: first.insert(section)
+        case .second: second.insert(section)
+        case nil: break
+        }
+        if first != dualBadgeFirst { dualBadgeFirst = first }
+        if second != dualBadgeSecond { dualBadgeSecond = second }
+    }
+
+    /// The sections counted right now, per the mode.
+    private var countedSections: (first: Set<Section>, second: Set<Section>?) {
+        badgeMode == .dual ? (dualBadgeFirst, dualBadgeSecond) : (badgeSections, nil)
+    }
+
     /// The team search runs every cycle when the section is open or counted in the badge.
-    private var wantsTeamFetch: Bool { isViaTeamExpanded || badgeSections.contains(.needsTeamsReview) }
+    private var wantsTeamFetch: Bool {
+        let counted = countedSections
+        return isViaTeamExpanded || counted.first.contains(.needsTeamsReview) || (counted.second?.contains(.needsTeamsReview) ?? false)
+    }
 
     var isViaTeamExpanded: Bool {
         didSet {
@@ -220,6 +300,10 @@ final class PRStore {
         }
         self.visibleSections = Set(Section.allCases).subtracting(Self.sections(in: defaults, key: Self.hiddenSectionsKey) ?? [])
         self.badgeSections = Self.sections(in: defaults, key: Self.badgeSectionsKey) ?? Section.defaultBadge
+        let dualFirst = Self.sections(in: defaults, key: Self.dualBadgeFirstKey) ?? Self.defaultDualFirst
+        self.dualBadgeFirst = dualFirst
+        self.dualBadgeSecond = (Self.sections(in: defaults, key: Self.dualBadgeSecondKey) ?? Self.defaultDualSecond).subtracting(dualFirst)
+        self.badgeMode = defaults.string(forKey: Self.badgeModeKey).flatMap(BadgeMode.init(rawValue:)) ?? .single
         self.sectionOrder = Self.normalizedOrder(defaults.stringArray(forKey: Self.sectionOrderKey)?.compactMap(Section.init(rawValue:)) ?? [])
         let seconds = defaults.integer(forKey: Self.intervalKey)
         self.refreshInterval = .seconds(seconds > 0 ? seconds : 120)
@@ -252,6 +336,9 @@ final class PRStore {
     func resetSectionsToDefault() {
         sectionOrder = Section.allCases
         visibleSections = Set(Section.allCases)
+        badgeMode = .single
+        dualBadgeFirst = Self.defaultDualFirst
+        dualBadgeSecond = Self.defaultDualSecond
         badgeSections = Section.defaultBadge
     }
 
@@ -641,7 +728,8 @@ final class PRStore {
         if errors.isEmpty {
             lastError = nil
             phase = .ok(date)
-            badgeCount = computeBadgeCount(mine: allowed(mine.value), direct: allowed(direct.value), viaTeam: viaTeamList, counting: badgeSections, dormant: dormantIDs.union(mergedIDs))
+            badgeCount = 0
+            recomputeBadge()
         } else {
             let kind = mostSevere(errors)
             lastError = kind
@@ -652,7 +740,12 @@ final class PRStore {
     /// Only once a full cycle has succeeded; before that the badge stays nil on purpose.
     private func recomputeBadge() {
         guard badgeCount != nil else { return }
-        badgeCount = computeBadgeCount(mine: allowed(mine.value), direct: allowed(direct.value), viaTeam: viaTeamList, counting: badgeSections, dormant: dormantIDs.union(mergedIDs))
+        let count = { (sections: Set<Section>) in
+            computeBadgeCount(mine: self.allowed(self.mine.value), direct: self.allowed(self.direct.value), viaTeam: self.viaTeamList, counting: sections, dormant: self.dormantIDs.union(self.mergedIDs))
+        }
+        let counted = countedSections
+        badgeCount = count(counted.first)
+        badgeSecondCount = counted.second.map(count)
     }
 
     private func mostSevere(_ errors: [ErrorKind]) -> ErrorKind {

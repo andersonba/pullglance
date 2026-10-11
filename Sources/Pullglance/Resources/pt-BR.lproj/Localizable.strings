@@ -192,3 +192,11 @@
 "Comment" = "Comentar";
 "Open" = "Abrir";
 "More" = "Mais";
+
+/* Badge mode */
+"Badge shows" = "O contador mostra";
+"One number" = "Um número";
+"Two numbers" = "Dois números";
+"The badge adds up the sections checked below." = "O contador soma as seções marcadas abaixo.";
+"Each section counts toward the first number, the second, or neither." = "Cada seção conta no primeiro número, no segundo, ou em nenhum.";
+"Counts toward the first number, the second, or neither" = "Conta no primeiro número, no segundo, ou em nenhum";

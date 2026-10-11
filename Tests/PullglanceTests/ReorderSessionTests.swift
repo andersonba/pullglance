@@ -29,4 +29,10 @@ import Testing
         #expect(ReorderSession<String>.slot(at: 44, rowHeight: 44, count: 4) == 1)
         #expect(ReorderSession<String>.slot(at: 1000, rowHeight: 44, count: 4) == 3)
     }
+
+    /// Snoozed is rendered as its own fixed row; inside the group it would overlap the first row.
+    @Test func reorderGroupLeavesSnoozedOut() {
+        #expect(Section.reorderable(in: .mine) == [.needsAction, .readyToMerge, .waitingForReview, .drafts])
+        #expect(Section.reorderable(in: .review) == [.needsYourReview, .needsTeamsReview])
+    }
 }

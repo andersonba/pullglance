@@ -33,6 +33,11 @@ enum Section: String, CaseIterable, Sendable, Identifiable {
     /// Everything that depends on you: fix it, merge it, or review it.
     static let defaultBadge: Set<Section> = [.needsAction, .readyToMerge, .needsYourReview]
 
+    /// The sections a user can reorder in a tab: everything but Snoozed, which is always last.
+    static func reorderable(in tab: Tab) -> [Section] {
+        allCases.filter { $0.tab == tab && !$0.isSnoozed }
+    }
+
     var title: String {
         switch self {
         case .needsAction: String(localized: "Needs action", bundle: .app)

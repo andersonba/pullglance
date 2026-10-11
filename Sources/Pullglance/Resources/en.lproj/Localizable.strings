@@ -192,3 +192,11 @@
 "Comment" = "Comment";
 "Open" = "Open";
 "More" = "More";
+
+/* Badge mode */
+"Badge shows" = "Badge shows";
+"One number" = "One number";
+"Two numbers" = "Two numbers";
+"The badge adds up the sections checked below." = "The badge adds up the sections checked below.";
+"Each section counts toward the first number, the second, or neither." = "Each section counts toward the first number, the second, or neither.";
+"Counts toward the first number, the second, or neither" = "Counts toward the first number, the second, or neither";
