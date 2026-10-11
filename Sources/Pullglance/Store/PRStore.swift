@@ -341,11 +341,12 @@ final class PRStore {
     private var pendingRefresh = false
     private var timerTask: Task<Void, Never>?
 
-    init(client: any GHRunning, defaults: UserDefaults = .standard, now: @escaping @Sendable () -> Date = { Date() }, successLinger: Duration = .seconds(1), log: AppLog = .shared) {
+    init(client: any GHRunning, defaults: UserDefaults = .standard, now: @escaping @Sendable () -> Date = { Date() }, successLinger: Duration = .seconds(1), log: AppLog = .shared, ciPollInterval: Duration = .seconds(20)) {
         self.client = client
         self.defaults = defaults
         self.now = now
         self.successLinger = successLinger
+        self.ciPollInterval = ciPollInterval
         self.appLog = log
         let verbose = defaults.bool(forKey: Self.verboseLoggingKey)
         self.verboseLogging = verbose
@@ -609,10 +610,11 @@ final class PRStore {
     /// Fetches this one pull request again and puts the answer in place: the row moves section if its
     /// state changed, leaves if it was merged or closed, and counts follow. Much cheaper than a full
     /// refresh, which is what makes it worth a menu item ("did CI finish yet?").
-    func refreshOne(_ pr: PullRequest) async -> ActionResult {
-        setActionState(.running(.refresh), for: pr)
+    /// `quiet` is the poller: no spinner, no failure on the row (just the log).
+    func refreshOne(_ pr: PullRequest, quiet: Bool = false) async -> ActionResult {
+        if !quiet { setActionState(.running(.refresh), for: pr) }
         let parts = pr.repo.split(separator: "/", maxSplits: 1).map(String.init)
-        guard parts.count == 2 else { return fail(pr, "bad repository name") }
+        guard parts.count == 2 else { return fail(pr, "bad repository name", quiet: quiet) }
         let inMine = mine.value.contains { $0.id == pr.id }
         let outcome = await client.pullRequest(owner: parts[0], name: parts[1], number: pr.number, includeMergeState: inMine)
         switch outcome {
@@ -628,22 +630,22 @@ final class PRStore {
                     appLog.info("refresh \(pr.id): gone")
                     withAnimation(.easeInOut(duration: 0.3)) { removeLocally(pr) }
                 }
-                clearActionState(for: pr)
+                if !quiet { clearActionState(for: pr) }
                 return .success()
             } catch DecodingFailure.noData(let errors) {
-                return fail(pr, errors.first ?? "no data")
+                return fail(pr, errors.first ?? "no data", quiet: quiet)
             } catch {
-                return fail(pr, String(describing: error))
+                return fail(pr, String(describing: error), quiet: quiet)
             }
         case .ghNotFound, .notAuthenticated, .failure:
-            if case .failure(let message) = outcomeResult(outcome) { return fail(pr, message) }
-            return fail(pr, "unknown error")
+            if case .failure(let message) = outcomeResult(outcome) { return fail(pr, message, quiet: quiet) }
+            return fail(pr, "unknown error", quiet: quiet)
         }
     }
 
-    private func fail(_ pr: PullRequest, _ message: String) -> ActionResult {
+    private func fail(_ pr: PullRequest, _ message: String, quiet: Bool) -> ActionResult {
         appLog.info("refresh \(pr.id): failed (\(message))")
-        setActionState(.failed(.refresh, message), for: pr)
+        if !quiet { setActionState(.failed(.refresh, message), for: pr) }
         return .failure(message)
     }
 
@@ -739,6 +741,62 @@ final class PRStore {
 
     /// While true the timer skips its cycles (the list must not move under a drag). Manual refresh still works.
     var holdsAutoRefresh = false
+
+    // MARK: CI polling while the popover is open
+
+    /// Only CI changes by itself within minutes, and only while the popover is open does anyone wait for
+    /// it. So, while it is open, every `ciPollInterval` the rows with CI still running are looked up one by
+    /// one (`refreshOne`, quietly) and move section when the result comes in. The poller always yields:
+    /// it skips a round while a full cycle is in flight or about to start, while reorder mode holds the
+    /// list, and skips a row the user is acting on. Not a setting: there is no trade-off worth a knob.
+    let ciPollInterval: Duration
+    static let ciPollMaxPerRound = 10
+    /// A full cycle this close brings the same answers, more completely.
+    static let ciPollYieldWindow: TimeInterval = 5
+    private var ciPollTask: Task<Void, Never>?
+
+    func startCIPolling() {
+        guard ciPollTask == nil else { return }
+        ciPollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                try? await Task.sleep(for: self.ciPollInterval)
+                guard !Task.isCancelled else { return }
+                _ = await self.pollPendingCI()
+            }
+        }
+    }
+
+    func stopCIPolling() {
+        ciPollTask?.cancel()
+        ciPollTask = nil
+    }
+
+    /// One round. Returns how many pull requests were looked up.
+    @discardableResult
+    func pollPendingCI() async -> Int {
+        guard !inFlight, !holdsAutoRefresh else { return 0 }
+        if let nextRefreshAt, nextRefreshAt.timeIntervalSince(now()) < Self.ciPollYieldWindow { return 0 }
+        var seen = Set<String>()
+        let candidates = (mine.value + direct.value + (viaTeam?.value ?? [])).filter { pr in
+            guard pr.ciState == .pending, !dormantIDs.contains(pr.id), actionStates[pr.id] == nil, !seen.contains(pr.id) else { return false }
+            seen.insert(pr.id)
+            return true
+        }
+        let round = Array(candidates.prefix(Self.ciPollMaxPerRound))
+        guard !round.isEmpty else { return 0 }
+        appLog.debug("ci poll: \(candidates.count) pending, checking \(round.count)")
+        var checked = 0
+        for pr in round {
+            // Re-check before each one: the poller may have been stopped, a cycle may have started, or the
+            // user may have acted meanwhile.
+            guard !Task.isCancelled else { break }
+            guard !inFlight, !holdsAutoRefresh, actionStates[pr.id] == nil else { continue }
+            _ = await refreshOne(pr, quiet: true)
+            checked += 1
+        }
+        return checked
+    }
 
     func start() { restartTimer() }
 

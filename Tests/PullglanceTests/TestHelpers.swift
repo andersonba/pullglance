@@ -52,11 +52,11 @@ func pullRequestEnvelope(_ node: String?, state: String = "OPEN") -> Data {
     return Data(("{\"data\":{\"repository\":{\"pullRequest\":" + body + "}}}").utf8)
 }
 
-func node(number: Int, ci: String?, decision: String? = nil, draft: Bool = false, mergeable: String = "MERGEABLE", mergeState: String = "CLEAN", headRefOid: String = "abc1234", repoExtra: String = "\"mergeCommitAllowed\":false,\"squashMergeAllowed\":true,\"rebaseMergeAllowed\":false,\"deleteBranchOnMerge\":true,\"viewerDefaultMergeMethod\":\"SQUASH\"") -> String {
+func node(number: Int, ci: String?, decision: String? = nil, draft: Bool = false, mergeable: String = "MERGEABLE", mergeState: String = "CLEAN", headRefOid: String = "abc1234", repo: String = "acme/web", repoExtra: String = "\"mergeCommitAllowed\":false,\"squashMergeAllowed\":true,\"rebaseMergeAllowed\":false,\"deleteBranchOnMerge\":true,\"viewerDefaultMergeMethod\":\"SQUASH\"") -> String {
     let rollup = ci.map { "{\"state\":\"\($0)\"}" } ?? "null"
     let dec = decision.map { "\"\($0)\"" } ?? "null"
     return """
-    {"number":\(number),"title":"PR \(number)","url":"https://github.com/acme/web/pull/\(number)","isDraft":\(draft),"mergeable":"\(mergeable)","mergeStateStatus":"\(mergeState)","baseRefName":"main","headRefName":"feature-\(number)","headRefOid":"\(headRefOid)","updatedAt":"2026-10-10T10:00:00Z","repository":{"nameWithOwner":"acme/web",\(repoExtra)},"author":{"login":"someone","avatarUrl":"https://example.com/someone.png"},"reviewDecision":\(dec),"reviewThreads":{"nodes":[]},"reviewRequests":{"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":\(rollup)}}]}}
+    {"number":\(number),"title":"PR \(number)","url":"https://github.com/\(repo)/pull/\(number)","isDraft":\(draft),"mergeable":"\(mergeable)","mergeStateStatus":"\(mergeState)","baseRefName":"main","headRefName":"feature-\(number)","headRefOid":"\(headRefOid)","updatedAt":"2026-10-10T10:00:00Z","repository":{"nameWithOwner":"\(repo)",\(repoExtra)},"author":{"login":"someone","avatarUrl":"https://example.com/someone.png"},"reviewDecision":\(dec),"reviewThreads":{"nodes":[]},"reviewRequests":{"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":\(rollup)}}]}}
     """
 }
 
@@ -77,6 +77,7 @@ actor FakeGH: GHRunning {
     func setPullRequest(_ outcome: GHOutcome, number: Int) { pullRequestOutcomes[number] = outcome }
     func pullRequest(owner: String, name: String, number: Int, includeMergeState: Bool) async -> GHOutcome {
         lookups.append((owner, name, number, includeMergeState))
+        if delay > .zero { try? await Task.sleep(for: delay) }
         return pullRequestOutcomes[number] ?? .failure("no scripted pull request \(number)")
     }
 

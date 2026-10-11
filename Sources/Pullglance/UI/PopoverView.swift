@@ -108,8 +108,12 @@ struct PopoverView: View {
             }
         }
         .frame(width: 380)
-        .onAppear { SettingsOpener.bringSettingsForwardIfOpen() }
+        .onAppear {
+            SettingsOpener.bringSettingsForwardIfOpen()
+            store.startCIPolling()
+        }
         .onDisappear {
+            store.stopCIPolling()
             mineFilter = nil
             reviewFilter = nil
             openRow = nil
