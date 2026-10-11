@@ -185,3 +185,8 @@
 "already merged" = "já mergeado";
 "closed" = "fechado";
 "not allowed" = "sem permissão";
+
+/* Swipe actions */
+"Comment" = "Comentar";
+"Open" = "Abrir";
+"More" = "Mais";

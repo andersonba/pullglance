@@ -9,20 +9,26 @@ struct QuickFilterItem: Equatable, Identifiable, Sendable {
 }
 
 /// Chips for a tab, honoring the sections the user keeps visible. Fewer than two sections means no chips:
-/// there is nothing to isolate.
-func quickFilterItems(sections ordered: [Section], visible: Set<Section>, mine: MineGroups, directTotal: Int, teamTotal: Int?) -> [QuickFilterItem] {
+/// there is nothing to isolate. Snoozed gets a chip only while something is snoozed; "All" never counts it.
+func quickFilterItems(sections ordered: [Section], visible: Set<Section>, mine: MineGroups, directTotal: Int, teamTotal: Int?, snoozedReview: Int) -> [QuickFilterItem] {
     let sections = ordered.filter { visible.contains($0) && !$0.isSnoozed }
     guard sections.count >= 2, let tab = sections.first?.tab else { return [] }
+    let items: [QuickFilterItem]
+    let snoozed: QuickFilterItem
     switch tab {
     case .mine:
         let all = QuickFilterItem(section: nil, count: sections.reduce(0) { $0 + mine[$1].count })
-        return [all] + sections.map { QuickFilterItem(section: $0, count: mine[$0].count) }
+        items = [all] + sections.map { QuickFilterItem(section: $0, count: mine[$0].count) }
+        snoozed = QuickFilterItem(section: .snoozedMine, count: mine.snoozed.count)
     case .review:
         let all = QuickFilterItem(section: nil, count: nil)
-        return [all] + sections.map { section in
+        items = [all] + sections.map { section in
             QuickFilterItem(section: section, count: section == .needsYourReview ? directTotal : teamTotal)
         }
+        snoozed = QuickFilterItem(section: .snoozedReview, count: snoozedReview)
     }
+    let showSnoozed = visible.contains(snoozed.section!) && (snoozed.count ?? 0) > 0
+    return showSnoozed ? items + [snoozed] : items
 }
 
 extension Section {

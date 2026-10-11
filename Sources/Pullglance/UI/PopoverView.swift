@@ -12,6 +12,8 @@ struct PopoverView: View {
     @State private var commenting: PullRequest? = nil
     @State private var toast: String? = nil
     @State private var toastTask: Task<Void, Never>? = nil
+    /// The row whose swipe actions are showing, if any. One at a time, like Mail.
+    @State private var openRow: PullRequest.ID? = nil
 
     static let maxListHeight: CGFloat = 480
 
@@ -35,7 +37,8 @@ struct PopoverView: View {
                     visible: store.visibleSections,
                     mine: store.mineGroups,
                     directTotal: store.direct.total,
-                    teamTotal: store.viaTeamTotal
+                    teamTotal: store.viaTeamTotal,
+                    snoozedReview: store.snoozedReviewList.count
                 )
                 if !items.isEmpty {
                     QuickFilterBar(items: items, selection: tab == .mine ? $mineFilter : $reviewFilter)
@@ -88,7 +91,9 @@ struct PopoverView: View {
         .onDisappear {
             mineFilter = nil
             reviewFilter = nil
+            openRow = nil
         }
+        .onChange(of: tab) { _, _ in openRow = nil }
     }
 
     @ViewBuilder private var content: some View {
@@ -110,6 +115,10 @@ struct PopoverView: View {
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
             }
             .scrollIndicators(.never)
+            // Scrolling the list puts a revealed row away.
+            .onScrollPhaseChange { _, phase in
+                if phase == .interacting || phase == .decelerating { openRow = nil }
+            }
             .background(OverlayScrollerStyle())
             .frame(height: min(max(listHeight, 1), Self.maxListHeight))
             // Only the measured height must not animate (it caused a visible jump); row changes may.
@@ -133,10 +142,14 @@ struct PopoverView: View {
     }
 
     private func handle(_ action: PRAction, for pr: PullRequest) {
+        // Any action, from a tile, the "more" tile or the context menu, puts a revealed row away.
+        openRow = nil
         switch action {
         case .merge: merging = pr
         case .comment: commenting = pr
-        case .snooze: store.isDormant(pr) ? store.wake(pr) : store.snooze(pr)
+        case .snooze:
+            // The row travels between its section and Snoozed; let it fade and slide rather than jump.
+            withAnimation(.easeInOut(duration: 0.3)) { store.isDormant(pr) ? store.wake(pr) : store.snooze(pr) }
         case .open: PopoverDismissal.open(pr.url)
         case .copyLink:
             NSPasteboard.general.clearContents()
@@ -151,20 +164,33 @@ struct PopoverView: View {
     private func row(_ pr: PullRequest, section: Section, showAuthor: Bool = false, teamLabel: String? = nil) -> some View {
         let dormant = store.isDormant(pr)
         return rowView(pr, section: section, showAuthor: showAuthor, teamLabel: teamLabel, dormant: dormant)
-            .transition(.asymmetric(insertion: .opacity, removal: .opacity.combined(with: .scale(scale: 0.97, anchor: .leading))))
+            .transition(.asymmetric(insertion: .opacity, removal: .collapse))
     }
 
     private func rowView(_ pr: PullRequest, section: Section, showAuthor: Bool, teamLabel: String?, dormant: Bool) -> some View {
-        PRRow(
-            pr: pr,
-            section: dormant ? store.originSection(of: pr) : section,
-            showAuthor: showAuthor,
-            teamLabel: teamLabel,
+        let actionSection = dormant ? store.originSection(of: pr) : section
+        let actionState = store.actionState(for: pr)
+        let running: Bool = { if case .running = actionState { return true }; return false }()
+        return SwipeActionsRow(
+            id: pr.id,
+            actions: quickActions(for: actionSection, dormant: dormant),
+            openRow: $openRow,
             isDormant: dormant,
-            originSection: dormant ? store.originSection(of: pr) : nil,
-            actionState: store.actionState(for: pr),
-            onAction: { handle($0, for: pr) }
-        )
+            isRunning: running,
+            onAction: { handle($0, for: pr) },
+            menu: { PRRowMenu(section: actionSection, isDormant: dormant, actionState: actionState, onAction: { handle($0, for: pr) }) }
+        ) {
+            PRRow(
+                pr: pr,
+                section: actionSection,
+                showAuthor: showAuthor,
+                teamLabel: teamLabel,
+                isDormant: dormant,
+                originSection: dormant ? store.originSection(of: pr) : nil,
+                actionState: actionState,
+                onAction: { handle($0, for: pr) }
+            )
+        }
     }
 
     /// The tab's snoozed PRs, always last, only when there are any and the section is visible.
@@ -173,7 +199,7 @@ struct PopoverView: View {
             SectionHeader(title: section.title, count: prs.count)
             ForEach(prs) { pr in
                 row(pr, section: section, showAuthor: showAuthor)
-                Divider().padding(.leading, 12)
+                Divider()
             }
         }
     }
@@ -195,7 +221,7 @@ struct PopoverView: View {
             ForEach(shown) { section in
                 mineSection(section, groups[section])
             }
-            if mineFilter == nil {
+            if mineFilter == nil || mineFilter == .snoozedMine {
                 snoozedSection(.snoozedMine, groups.snoozed, showAuthor: false)
             }
         }
@@ -206,7 +232,7 @@ struct PopoverView: View {
             SectionHeader(title: section.title, count: prs.count)
             ForEach(prs) { pr in
                 row(pr, section: section)
-                Divider().padding(.leading, 12)
+                Divider()
             }
         }
     }
@@ -224,7 +250,7 @@ struct PopoverView: View {
         if store.visibleSections.isDisjoint(with: Section.reviewSections) {
             EmptyStateView(kind: .allClear)
         }
-        if reviewFilter == nil {
+        if reviewFilter == nil || reviewFilter == .snoozedReview {
             snoozedSection(.snoozedReview, store.snoozedReviewList, showAuthor: true)
         }
     }
@@ -241,7 +267,7 @@ struct PopoverView: View {
         }
         ForEach(store.directList) { pr in
             row(pr, section: .needsYourReview, showAuthor: true)
-            Divider().padding(.leading, 12)
+            Divider()
         }
     }
 
@@ -267,7 +293,7 @@ struct PopoverView: View {
             } else {
                 ForEach(store.viaTeamList) { pr in
                     row(pr, section: .needsTeamsReview, showAuthor: true, teamLabel: pr.requestedTeams.first)
-                    Divider().padding(.leading, 12)
+                    Divider()
                 }
                 Button {
                     PopoverDismissal.open(URL(string: "https://github.com/pulls/review-requested")!)
@@ -280,4 +306,24 @@ struct PopoverView: View {
             }
         }
     }
+}
+
+/// A leaving row folds up toward its top edge while the rows below slide over it, so it reads as the
+/// list closing the gap rather than a card vanishing in place.
+private struct CollapseModifier: ViewModifier, @preconcurrency Animatable {
+    var progress: CGFloat
+    nonisolated var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(x: 1, y: max(progress, 0.001), anchor: .top)
+            .opacity(progress)
+    }
+}
+
+extension AnyTransition {
+    static var collapse: AnyTransition { .modifier(active: CollapseModifier(progress: 0), identity: CollapseModifier(progress: 1)) }
 }

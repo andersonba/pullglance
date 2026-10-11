@@ -38,8 +38,14 @@ import Testing
         #expect(quickActions(for: .readyToMerge) == [.merge, .comment])
         #expect(quickActions(for: .needsAction) == [.open, .comment])
         #expect(quickActions(for: .needsYourReview) == [.open, .comment])
+        // A snoozed row leads with Wake, whatever its origin section.
+        #expect(quickActions(for: .readyToMerge, dormant: true) == [.snooze, .open])
+        #expect(quickActions(for: .needsAction, dormant: true) == [.snooze, .open])
         #expect(allActions(for: .readyToMerge) == [.merge, .comment, .snooze, .open, .copyLink])
         #expect(allActions(for: .drafts).contains(.merge) == false)
+        // A snoozed row leads with Wake in the menu too.
+        #expect(allActions(for: .readyToMerge, dormant: true) == [.snooze, .merge, .comment, .open, .copyLink])
+        #expect(allActions(for: .needsAction, dormant: true) == [.snooze, .comment, .open, .copyLink])
     }
 }
 

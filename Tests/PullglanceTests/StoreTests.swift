@@ -194,6 +194,21 @@ import Testing
         #expect(reloaded.visibleSections == [.needsAction, .needsYourReview])
     }
 
+    /// Visibility used to be stored as the visible set, so a section added later (Snoozed) came up hidden
+    /// for anyone with a saved preference. It is stored as the hidden set now, and the old key migrates.
+    @Test func sectionsAddedAfterTheSavedPreferenceStayVisible() async throws {
+        let defaults = testDefaults()
+        defaults.set(["needsAction", "needsYourReview"], forKey: "visibleSections")
+        let store = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })
+        #expect(store.visibleSections == [.needsAction, .needsYourReview, .snoozedMine, .snoozedReview])
+        #expect(defaults.object(forKey: "visibleSections") == nil)
+        #expect(Set(defaults.stringArray(forKey: PRStore.hiddenSectionsKey) ?? []) == ["drafts", "needsTeamsReview", "readyToMerge", "waitingForReview"])
+        store.visibleSections.remove(.snoozedMine)
+        let reloaded = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })
+        #expect(!reloaded.visibleSections.contains(.snoozedMine))
+        #expect(reloaded.visibleSections.contains(.snoozedReview))
+    }
+
     @Test func changingBadgeSectionsRecomputesWithoutAFetch() async throws {
         let gh = try await happyGH()
         let store = makeStore(gh)

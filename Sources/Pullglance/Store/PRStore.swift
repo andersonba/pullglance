@@ -60,7 +60,7 @@ final class PRStore {
     static let hiddenOwnersKey = "hiddenOwners"
     static let repoRulesKey = "repoRules"
     static let dormantKey = "dormant"
-    static let visibleSectionsKey = "visibleSections"
+    static let hiddenSectionsKey = "hiddenSections"
     static let badgeSectionsKey = "badgeSections"
     static let sectionOrderKey = "sectionOrder"
 
@@ -143,8 +143,9 @@ final class PRStore {
     var quickRepoFilter: Set<String> = []
 
     /// Sections shown in the popover. Missing from defaults means all.
+    /// Persisted as the hidden set, so a section added in a later version shows up for existing users.
     var visibleSections: Set<Section> {
-        didSet { defaults.set(visibleSections.map(\.rawValue).sorted(), forKey: Self.visibleSectionsKey) }
+        didSet { defaults.set(Set(Section.allCases).subtracting(visibleSections).map(\.rawValue).sorted(), forKey: Self.hiddenSectionsKey) }
     }
 
     /// Display order across both tabs. Each tab keeps its own relative order; see `orderedSections(_:)`.
@@ -211,7 +212,13 @@ final class PRStore {
         }
         self.repoRules = rules
         self.dormant = defaults.data(forKey: Self.dormantKey).flatMap { try? JSONDecoder().decode([String: DormantMark].self, from: $0) } ?? [:]
-        self.visibleSections = Self.sections(in: defaults, key: Self.visibleSectionsKey) ?? Set(Section.allCases)
+        if let legacyVisible = Self.sections(in: defaults, key: "visibleSections") {
+            // Older builds stored the visible set, before the Snoozed sections existed; those must not come up hidden.
+            let hidden = Set(Section.allCases).subtracting(legacyVisible).filter { !$0.isSnoozed }
+            defaults.set(hidden.map(\.rawValue).sorted(), forKey: Self.hiddenSectionsKey)
+            defaults.removeObject(forKey: "visibleSections")
+        }
+        self.visibleSections = Set(Section.allCases).subtracting(Self.sections(in: defaults, key: Self.hiddenSectionsKey) ?? [])
         self.badgeSections = Self.sections(in: defaults, key: Self.badgeSectionsKey) ?? Section.defaultBadge
         self.sectionOrder = Self.normalizedOrder(defaults.stringArray(forKey: Self.sectionOrderKey)?.compactMap(Section.init(rawValue:)) ?? [])
         let seconds = defaults.integer(forKey: Self.intervalKey)

@@ -56,7 +56,7 @@ struct PRRow: View {
             // A failed action reopens its modal; otherwise the row opens the PR.
             if case .failed(let action, _) = actionState { onAction(action) } else { PopoverDismissal.open(pr.url) }
         }
-        .contextMenu { menu }
+        .contextMenu { PRRowMenu(section: section, isDormant: isDormant, actionState: actionState, onAction: onAction) }
     }
 
     /// Left column: CI dot normally; spinner, merged check or failure mark while an action is in play;
@@ -92,14 +92,25 @@ struct PRRow: View {
         }
     }
 
-    @ViewBuilder private var menu: some View {
+}
+
+/// The row's full action list: the context menu, and the "more" tile revealed by a swipe.
+struct PRRowMenu: View {
+    let section: Section
+    var isDormant = false
+    var actionState: ActionState? = nil
+    var onAction: (PRAction) -> Void = { _ in }
+
+    private var isRunning: Bool { if case .running = actionState { return true }; return false }
+
+    var body: some View {
         if case .failed = actionState {
             Button { onAction(.refresh) } label: {
                 Label { Text("Refresh now", bundle: .app) } icon: { Image(systemName: "arrow.clockwise") }
             }
             Divider()
         }
-        ForEach(allActions(for: section), id: \.self) { action in
+        ForEach(allActions(for: section, dormant: isDormant), id: \.self) { action in
             Button { onAction(action) } label: {
                 switch action {
                 case .merge: Label { Text("Merge…", bundle: .app) } icon: { Image(systemName: "arrow.triangle.merge") }
@@ -181,6 +192,9 @@ struct CIDot: View {
 struct AuthorAvatar: View {
     let login: String
     let url: URL?
+    var cache: AvatarCache = .shared
+
+    private var sizedURL: URL? { url?.appending(queryItems: [URLQueryItem(name: "s", value: "40")]) }
 
     var body: some View {
         Group {
@@ -192,11 +206,12 @@ struct AuthorAvatar: View {
         }
         .frame(width: 16, height: 16)
         .clipShape(Circle())
-    var cache: AvatarCache = .shared
-
-    private var sizedURL: URL? { url?.appending(queryItems: [URLQueryItem(name: "s", value: "40")]) }
         .padding(.top, 3)
         .help(Text(verbatim: login))
+        .task(id: sizedURL) {
+            guard let sizedURL else { return }
+            _ = await cache.image(for: sizedURL)
+        }
     }
 
     private var initial: some View {
@@ -208,10 +223,6 @@ struct AuthorAvatar: View {
     }
 }
 
-        .task(id: sizedURL) {
-            guard let sizedURL else { return }
-            _ = await cache.image(for: sizedURL)
-        }
 struct PillView: View {
     let pill: Pill
 
