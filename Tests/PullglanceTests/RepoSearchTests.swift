@@ -41,18 +41,4 @@ import Testing
         #expect(result?.repos.map(\.fullName) == ["acme/payments-api"])
     }
 
-    @Test func hidingFromASearchListsTheRepoHiddenUnderItsOwner() async throws {
-        let gh = try await gh()
-        await gh.set(.success(try fixture("search-mine.json")), for: SearchQuery.mine(hiding: [], repos: ["acme/payments-api"]))
-        await gh.set(.success(try fixture("search-direct.json")), for: SearchQuery.direct(hiding: [], repos: ["acme/payments-api"]))
-        let defaults = testDefaults()
-        let store = PRStore(client: gh, defaults: defaults, now: { Date() })
-        await store.refresh()
-        store.hide(repos: ["acme/payments-api"])
-        try await Task.sleep(for: .milliseconds(150))
-        #expect(defaults.stringArray(forKey: PRStore.hiddenReposKey) == ["acme/payments-api"])
-        let acme = try #require(store.knownOwners.first { $0.login == "acme" })
-        #expect(acme.repos.map(\.fullName) == ["acme/api", "acme/cli", "acme/mobile", "acme/payments-api", "acme/web"])
-        #expect(acme.repos.first { $0.fullName == "acme/payments-api" }?.isHidden == true)
-    }
 }

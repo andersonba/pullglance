@@ -46,6 +46,7 @@ struct PopoverView: View {
             FooterView(store: store)
         }
         .frame(width: 380)
+        .onAppear { SettingsOpener.bringSettingsForwardIfOpen() }
         .onDisappear {
             mineFilter = nil
             reviewFilter = nil
