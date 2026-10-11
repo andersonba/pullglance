@@ -49,12 +49,12 @@ struct GHClient: GHRunning {
     }
 
     /// `-F` sends a typed value, so `withMerge` reaches GraphQL as a Boolean.
-    static func arguments(for query: String, includeMergeState: Bool) -> [String] {
-        ["api", "graphql", "-f", "query=\(searchQuery)", "-f", "q=\(query)", "-F", "withMerge=\(includeMergeState)"]
+    static func arguments(for query: String, includeMergeState: Bool, first: Int) -> [String] {
+        ["api", "graphql", "-f", "query=\(searchQuery)", "-f", "q=\(query)", "-F", "withMerge=\(includeMergeState)", "-F", "first=\(first)"]
     }
 
-    func search(_ query: String, includeMergeState: Bool) async -> GHOutcome {
-        await run(Self.arguments(for: query, includeMergeState: includeMergeState))
+    func search(_ query: String, includeMergeState: Bool, first: Int) async -> GHOutcome {
+        await run(Self.arguments(for: query, includeMergeState: includeMergeState, first: first))
     }
 
     static func pullRequestArguments(owner: String, name: String, number: Int, includeMergeState: Bool) -> [String] {

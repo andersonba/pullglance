@@ -47,6 +47,10 @@ import Testing
         #expect(await gh.mergeFlags[SearchQuery.mine] == true)
         #expect(await gh.mergeFlags[SearchQuery.direct] == false)
         #expect(await gh.mergeFlags[SearchQuery.viaTeam] == false)
+        #expect(await gh.pageSizes[SearchQuery.mine] == 100)
+        #expect(await gh.pageSizes[SearchQuery.direct] == 100)
+        #expect(await gh.pageSizes[SearchQuery.viaTeam] == 30)
+        #expect(SearchQuery.viaTeam.contains("review-requested:@me -user-review-requested:@me"))
     }
 
     @Test func failureKeepsPreviousSnapshotAndBadge() async throws {

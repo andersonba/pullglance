@@ -7,7 +7,9 @@ enum SearchQuery {
     static let suffix = "archived:false sort:updated-desc"
     static let mine = "is:pr is:open author:@me \(suffix)"
     static let direct = "is:pr is:open user-review-requested:@me \(suffix)"
-    static let viaTeam = "is:pr is:open review-requested:@me \(suffix)"
+    /// Team requests only: the direct ones are already in `direct`, and leaving them out here is what
+    /// makes `issueCount` the number the section header should show.
+    static let viaTeam = "is:pr is:open review-requested:@me -user-review-requested:@me \(suffix)"
 
     static func mine(hiding owners: Set<String>, repos: Set<String> = []) -> String { mine + exclusions(owners, repos) }
     static func direct(hiding owners: Set<String>, repos: Set<String> = []) -> String { direct + exclusions(owners, repos) }
@@ -770,21 +772,30 @@ final class PRStore {
         }
     }
 
+    /// Page sizes. The team search is a sample (20 shown) and was most of a cycle's time at 100 nodes;
+    /// 30 keeps a margin over the 20 after the author filter and costs about half the time.
+    static let pageSize = 100
+    static let teamPageSize = 30
+
     private func runCycle() async {
         phase = .loading
         cycleStarted = now()
         appLog.debug("refresh start; hidden owners \(hiddenOwners.count), excluded repos \(excludedRepos.count), team \(wantsTeamFetch)")
 
-        async let mineOutcome = client.search(SearchQuery.mine(hiding: hiddenOwners, repos: excludedRepos), includeMergeState: true)
-        async let directOutcome = client.search(SearchQuery.direct(hiding: hiddenOwners, repos: excludedRepos), includeMergeState: false)
-        let (m, d) = await (mineOutcome, directOutcome)
+        // All three at once: the team search no longer needs the direct list to exclude anything.
+        let wantsTeam = wantsTeamFetch
+        async let mineOutcome = client.search(SearchQuery.mine(hiding: hiddenOwners, repos: excludedRepos), includeMergeState: true, first: Self.pageSize)
+        async let directOutcome = client.search(SearchQuery.direct(hiding: hiddenOwners, repos: excludedRepos), includeMergeState: false, first: Self.pageSize)
+        async let teamOutcome: GHOutcome? = wantsTeam
+            ? client.search(SearchQuery.viaTeam(hiding: hiddenOwners, repos: excludedRepos), includeMergeState: false, first: Self.teamPageSize)
+            : nil
+        let (m, d, t) = await (mineOutcome, directOutcome, teamOutcome)
 
         var errors: [ErrorKind] = []
         if let error = apply(m, to: &mine, search: .mine) { errors.append(error) }
         if let error = apply(d, to: &direct, search: .direct) { errors.append(error) }
 
-        if wantsTeamFetch {
-            let t = await client.search(SearchQuery.viaTeam(hiding: hiddenOwners, repos: excludedRepos), includeMergeState: false)
+        if let t {
             var snapshot = viaTeam ?? Snapshot(value: [], total: 0, fetchedAt: nil)
             if let error = apply(t, to: &snapshot, search: .team) {
                 errors.append(error)
@@ -813,7 +824,7 @@ final class PRStore {
     func refreshViaTeam() async {
         isLoadingViaTeam = true
         defer { isLoadingViaTeam = false }
-        let outcome = await client.search(SearchQuery.viaTeam(hiding: hiddenOwners, repos: excludedRepos), includeMergeState: false)
+        let outcome = await client.search(SearchQuery.viaTeam(hiding: hiddenOwners, repos: excludedRepos), includeMergeState: false, first: Self.teamPageSize)
         var snapshot = viaTeam ?? Snapshot(value: [], total: 0, fetchedAt: nil)
         if let error = apply(outcome, to: &snapshot, search: .team) {
             viaTeamError = error

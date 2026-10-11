@@ -66,6 +66,7 @@ actor FakeGH: GHRunning {
     private var delay: Duration = .zero
     private(set) var calls: [String] = []
     private(set) var mergeFlags: [String: Bool] = [:]
+    private(set) var pageSizes: [String: Int] = [:]
     private var repoSearches: [String: GHOutcome] = [:]
     private var mergeOutcome: GHOutcome = .success(Data())
     private var commentOutcome: GHOutcome = .success(Data())
@@ -112,9 +113,10 @@ actor FakeGH: GHRunning {
     func setDelay(_ value: Duration) { delay = value }
     func callCount(for query: String) -> Int { calls.filter { $0 == query }.count }
 
-    func search(_ query: String, includeMergeState: Bool) async -> GHOutcome {
+    func search(_ query: String, includeMergeState: Bool, first: Int) async -> GHOutcome {
         calls.append(query)
         mergeFlags[query] = includeMergeState
+        pageSizes[query] = first
         if delay > .zero { try? await Task.sleep(for: delay) }
         return outcomes[query] ?? .failure("no scripted outcome for \(query)")
     }

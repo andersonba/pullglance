@@ -10,7 +10,8 @@ enum GHOutcome: Sendable, Equatable {
 protocol GHRunning: Sendable {
     /// `includeMergeState` asks for `mergeable`/`mergeStateStatus`, which GitHub computes on demand and
     /// refuses for large pages ("Resource limits for this query exceeded"). Only your own PRs need it.
-    func search(_ query: String, includeMergeState: Bool) async -> GHOutcome
+    /// `first` is the page size: 100 for the lists, fewer for the team sample, where it is most of the cost.
+    func search(_ query: String, includeMergeState: Bool, first: Int) async -> GHOutcome
     /// Repository search with a full search string (`repo-search.graphql`).
     func searchRepos(query: String) async -> GHOutcome
     /// `gh pr merge`. `matchHeadCommit` makes GitHub refuse if the branch moved since the PR was shown.
