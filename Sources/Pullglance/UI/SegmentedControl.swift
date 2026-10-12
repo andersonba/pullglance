@@ -27,8 +27,10 @@ struct SegmentedControl<Value: Hashable>: View {
 
     private func segment(_ segment: Segment) -> some View {
         let selected = selection == segment.value
+        // Only the indicator animates. Animating the selection itself would carry the animation into the
+        // caller's content, where every row of the leaving tab plays its collapse transition at once.
         return Button {
-            withAnimation(.easeInOut(duration: 0.18)) { selection = segment.value }
+            selection = segment.value
         } label: {
             HStack(spacing: 6) {
                 segment.title.fontWeight(.medium)
@@ -50,6 +52,7 @@ struct SegmentedControl<Value: Hashable>: View {
                 }
             }
             .contentShape(Rectangle())
+            .animation(.easeInOut(duration: 0.18), value: selection)
         }
         .buttonStyle(.plain)
         .disabled(!segment.enabled)
