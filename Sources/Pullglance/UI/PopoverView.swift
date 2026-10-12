@@ -134,7 +134,9 @@ struct PopoverView: View {
             // MenuBarExtra's window sizes itself to the content's ideal size, and a ScrollView has none
             // of its own. Measure the list and give the ScrollView that height, capped.
             ScrollView {
-                VStack(spacing: 0) {
+                // Lazy: only the rows on screen are built. With 50+ rows, building them all on a tab switch
+                // (and walking them all for accessibility focus) blocked the main thread for ~400 ms.
+                LazyVStack(spacing: 0) {
                     switch tab {
                     case .mine: mineList
                     case .review: reviewList
