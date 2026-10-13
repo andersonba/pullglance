@@ -40,6 +40,13 @@ enum ReviewPage: Equatable, Sendable {
 
     var showsBar: Bool { self != .other }
 
+    /// Same pull request, any tab. Clicking a row for the PR already on screen must not throw away the
+    /// tab the user navigated to.
+    func isSamePullRequest(as other: ReviewPage) -> Bool {
+        guard case .pullRequest(let repo, let number, _) = self, case .pullRequest(let otherRepo, let otherNumber, _) = other else { return false }
+        return repo == otherRepo && number == otherNumber
+    }
+
     /// "main...feat/x" shown as "main…feat/x".
     var compareTitle: String? {
         guard case .compare(_, let range) = self else { return nil }

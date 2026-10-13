@@ -12,6 +12,13 @@ describe('matchFiles', () => {
     expect(out[0]!.matchedBy.id).toBe('unit')
   })
 
+  it('um glob sem barra casa pelo nome do arquivo em qualquer pasta', () => {
+    const out = matchFiles([file('README.md'), file('docs/dev/guide.md'), file('src/a.ts')], [rule('custom', ['*.md'])])
+    expect(out.map((m) => m.file.path)).toEqual(['README.md', 'docs/dev/guide.md'])
+    expect(matchFiles([file('docs/x.md')], [rule('custom', ['docs/*.md'])]).map((m) => m.file.path)).toEqual(['docs/x.md'])
+    expect(matchFiles([file('other/docs/x.md')], [rule('custom', ['docs/*.md'])])).toEqual([])   // with a slash, the path counts
+  })
+
   it('ignora regras desabilitadas', () => {
     expect(matchFiles([file('a.test.ts')], [rule('unit', ['**/*.test.ts'], false)])).toEqual([])
   })

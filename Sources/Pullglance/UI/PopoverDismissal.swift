@@ -6,7 +6,8 @@ import AppKit
 @MainActor
 enum PopoverDismissal {
     static func dismiss() {
-        NSApp.keyWindow?.close()
+        guard let key = NSApp.keyWindow, key !== ReviewWindowController.shared?.window else { return }
+        key.close()
     }
 
     static func open(_ url: URL) {

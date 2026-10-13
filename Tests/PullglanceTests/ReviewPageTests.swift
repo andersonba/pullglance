@@ -22,6 +22,15 @@ import Testing
         #expect(page("https://github.com/acme/web/compare/v1.0.0...v1.1.0") == .compare(repo: "acme/web", range: "v1.0.0...v1.1.0"))
     }
 
+    @Test func samePullRequestIgnoresTheTab() {
+        let files = page("https://github.com/acme/web/pull/42/files")
+        let conversation = page("https://github.com/acme/web/pull/42")
+        #expect(files.isSamePullRequest(as: conversation))
+        #expect(!files.isSamePullRequest(as: page("https://github.com/acme/web/pull/43")))
+        #expect(!files.isSamePullRequest(as: page("https://github.com/acme/web/compare/a...b")))
+        #expect(!ReviewPage.other.isSamePullRequest(as: .other))
+    }
+
     @Test func everythingElseIsOther() {
         #expect(page("https://github.com/acme/web/pulls") == .other)
         #expect(page("https://github.com/acme/web") == .other)

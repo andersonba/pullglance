@@ -14,7 +14,8 @@ function compile(rules: Rule[], onInvalidGlob?: InvalidGlobReporter): Compiled[]
         const negated = glob.startsWith('!')
         const pattern = negated ? glob.slice(1) : glob
         try {
-          const fn = picomatch(pattern, { dot: true })
+          // A pattern without a slash is about the file name wherever it sits ("*.md"); with one, the path.
+          const fn = picomatch(pattern, { dot: true, basename: !pattern.includes('/') })
           ;(negated ? compiled.negative : compiled.positive).push(fn)
         } catch (error) {
           onInvalidGlob?.(rule, glob, error as Error)
