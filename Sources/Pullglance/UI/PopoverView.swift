@@ -222,6 +222,9 @@ struct PopoverView: View {
             .zIndex(lifted ? 1 : 0)
             .animation(.easeInOut(duration: 0.15), value: rowDrag?.order)
             .transition(.asymmetric(insertion: .opacity, removal: .collapse))
+            // The lazy stack identifies children by id across the sections' ForEach blocks: a PR that moves
+            // section would keep its old view (stale pills). Scope the identity to the section.
+            .id("\(section.rawValue)/\(pr.id)")
     }
 
     private func dragOffset(for id: PullRequest.ID) -> CGFloat {
