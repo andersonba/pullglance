@@ -222,7 +222,11 @@ struct PopoverView: View {
             pull.began(atTop: listAtTop)
             return false
         case .changed:
-            return pull.drag(by: event.scrollingDeltaY, atTop: listAtTop)
+            let wasArmed = pull.armed
+            let took = pull.drag(by: event.scrollingDeltaY, horizontal: event.scrollingDeltaX, atTop: listAtTop)
+            // The moment it arms, a tick under the fingers: from here, letting go refreshes.
+            if pull.armed, !wasArmed { NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now) }
+            return took
         case .ended, .cancelled:
             if pull.ended(), manualRefreshAllowed { Task { await store.refresh() } }
             return false

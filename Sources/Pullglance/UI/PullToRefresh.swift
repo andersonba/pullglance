@@ -3,14 +3,26 @@ import SwiftUI
 
 /// Pull to refresh on the trackpad. SwiftUI's scroll view on macOS gives no rubber band when the list fits,
 /// so the gesture is measured directly: while the list sits at its top, dragging down accumulates a pull,
-/// the list and a ring follow it (damped), the threshold arms it, and lifting the fingers refreshes.
-/// Pure state here; `ScrollWheelMonitor` feeds it and `PullRing` draws it.
+/// the list and a ring follow it (a rubber band), the threshold arms it, and lifting the fingers after a
+/// beat refreshes. Pure state here; `ScrollWheelMonitor` feeds it and `PullRing` draws it.
 struct PullToRefreshState: Equatable {
-    static let threshold: CGFloat = 56
-    /// Points of finger travel per point of visible stretch.
-    static let damping: CGFloat = 0.5
-    /// Travel beyond this is ignored: the list never slides further than `maxPull * damping` points.
-    static let maxPull: CGFloat = 112
+    /// Finger travel that arms the pull. A finger's centimetre is a lot of points: a nudge never gets here.
+    static let threshold: CGFloat = 110
+    /// The list never slides further than this.
+    static let maxStretch: CGFloat = 72
+    /// How quickly the band gives at first (the classic 0.55).
+    static let rubber: CGFloat = 0.55
+    /// Travel beyond this is ignored; the band is nearly flat there anyway.
+    static let maxPull: CGFloat = 400
+    /// Armed for at least this long before the lift, or it was a flick, not a pull.
+    static let armDwell: TimeInterval = 0.15
+    /// Finger travel on one axis that decides which axis the gesture belongs to.
+    static let axisLock: CGFloat = 8
+
+    /// A gesture is either a row swipe or a pull, decided by its first points and kept until the lift, as
+    /// AppKit does between horizontal and vertical scrolling. Sideways never becomes a pull, and a pull
+    /// swallows the sideways drift that would otherwise swipe the row under it.
+    enum Axis: Equatable { case undecided, vertical, horizontal }
     /// Mouse wheel only: notches at the top during this long are a probe ("am I at the top?"), answered
     /// with a glow, not a pull. One flick, however many notches, ends before it; keeping the wheel going
     /// past it starts the pull.
@@ -20,34 +32,59 @@ struct PullToRefreshState: Equatable {
     private(set) var pull: CGFloat = 0
     private(set) var armed = false
     private(set) var dragging = false
+    /// When it last crossed the threshold; nil while below it.
+    private(set) var armedAt: Date?
+    private(set) var axis: Axis = .undecided
+    private var travelX: CGFloat = 0
+    private var travelY: CGFloat = 0
 
     var progress: CGFloat { min(pull / Self.threshold, 1) }
-    /// How far the list is shown stretched.
-    var stretch: CGFloat { pull * Self.damping }
+    /// How far the list is shown stretched: the rubber band, quick at first, flattening towards `maxStretch`.
+    var stretch: CGFloat {
+        (1 - 1 / (pull * Self.rubber / Self.maxStretch + 1)) * Self.maxStretch
+    }
 
     /// A gesture that begins with the list already at its top may become a pull; one that scrolls up to the
     /// top and keeps going is just a scroll, however far it overshoots.
     mutating func began(atTop: Bool) {
         pull = 0
         armed = false
+        armedAt = nil
+        axis = .undecided
+        travelX = 0
+        travelY = 0
         dragging = atTop
     }
 
     /// A scroll step while dragging; positive deltas pull down. Returns whether the step was taken by the
-    /// pull (and must not scroll the list): only while the list is at its top and the pull is growing or open.
-    mutating func drag(by delta: CGFloat, atTop: Bool) -> Bool {
-        guard dragging, atTop, pull > 0 || delta > 0 else { return false }
+    /// pull (and must not reach the views): only while the list is at its top and the pull is growing or open.
+    /// Until the axis is decided the step passes through; a sideways decision ends the pull's interest.
+    mutating func drag(by delta: CGFloat, horizontal: CGFloat = 0, atTop: Bool, at now: Date = Date()) -> Bool {
+        guard dragging else { return false }
+        if axis == .undecided {
+            travelX += abs(horizontal)
+            travelY += abs(delta)
+            guard max(travelX, travelY) >= Self.axisLock else { return false }
+            if travelX > travelY { axis = .horizontal; dragging = false; return false }
+            axis = .vertical
+        }
+        guard atTop, pull > 0 || delta > 0 else { return false }
         pull = min(max(0, pull + delta), Self.maxPull)
+        let wasArmed = armed
         armed = pull >= Self.threshold
+        if armed, !wasArmed { armedAt = now }
+        if !armed { armedAt = nil }
         return true
     }
 
-    /// Fingers lifted. True when the pull should refresh.
-    mutating func ended() -> Bool {
-        let fire = dragging && armed
+    /// Fingers lifted. True when the pull should refresh: armed, and armed long enough that it was held,
+    /// not flicked through.
+    mutating func ended(at now: Date = Date()) -> Bool {
+        let fire = dragging && armed && armedAt.map { now.timeIntervalSince($0) >= Self.armDwell } == true
         dragging = false
         pull = 0
         armed = false
+        armedAt = nil
         return fire
     }
 }
