@@ -137,6 +137,7 @@ struct SwipeTile: View {
         switch action {
         case .merge: Text("Merge", bundle: .app)
         case .comment: Text("Comment", bundle: .app)
+        case .approve: Text("Approve", bundle: .app)
         case .open: Text("Open", bundle: .app)
         case .snooze: Text(isDormant ? "Wake" : "Snooze", bundle: .app)
         default: Text("More", bundle: .app)
@@ -147,6 +148,7 @@ struct SwipeTile: View {
         switch action {
         case .merge: "arrow.triangle.merge"
         case .comment: "text.bubble"
+        case .approve: "checkmark.circle"
         case .open: "arrow.up.forward.square"
         case .snooze: isDormant ? "sun.max" : "moon.zzz"
         default: "ellipsis"
@@ -157,6 +159,7 @@ struct SwipeTile: View {
         switch action {
         case .merge: Color(red: 0.51, green: 0.31, blue: 0.87)
         case .comment: .blue
+        case .approve: .green
         case .open: .teal
         case .snooze: .orange
         default: .gray

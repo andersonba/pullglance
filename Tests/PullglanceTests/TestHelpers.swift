@@ -72,6 +72,8 @@ actor FakeGH: GHRunning {
     private var commentOutcome: GHOutcome = .success(Data())
     private(set) var merges: [(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?)] = []
     private(set) var comments: [(url: URL, body: String)] = []
+    private var approveOutcome: GHOutcome = .success(Data())
+    private(set) var approvals: [(url: URL, body: String?)] = []
     private var pullRequestOutcomes: [Int: GHOutcome] = [:]
     private(set) var lookups: [(owner: String, name: String, number: Int, includeMergeState: Bool)] = []
     func setPullRequest(_ outcome: GHOutcome, number: Int) { pullRequestOutcomes[number] = outcome }
@@ -110,6 +112,7 @@ actor FakeGH: GHRunning {
     func setRepoSearch(_ outcome: GHOutcome, for query: String) { repoSearches[query] = outcome }
     func setMergeOutcome(_ outcome: GHOutcome) { mergeOutcome = outcome }
     func setCommentOutcome(_ outcome: GHOutcome) { commentOutcome = outcome }
+    func setApproveOutcome(_ outcome: GHOutcome) { approveOutcome = outcome }
 
     func merge(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?) async -> GHOutcome {
         merges.append((url, method, deleteBranch, matchHeadCommit))
@@ -121,6 +124,11 @@ actor FakeGH: GHRunning {
         comments.append((url, body))
         if delay > .zero { try? await Task.sleep(for: delay) }
         return commentOutcome
+    }
+
+    func approve(url: URL, body: String?) async -> GHOutcome {
+        approvals.append((url, body))
+        return approveOutcome
     }
 
     func searchRepos(query: String) async -> GHOutcome {

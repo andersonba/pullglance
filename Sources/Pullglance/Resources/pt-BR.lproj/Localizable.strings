@@ -217,3 +217,10 @@
 "Show in Finder" = "Mostrar no Finder";
 "Export diagnostics…" = "Exportar diagnóstico…";
 "Could not export diagnostics" = "Não foi possível exportar o diagnóstico";
+
+/* Approve */
+"Approve #%lld" = "Aprovar #%lld";
+"Optional comment" = "Comentário opcional";
+"⌘↩ to approve" = "⌘↩ para aprovar";
+"Approve" = "Aprovar";
+"Approve…" = "Aprovar…";

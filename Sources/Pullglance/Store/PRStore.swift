@@ -600,6 +600,16 @@ final class PRStore {
         return result
     }
 
+    /// An empty body approves without a comment.
+    func approve(_ pr: PullRequest, body: String) async -> ActionResult {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        setActionState(.running(.approve), for: pr)
+        let result = outcomeResult(await client.approve(url: pr.url, body: trimmed.isEmpty ? nil : trimmed))
+        appLog.info("approve \(pr.id): \(result.logDescription)")
+        setActionState(nil, for: pr)
+        return result
+    }
+
     private func outcomeResult(_ outcome: GHOutcome) -> ActionResult {
         switch outcome {
         case .success: .success()

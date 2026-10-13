@@ -133,6 +133,7 @@ struct PRRowMenu: View {
                 switch action {
                 case .merge: Label { Text("Merge…", bundle: .app) } icon: { Image(systemName: "arrow.triangle.merge") }
                 case .comment: Label { Text("Comment…", bundle: .app) } icon: { Image(systemName: "text.bubble") }
+                case .approve: Label { Text("Approve…", bundle: .app) } icon: { Image(systemName: "checkmark.circle") }
                 case .snooze: Label { Text(isDormant ? "Wake" : "Snooze", bundle: .app) } icon: { Image(systemName: isDormant ? "sun.max" : "moon.zzz") }
                 case .open: Label { Text("Open on GitHub", bundle: .app) } icon: { Image(systemName: "arrow.up.forward.square") }
                 case .copyLink: Label { Text("Copy link", bundle: .app) } icon: { Image(systemName: "link") }

@@ -179,6 +179,7 @@ struct PopoverView: View {
         switch action {
         case .merge: merging = pr
         case .comment: commenting = pr
+        case .approve: break // The review window owns approving; rows never offer it.
         case .snooze:
             // The row travels between its section and Snoozed; let it fade and slide rather than jump.
             withAnimation(.easeInOut(duration: 0.3)) { store.isDormant(pr) ? store.wake(pr) : store.snooze(pr) }

@@ -43,6 +43,8 @@ private func tempDir() -> URL {
     @Test func ghArgumentsAreRedactedBeforeLogging() {
         #expect(redactedForLog(["pr", "comment", "https://github.com/acme/web/pull/7", "--body", "secret text"]) ==
                 "pr comment https://github.com/acme/web/pull/7 --body <redacted>")
+        #expect(redactedForLog(GHClient.approveArguments(url: URL(string: "https://github.com/acme/web/pull/7")!, body: "secret text")) ==
+                "pr review https://github.com/acme/web/pull/7 --approve --body <redacted>")
         #expect(redactedForLog(["pr", "list", "--repo", "acme/web"]) == "pr list --repo acme/web")
         #expect(redactedForLog(["api", "graphql", "-f", "query=query { a }", "-f", "q=is:pr author:@me"]) == "api graphql -f query=<graphql 11 chars> -f q=is:pr author:@me")
         #expect(redactedForLog(["--body", "line one\nline two"]) == "--body <redacted>")

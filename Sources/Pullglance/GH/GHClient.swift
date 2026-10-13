@@ -110,6 +110,12 @@ struct GHClient: GHRunning {
         ["pr", "comment", url.absoluteString, "--body", body]
     }
 
+    static func approveArguments(url: URL, body: String?) -> [String] {
+        var args = ["pr", "review", url.absoluteString, "--approve"]
+        if let body, !body.isEmpty { args += ["--body", body] }
+        return args
+    }
+
     static func openPullRequestsArguments(repo: String, base: String) -> [String] {
         ["pr", "list", "--repo", repo, "--base", base, "--state", "open", "--json", "number", "--limit", "100"]
     }
@@ -127,6 +133,10 @@ struct GHClient: GHRunning {
 
     func comment(url: URL, body: String) async -> GHOutcome {
         await run(Self.commentArguments(url: url, body: body))
+    }
+
+    func approve(url: URL, body: String?) async -> GHOutcome {
+        await run(Self.approveArguments(url: url, body: body))
     }
 
     private func run(_ arguments: [String]) async -> GHOutcome {

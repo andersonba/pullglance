@@ -186,6 +186,73 @@ struct CommentView: View {
     }
 }
 
+/// Approve a PR, with an optional comment. Presented by the review window.
+struct ApproveView: View {
+    let pr: PullRequest
+    @Bindable var store: PRStore
+    let onDone: (ActionResult?) -> Void
+
+    @State private var body_ = ""
+    @State private var running = false
+    @State private var error: String? = nil
+    @FocusState private var focused: Bool
+
+    init(pr: PullRequest, store: PRStore, onDone: @escaping (ActionResult?) -> Void) {
+        self.pr = pr
+        self.store = store
+        self.onDone = onDone
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Approve #\(pr.number)", bundle: .app).font(.headline)
+            Text(verbatim: pr.title).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            TextEditor(text: $body_)
+                .font(.system(size: 12))
+                .frame(height: 70)
+                .padding(4)
+                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.15)))
+                .focused($focused)
+                .disabled(running)
+            Text("Optional comment", bundle: .app).font(.caption2).foregroundStyle(.tertiary)
+            if let error {
+                Label { Text(verbatim: error) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
+                    .font(.caption).foregroundStyle(.orange)
+            }
+            HStack {
+                Text("⌘↩ to approve", bundle: .app).font(.caption2).foregroundStyle(.tertiary)
+                Spacer()
+                Button { onDone(nil) } label: { Text("Cancel", bundle: .app) }.keyboardShortcut(.cancelAction).disabled(running)
+                Button(action: send) {
+                    if running { ProgressView().controlSize(.small).frame(width: 60) } else { Text("Approve", bundle: .app) }
+                }
+                .keyboardShortcut(.return, modifiers: .command)
+                .buttonStyle(.borderedProminent)
+                .disabled(running)
+            }
+        }
+        .padding(16)
+        .frame(width: 320)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.25), radius: 14, y: 6)
+        .onAppear { focused = true }
+    }
+
+    private func send() {
+        running = true
+        error = nil
+        Task {
+            let result = await store.approve(pr, body: body_)
+            running = false
+            switch result {
+            case .success: onDone(.success())
+            case .failure(let message): error = message
+            }
+        }
+    }
+}
+
 /// Short confirmation at the bottom of the popover.
 struct ToastView: View {
     let text: String

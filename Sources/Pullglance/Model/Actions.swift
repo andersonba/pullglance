@@ -41,6 +41,8 @@ struct MergeOptions: Equatable, Sendable {
 enum PRAction: Equatable, Sendable {
     case merge
     case comment
+    /// Offered by the review window only; rows never list it.
+    case approve
     case snooze
     case open
     case copyLink
