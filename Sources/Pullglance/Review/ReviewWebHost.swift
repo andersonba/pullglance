@@ -20,8 +20,6 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
     let webView: WKWebView
     /// The page script's native half: the only script message handler on this web view.
     let bridge: ReviewBridge
-    private(set) var logs: [String] = []
-    private(set) var navigations: [String] = []
     var popups: [NSWindow] = []
     var onLog: ((String) -> Void)?
 
@@ -133,16 +131,7 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
         return true
     }
 
-    static func resource(_ name: String) -> String {
-        guard let url = Bundle.app.url(forResource: name, withExtension: nil) else { return "" }
-        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
-    }
-
     // MARK: logging
-
-    /// Set by the interactive window: every line is appended here as it happens, so a test session can be
-    /// read back even when stderr went nowhere.
-    var logFileURL: URL?
 
     /// Log form of a URL: scheme, host and path only. Queries and fragments can carry sign-in tokens;
     /// titles never reach the log at all (the file log rule: repository and number, nothing from the PR).
@@ -151,22 +140,14 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
         return (url.scheme.map { $0 + "://" } ?? "") + (url.host ?? "") + url.path
     }
 
-
     func log(_ line: String) {
-        logs.append(line)
         onLog?(line)
         FileHandle.standardError.write(Data((line + "\n").utf8))
-        if let logFileURL, let handle = try? FileHandle(forWritingTo: logFileURL) {
-            defer { try? handle.close() }
-            _ = try? handle.seekToEnd()
-            try? handle.write(contentsOf: Data((line + "\n").utf8))
-        }
     }
 
     // MARK: WKNavigationDelegate
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        navigations.append("start \(webView.url?.absoluteString ?? "-")")
         log("nav.start \(Self.redacted(webView.url))")
         if webView === self.webView { onNavigationStart?() }
     }
@@ -222,19 +203,24 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
     static let refusedDownloadExtensions: Set<String> = ["app", "pkg", "dmg", "sh", "command", "scpt", "zsh", "bash", "pl", "py", "rb", "jar"]
 
     static func isRefusedDownload(_ filename: String) -> Bool {
-        // Trailing dots and spaces would hide the real extension from a plain check.
-        let trimmed = filename.trimmingCharacters(in: CharacterSet(charactersIn: ". ").union(.whitespacesAndNewlines))
+        // Invisible characters (controls, zero-width and bidi marks) and trailing dots or spaces would hide
+        // the real extension from a plain check.
+        let visible = String(String.UnicodeScalarView(filename.unicodeScalars.filter {
+            !CharacterSet.controlCharacters.contains($0) && $0.properties.generalCategory != .format
+        }))
+        let trimmed = visible.trimmingCharacters(in: CharacterSet(charactersIn: ". ").union(.whitespacesAndNewlines))
         return refusedDownloadExtensions.contains((trimmed as NSString).pathExtension.lowercased())
     }
 
     func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String) async -> URL? {
-        if Self.isRefusedDownload(suggestedFilename) {
+        let folder = Self.downloadsFolder()
+        let destination = Self.availableFileURL(for: suggestedFilename, in: folder)
+        // Checked on the name the file is actually saved under, after sanitizing.
+        if Self.isRefusedDownload(destination.lastPathComponent) {
             log("download refused: executable type")
             return nil
         }
-        let folder = Self.downloadsFolder()
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let destination = Self.availableFileURL(for: suggestedFilename, in: folder)
         downloads[download] = destination
         log("download → .\(destination.pathExtension)")
         return destination
@@ -254,7 +240,6 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        navigations.append("finish \(webView.url?.absoluteString ?? "-")")
         log("nav.finish \(Self.redacted(webView.url))")
         if webView === self.webView { onNavigationFinished?(webView.url, webView.title) }
     }
@@ -413,10 +398,6 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
         let alert = dialog(message, origin: frame)
         alert.addButton(withTitle: "OK")
         _ = await sheet(alert, on: webView)
-    }
-
-    func cookies() async -> [HTTPCookie] {
-        await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
     }
 }
 

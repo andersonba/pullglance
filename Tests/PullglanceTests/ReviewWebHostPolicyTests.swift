@@ -11,6 +11,8 @@ struct ReviewWebHostPolicyTests {
         #expect(ReviewWebHost.isRefusedDownload("run.sh"))
         #expect(ReviewWebHost.isRefusedDownload("Tool.APP"))
         #expect(ReviewWebHost.isRefusedDownload("run.sh. "))
+        #expect(ReviewWebHost.isRefusedDownload("run.sh\u{07}"))
+        #expect(ReviewWebHost.isRefusedDownload("run.s\u{200B}h"))
     }
 
     @Test func identityProvidersStayOnlyInsidePopups() {
