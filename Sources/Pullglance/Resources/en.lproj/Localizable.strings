@@ -179,6 +179,7 @@
 "Pin to top" = "Pin to top";
 "Unpin" = "Unpin";
 "Pin" = "Pin";
+"Exit" = "Exit";
 "Snoozed here until a new commit, review decision or CI result" = "Snoozed here until a new commit, review decision or CI result";
 "Merging… " = "Merging… ";
 "Posting comment… " = "Posting comment… ";

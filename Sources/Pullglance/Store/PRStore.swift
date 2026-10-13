@@ -536,6 +536,35 @@ final class PRStore {
         dormant = marks
     }
 
+    /// What the keyboard walks: exactly the rows on screen for a tab and quick filter, in display order
+    /// (pinned, the visible sections in the user's order, snoozed; the team sample only when expanded).
+    func triageRows(for tab: Section.Tab, filter: Section?) -> [(section: Section, pr: PullRequest)] {
+        var rows: [(section: Section, pr: PullRequest)] = []
+        func pinnedRows(_ prs: [PullRequest], _ section: Section) {
+            rows += prs.filter { filter == nil || originSection(of: $0) == filter }.map { (section, $0) }
+        }
+        let sections = orderedSections(tab).filter { visibleSections.contains($0) && (filter == nil || filter == $0) }
+        switch tab {
+        case .mine:
+            let groups = mineGroups
+            pinnedRows(groups.pinned, .pinnedMine)
+            for section in sections { rows += groups[section].map { (section, $0) } }
+            if filter == nil || filter == .snoozedMine, visibleSections.contains(.snoozedMine) { rows += groups.snoozed.map { (.snoozedMine, $0) } }
+        case .review:
+            pinnedRows(pinnedReviewList, .pinnedReview)
+            for section in sections {
+                switch section {
+                case .needsYourReview: rows += directList.map { (section, $0) }
+                case .needsTeamsReview:
+                    if isViaTeamExpanded || filter == .needsTeamsReview, viaTeam != nil { rows += viaTeamList.map { (section, $0) } }
+                default: break
+                }
+            }
+            if filter == nil || filter == .snoozedReview, visibleSections.contains(.snoozedReview) { rows += snoozedReviewList.map { (.snoozedReview, $0) } }
+        }
+        return rows
+    }
+
     // MARK: Pinning
 
     func isPinned(_ pr: PullRequest) -> Bool { pinned.contains(pr.id) }

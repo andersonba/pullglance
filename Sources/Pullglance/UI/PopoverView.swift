@@ -27,6 +27,8 @@ struct PopoverView: View {
     @State private var rowDrag: RowDrag? = nil
     /// Row frames in the list's coordinate space, refreshed only while nothing is being dragged.
     @State private var rowFrames: [PullRequest.ID: CGRect] = [:]
+    /// Keyboard triage: the focused row, if any. See `TriageFocus`.
+    @State private var focus = TriageFocus()
     private static let listSpace = "list"
     static let holdToReorder: Double = 0.5
 
@@ -111,10 +113,18 @@ struct PopoverView: View {
             if reordering {
                 ReorderFooter { setReordering(false) }
             } else {
-                FooterView(store: store)
+                // The regular footer always sets the height; the triage keys draw over it while a row is focused.
+                ZStack {
+                    FooterView(store: store).opacity(focusedPR == nil ? 1 : 0)
+                    if let focusedPR {
+                        TriageFooter(isPinned: store.isPinned(focusedPR), isDormant: store.isDormant(focusedPR))
+                    }
+                }
             }
         }
         .frame(width: 380)
+        .background(KeyDownMonitor { event in handleKey(event) })
+        .animation(.easeInOut(duration: 0.15), value: focus.id != nil)
         .onAppear {
             SettingsOpener.bringSettingsForwardIfOpen()
             store.startCIPolling()
@@ -124,10 +134,12 @@ struct PopoverView: View {
             mineFilter = nil
             reviewFilter = nil
             openRow = nil
+            focus.clear()
             setReordering(false)
         }
         .onChange(of: tab) { _, _ in
             openRow = nil
+            focus.clear()
             setReordering(false)
         }
     }
@@ -140,20 +152,27 @@ struct PopoverView: View {
         } else {
             // MenuBarExtra's window sizes itself to the content's ideal size, and a ScrollView has none
             // of its own. Measure the list and give the ScrollView that height, capped.
-            ScrollView {
-                // Lazy: only the rows on screen are built. With 50+ rows, building them all on a tab switch
-                // (and walking them all for accessibility focus) blocked the main thread for ~400 ms.
-                LazyVStack(spacing: 0) {
-                    switch tab {
-                    case .mine: mineList
-                    case .review: reviewList
+            ScrollViewReader { proxy in
+                ScrollView {
+                    // Lazy: only the rows on screen are built. With 50+ rows, building them all on a tab switch
+                    // (and walking them all for accessibility focus) blocked the main thread for ~400 ms.
+                    LazyVStack(spacing: 0) {
+                        switch tab {
+                        case .mine: mineList
+                        case .review: reviewList
+                        }
                     }
+                    .padding(.bottom, 6)
+                    .offset(y: pull.stretch)
+                    .animation(pull.dragging ? nil : .spring(duration: 0.3), value: pull.stretch)
+                    .coordinateSpace(name: Self.listSpace)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
                 }
-                .padding(.bottom, 6)
-                .offset(y: pull.stretch)
-                .animation(pull.dragging ? nil : .spring(duration: 0.3), value: pull.stretch)
-                .coordinateSpace(name: Self.listSpace)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
+                // The focused row stays in view as the keyboard walks the list.
+                .onChange(of: focus.id) { _, id in
+                    guard let id, let row = triageRows.first(where: { $0.pr.id == id }) else { return }
+                    withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo("\(row.section.rawValue)/\(id)") }
+                }
             }
             .scrollIndicators(.never)
             .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top <= 0.5 } action: { _, top in listAtTop = top }
@@ -174,6 +193,76 @@ struct PopoverView: View {
             .frame(height: min(max(listHeight, 1), Self.maxListHeight))
             // Only the measured height must not animate (it caused a visible jump); row changes may.
             .animation(nil, value: listHeight)
+        }
+    }
+
+    // MARK: keyboard triage
+
+    private var triageRows: [(section: Section, pr: PullRequest)] {
+        store.triageRows(for: tab == .mine ? .mine : .review, filter: tab == .mine ? mineFilter : reviewFilter)
+    }
+
+    private var focusedPR: PullRequest? {
+        guard let id = focus.id else { return nil }
+        return triageRows.first { $0.pr.id == id }?.pr
+    }
+
+    /// Plain keys while the popover is up and nothing else wants them: no field being edited, no modal,
+    /// no reorder mode. ↓ starts; from then on the letters act on the focused row and Esc ends it.
+    private func handleKey(_ event: NSEvent) -> Bool {
+        guard !reordering, merging == nil, commenting == nil, store.hasAnyData, store.blockingError == nil else { return false }
+        if event.window?.firstResponder is NSTextView { return false }
+        guard let key = TriageKey(characters: event.charactersIgnoringModifiers, keyCode: event.keyCode, modifiers: event.modifierFlags.intersection(.deviceIndependentFlagsMask)) else { return false }
+        let rows = triageRows
+        let ids = rows.map(\.pr.id)
+        switch key {
+        case .down:
+            openRow = nil
+            focus.move(1, in: ids)
+            return true
+        case .up:
+            guard focus.id != nil else { return false }
+            focus.move(-1, in: ids)
+            return true
+        case .left, .right:
+            // The other tab; a focus in flight lands on its first row.
+            let other: Tab = tab == .mine ? .review : .mine
+            let hadFocus = focus.id != nil
+            withAnimation(.easeInOut(duration: 0.15)) { tab = other }
+            if hadFocus {
+                let first = store.triageRows(for: other == .mine ? .mine : .review, filter: other == .mine ? mineFilter : reviewFilter).first?.pr.id
+                focus.set(first)
+            }
+            return true
+        case .escape:
+            guard focus.id != nil else { return false }
+            focus.clear()
+            return true
+        case .pin, .snooze, .open, .review:
+            guard let id = focus.id, let row = rows.first(where: { $0.pr.id == id }) else { return false }
+            switch key {
+            case .pin, .snooze:
+                // The row leaves its place: the one that slides in is next, so a run of P and S needs no arrows.
+                let next = TriageFocus.successor(of: id, in: ids)
+                handle(key == .pin ? .pin : .snooze, for: row.pr)
+                focus.set(next)
+            case .open:
+                focus.clear()
+                handle(.open, for: row.pr)
+            default:
+                focus.clear()
+                openReview(row.pr, section: row.section)
+            }
+            return true
+        }
+    }
+
+    /// Same destination as a click on the row.
+    private func openReview(_ pr: PullRequest, section: Section) {
+        if let review = ReviewWindowController.shared {
+            review.open(pr, landing: section.tab == .review ? .files : .conversation)
+        } else {
+            PopoverDismissal.open(pr.url)
         }
     }
 
@@ -301,7 +390,14 @@ struct PopoverView: View {
         let pinnedRow = store.isPinned(pr)
         let reorderable = Self.isReorderable(section) && !dormant
         let lifted = rowDrag?.id == pr.id
+        let focused = focus.id == pr.id
         return rowView(pr, section: section, showAuthor: showAuthor, teamLabel: teamLabel, dormant: dormant, pinned: pinnedRow, reorderable: reorderable, among: among)
+            .background(focused ? Color.accentColor.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 8))
+            .overlay {
+                if focused {
+                    RoundedRectangle(cornerRadius: 8).strokeBorder(Color.accentColor, lineWidth: 2).padding(1.5).allowsHitTesting(false)
+                }
+            }
             .opacity(reordering && !reorderable ? 0.4 : 1)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.listSpace)) } action: { if rowDrag == nil { rowFrames[pr.id] = $0 } }
             .background(lifted ? AnyShapeStyle(.regularMaterial) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 8))

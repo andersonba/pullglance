@@ -179,6 +179,7 @@
 "Pin to top" = "Fixar no topo";
 "Unpin" = "Desafixar";
 "Pin" = "Fixar";
+"Exit" = "Sair";
 "Snoozed here until a new commit, review decision or CI result" = "Ficam aqui até um novo commit, decisão de review ou resultado de CI";
 "Merging… " = "Mergeando… ";
 "Posting comment… " = "Publicando comentário… ";

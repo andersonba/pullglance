@@ -227,6 +227,29 @@ import Testing
         #expect(store.isPinned(pr) == false)
     }
 
+    /// The keyboard walks exactly what is on screen: pinned first, the visible sections in order, snoozed
+    /// last, the team sample only when expanded, and a quick filter narrows it the same way it narrows the list.
+    @Test func triageRowsFollowTheTabInDisplayOrder() async throws {
+        let store = PRStore(client: try await gh(), defaults: testDefaults(), now: { Date() })
+        await store.refresh()
+        let direct = store.directList
+        store.pin(direct[1])
+        store.snooze(direct[2])
+        let rows = store.triageRows(for: .review, filter: nil)
+        #expect(rows.first?.section == .pinnedReview && rows.first?.pr.id == direct[1].id)
+        #expect(rows.last?.section == .snoozedReview && rows.last?.pr.id == direct[2].id)
+        #expect(rows.filter { $0.section == .needsYourReview }.map(\.pr.id) == store.directList.map(\.id))
+        #expect(rows.contains { $0.section == .needsTeamsReview } == false, "collapsed team sample is not on screen")
+        let yours = store.triageRows(for: .review, filter: .needsYourReview)
+        #expect(yours.first?.section == .pinnedReview, "a pinned row from this section stays in its filter")
+        #expect(yours.contains { $0.section == .snoozedReview } == false)
+        let ready = store.mineGroups.readyToMerge[0]
+        store.pin(ready)
+        let mine = store.triageRows(for: .mine, filter: nil)
+        #expect(mine.first?.pr.id == ready.id && mine.first?.section == .pinnedMine)
+        #expect(mine.map(\.section).filter { $0 == .readyToMerge }.count == store.mineGroups.readyToMerge.count)
+    }
+
     @Test func snoozedPRWakesByItselfOnNewActivity() async throws {
         let gh = try await gh()
         let defaults = testDefaults()
