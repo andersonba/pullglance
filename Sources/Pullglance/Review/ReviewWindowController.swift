@@ -331,15 +331,26 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         page.translatesAutoresizingMaskIntoConstraints = false
         errorOverlay = makeErrorOverlay()
         errorOverlay.isHidden = true
-        host.webView.translatesAutoresizingMaskIntoConstraints = false
-        page.addSubview(host.webView)
+        // The web view lives in a frame-laid-out container, not under constraints: the docked Web Inspector
+        // becomes a sibling of the web view and shrinks it with setFrame (WebInspectorUIProxyMac). Edge
+        // constraints would restore the full frame on every layout pass, and the two fight: the page
+        // flickers and the inspector ends up hidden behind it.
+        let webContainer = NSView()
+        webContainer.translatesAutoresizingMaskIntoConstraints = false
+        host.webView.translatesAutoresizingMaskIntoConstraints = true
+        host.webView.autoresizingMask = [.width, .height]
+        host.webView.frame = webContainer.bounds
+        webContainer.addSubview(host.webView)
+        page.addSubview(webContainer)
         page.addSubview(errorOverlay)
         pillHost = NSHostingView(rootView: ReviewFilePill(session: session))
         pillHost.translatesAutoresizingMaskIntoConstraints = false
         pillHost.isHidden = true
         pillHost.alphaValue = 0
         page.addSubview(pillHost)
-        NSLayoutConstraint.activate([pillHost.centerXAnchor.constraint(equalTo: page.centerXAnchor)])
+        // Anchored to the web view, not the page: with the inspector docked the web view is the smaller
+        // rectangle, and the pill must stay over the page, centred on it, not over the inspector.
+        NSLayoutConstraint.activate([pillHost.centerXAnchor.constraint(equalTo: host.webView.centerXAnchor)])
 
         root.addArrangedSubview(bar)
         root.addArrangedSubview(progress)
@@ -363,10 +374,10 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
             progress.heightAnchor.constraint(equalToConstant: 4),
             findBar.widthAnchor.constraint(equalTo: root.widthAnchor),
             page.widthAnchor.constraint(equalTo: root.widthAnchor),
-            host.webView.leadingAnchor.constraint(equalTo: page.leadingAnchor),
-            host.webView.trailingAnchor.constraint(equalTo: page.trailingAnchor),
-            host.webView.topAnchor.constraint(equalTo: page.topAnchor),
-            host.webView.bottomAnchor.constraint(equalTo: page.bottomAnchor),
+            webContainer.leadingAnchor.constraint(equalTo: page.leadingAnchor),
+            webContainer.trailingAnchor.constraint(equalTo: page.trailingAnchor),
+            webContainer.topAnchor.constraint(equalTo: page.topAnchor),
+            webContainer.bottomAnchor.constraint(equalTo: page.bottomAnchor),
             errorOverlay.leadingAnchor.constraint(equalTo: page.leadingAnchor),
             errorOverlay.trailingAnchor.constraint(equalTo: page.trailingAnchor),
             errorOverlay.topAnchor.constraint(equalTo: page.topAnchor),
@@ -412,10 +423,11 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     private static func pillRest(_ position: FilePillPosition) -> CGFloat { position == .top ? 12 : -16 }
 
     private func placePill(_ position: FilePillPosition) {
-        guard let page = pillHost.superview else { return }
+        // The web view's frame is set by hand (autoresizing, and the docked inspector); its anchors follow it.
+        let web = host.webView
         let wanted: NSLayoutConstraint = switch position {
-        case .top: pillHost.topAnchor.constraint(equalTo: page.topAnchor, constant: Self.pillRest(.top))
-        case .bottom: pillHost.bottomAnchor.constraint(equalTo: page.bottomAnchor, constant: Self.pillRest(.bottom))
+        case .top: pillHost.topAnchor.constraint(equalTo: web.topAnchor, constant: Self.pillRest(.top))
+        case .bottom: pillHost.bottomAnchor.constraint(equalTo: web.bottomAnchor, constant: Self.pillRest(.bottom))
         }
         if let pillEdge, pillEdge.firstAttribute == wanted.firstAttribute { return }
         pillEdge?.isActive = false
