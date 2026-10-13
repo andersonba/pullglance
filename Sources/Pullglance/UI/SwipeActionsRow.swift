@@ -127,7 +127,9 @@ struct SwipeTile: View {
         .foregroundStyle(tint.mix(with: .primary, by: 0.45))
         .frame(width: swipeTileWidth)
         .frame(maxHeight: .infinity)
-        .background(tint.opacity(0.16))
+        // Explicit shape: the row above sets a rounded container shape (its reorder background), and on
+        // macOS 26+ a shapeless background follows it, which rounded the tiles.
+        .background(tint.opacity(0.16), in: Rectangle())
         .overlay(alignment: .leading) { Rectangle().fill(tint.opacity(0.25)).frame(width: 0.5) }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
