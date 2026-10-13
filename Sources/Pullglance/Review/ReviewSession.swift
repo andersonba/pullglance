@@ -232,6 +232,13 @@ final class ReviewSession {
         }
     }
 
+    /// The outcome of a pull request action taken from the window (merge): a failure shows in the bar,
+    /// success stays quiet; either way the review state is refreshed.
+    func report(_ result: ActionResult) async {
+        if case .failure(let message) = result { notice = .error(message) }
+        await refresh()
+    }
+
     func scroll(_ direction: ScrollDirection) async {
         guard (try? await ensureSettingsPushed()) != nil else { return }
         _ = try? await scripting.call("scrollToUnviewed", ["args": [direction.rawValue]])

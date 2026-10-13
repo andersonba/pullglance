@@ -142,6 +142,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
             let focusInWebView = window.firstResponder is WKWebView || (window.firstResponder as? NSView)?.superview is WKWebView
             guard focusInWebView || flags.contains(.command) else { return event }
             let key = event.charactersIgnoringModifiers ?? ""
+            let reviewKeys = Self.handlesReviewShortcut(focusInWebView: focusInWebView, modalPresented: self.modalHost != nil)
             switch (flags, key) {
             case (.command, "r"): self.reload()
             case (.command, "l"): self.focusAddress()
@@ -156,34 +157,41 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
             case (.command, "-"): self.zoomOut()
             case (.command, "0"): self.zoomReset()
             case ([.command, .shift], "O"), ([.command, .shift], "o"): self.openInBrowser()
-            // Review keys only act on review pages; elsewhere the page keeps them (⌘↓ scrolls to the end, etc.).
+            // Review keys act only when the page has focus and no modal is up (text fields keep ⌘↓ etc.), and only
+            // on review pages; elsewhere the page keeps them (⌘↓ scrolls to the end, etc.).
             case ([.command, .shift], "V"), ([.command, .shift], "v"):
-                guard self.session.page.showsBar else { return event }
+                guard reviewKeys, self.session.page.showsBar else { return event }
                 self.markTests()
             case (.command, "\u{F701}"), ([.command, .function], "\u{F701}"), ([.command, .numericPad, .function], "\u{F701}"):
-                guard self.session.page.showsBar else { return event }
+                guard reviewKeys, self.session.page.showsBar else { return event }
                 self.nextUnviewed()
             case (.command, "\u{F700}"), ([.command, .function], "\u{F700}"), ([.command, .numericPad, .function], "\u{F700}"):
-                guard self.session.page.showsBar else { return event }
+                guard reviewKeys, self.session.page.showsBar else { return event }
                 self.previousUnviewed()
             case ([.command, .shift], "A"), ([.command, .shift], "a"):
-                guard self.session.pullRequest != nil else { return event }
+                guard reviewKeys, self.session.pullRequest != nil else { return event }
                 self.approvePR()
             case ([.command, .shift], "C"), ([.command, .shift], "c"):
-                guard self.session.pullRequest != nil else { return event }
+                guard reviewKeys, self.session.pullRequest != nil else { return event }
                 self.commentPR()
             case ([.command, .shift], "M"), ([.command, .shift], "m"):
-                guard self.session.pullRequest != nil else { return event }
+                guard reviewKeys, self.session.pullRequest != nil else { return event }
                 self.mergePR()
             case ([.command, .shift], "R"), ([.command, .shift], "r"):
-                guard self.session.page.showsBar else { return event }
+                guard reviewKeys, self.session.page.showsBar else { return event }
                 self.refreshReview()
             case ([.command, .option], "b"), ([.command, .option], "∫"):
+                guard reviewKeys else { return event }
                 self.toggleReviewBar()
             default: return event
             }
             return nil
         }
+    }
+
+    /// The review shortcuts belong to the page: never while typing in the address, find or modal fields.
+    nonisolated static func handlesReviewShortcut(focusInWebView: Bool, modalPresented: Bool) -> Bool {
+        focusInWebView && !modalPresented
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
@@ -447,10 +455,15 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     @objc func mergePR() {
         presentModal { pr, store, done in
-            AnyView(MergeConfirmView(pr: pr, store: store) { options in
+            // Same "previous failure" line as the popover's merge sheet.
+            let previous: String? = if case .failed(.merge, let message) = store.actionState(for: pr) { message } else { nil }
+            return AnyView(MergeConfirmView(pr: pr, store: store, previousFailure: previous) { [weak self] options in
                 done()
                 guard let options else { return }
-                Task { _ = await store.merge(pr, method: options.method, deleteBranch: options.deleteBranch) }
+                Task {
+                    let result = await store.merge(pr, method: options.method, deleteBranch: options.deleteBranch)
+                    await self?.session.report(result)
+                }
             })
         }
     }

@@ -197,4 +197,19 @@ final class FakeScripting: ReviewScripting {
         await s.settle()
         #expect(scripting.calls.filter { $0.function == "mark" }.count == 1)
     }
+    @Test func aFailedMergeShowsInTheBarAndSuccessStaysQuiet() async {
+        let (s, _, _, _) = await make(mine: [pr7])
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7"))
+        await s.settle()
+        await s.report(.success(note: nil))
+        #expect(s.notice == nil)
+        await s.report(.failure("Merge blocked"))
+        #expect(s.notice == .error("Merge blocked"))
+    }
+
+    @Test func reviewShortcutsNeedPageFocusAndNoModal() {
+        #expect(ReviewWindowController.handlesReviewShortcut(focusInWebView: true, modalPresented: false))
+        #expect(!ReviewWindowController.handlesReviewShortcut(focusInWebView: false, modalPresented: false))
+        #expect(!ReviewWindowController.handlesReviewShortcut(focusInWebView: true, modalPresented: true))
+    }
 }
