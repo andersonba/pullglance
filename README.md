@@ -33,6 +33,7 @@ One click opens the pull request in a window of its own, with a review bar above
 - **General**: launch at login, refresh interval, language.
 - **Sections**: show or hide sections, drag to reorder them, choose what the badge counts, one number or two.
 - **Filters**: hide organizations or accounts, and per owner either keep everything except a few repositories or only a chosen few. Hidden owners and excluded repositories leave the searches themselves, so lists, totals and the badge all follow.
+- **Review**: which files count as tests, by preset or your own globs, and how marking behaves: automatically on opening a pull request, after loading the whole file list, verified on the server. Compare pages can remember viewed files, and that memory can be cleared.
 - **Diagnostics**: the failures of the last refreshes, the avatar cache, a verbose log toggle and *Export diagnostics…*, which zips a summary, the log and optional screenshots for a bug report.
 
 ## Install

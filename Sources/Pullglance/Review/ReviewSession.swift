@@ -39,16 +39,24 @@ final class ReviewSession {
     @ObservationIgnored private var pendingSettingsPush: Task<Void, Never>?
     /// Bumped whenever the pull request under the bar may change; a GraphQL answer for an older value is dropped.
     @ObservationIgnored private var generation = 0
+    /// Bumped only when the page moves to another pull request. A GraphQL file-count answer is kept while this
+    /// holds: reloads of the same document (URL KVO, then didFinish) bump `generation` but not this.
+    @ObservationIgnored private var countsEpoch = 0
+    /// `repo#number` whose file counts are being fetched; a second report of the same page does not refetch.
+    @ObservationIgnored private var countsInFlightFor: String?
     /// `repo#number` of pull requests auto-marked in this app run; auto-mark happens once per pull request.
     @ObservationIgnored private var autoMarked: Set<String> = []
 
     private(set) var page: ReviewPage = .other
-    private(set) var pullRequest: PullRequest?
+    /// The store's pull request for the page, read live: the store is observable, so the bar follows its cycles.
+    var pullRequest: PullRequest? { storedPullRequest(for: page) }
     private(set) var fileCounts: FileCounts?
     private(set) var pageCounts: PageCounts?
     private(set) var busy = false
     private(set) var notice: Notice?
     private(set) var presetChoice: ReviewPresetChoice = .auto
+    /// The caret is in a page field (textarea, input, contenteditable): review shortcuts leave the keys to it.
+    private(set) var isEditingInPage = false
     var isBarHidden: Bool { didSet { defaults.set(isBarHidden, forKey: "reviewBarHidden") } }
 
     var showsBar: Bool { page.showsBar && !isBarHidden }
@@ -75,8 +83,8 @@ final class ReviewSession {
         }()
         page = newPage
         if let repo = newPage.repo { presetChoice = ReviewPresetChoice.load(defaults, repo: repo) }
-        if !samePR { notice = nil; fileCounts = nil; pageCounts = nil }
-        pullRequest = storedPullRequest(for: newPage)
+        // Another page: the old document's focused field is gone with it (its focusout may never arrive).
+        if !samePR { notice = nil; fileCounts = nil; pageCounts = nil; countsEpoch += 1; isEditingInPage = false }
         // A full load restarts the script, which needs setSettings before anything else; it is idempotent.
         settingsEpoch += 1
         generation += 1
@@ -87,7 +95,10 @@ final class ReviewSession {
             await previous?.value
             guard let self, gen == self.generation else { return }
             await self.pushSettingsAndCount()
-            if case .pullRequest = newPage, !samePR || self.fileCounts == nil { await self.refreshFileCounts(generation: gen) }
+            if case .pullRequest(let repo, let number, _) = newPage,
+               !samePR || (self.fileCounts == nil && self.countsInFlightFor != "\(repo)#\(number)") {
+                await self.refreshFileCounts()
+            }
             await self.autoMarkIfNeeded(generation: gen)
         }
     }
@@ -97,6 +108,8 @@ final class ReviewSession {
         case "context":
             // The page moved under us (Turbo). A new diff means undo no longer applies.
             if let dict = payload as? [String: Any], let base = dict["basePath"] as? String, base != currentBasePath { notice = nil }
+        case "editing":
+            if let dict = payload as? [String: Any], let active = dict["active"] as? Bool { isEditingInPage = active }
         case "listing":
             let gen = generation
             track { await $0.recount(); await $0.autoMarkIfNeeded(generation: gen) }
@@ -175,10 +188,14 @@ final class ReviewSession {
                                 partial: raw["partial"] as? Bool ?? false, perRule: raw["perRule"] as? [String: Int] ?? [:])
     }
 
-    private func refreshFileCounts(generation gen: Int) async {
+    /// The answer is kept unless the page moved to another pull request meanwhile.
+    private func refreshFileCounts() async {
         guard case .pullRequest(let repo, let number, _) = page, let ref = PullRequestRef(repo: repo, number: number) else { return }
+        let key = "\(repo)#\(number)", epoch = countsEpoch
+        countsInFlightFor = key
         let counts = await fetchFileCounts(client, ref: ref)
-        guard gen == generation else { return }
+        if countsInFlightFor == key { countsInFlightFor = nil }
+        guard epoch == countsEpoch else { return }
         fileCounts = counts
     }
 
@@ -186,11 +203,8 @@ final class ReviewSession {
         let gen = generation
         await pushSettingsAndCount()
         if case .pullRequest = page {
-            await refreshFileCounts(generation: gen)
-            if let pullRequest, gen == generation {
-                _ = await store.refreshOne(pullRequest, quiet: true)
-                if gen == generation { self.pullRequest = storedPullRequest(for: page) }
-            }
+            await refreshFileCounts()
+            if let pullRequest, gen == generation { _ = await store.refreshOne(pullRequest, quiet: true) }
         }
     }
 
@@ -219,6 +233,8 @@ final class ReviewSession {
     }
 
     func undo() async {
+        // Only a marking the page can undo; otherwise the script would throw and the bar blame the page.
+        guard case .marked(_, _, canUndo: true) = notice else { return }
         await perform { [self] in
             let raw = try await scripting.call("undo", ["args": []]) as? [String: Any] ?? [:]
             return .undone(count: raw["marked"] as? Int ?? 0)
@@ -232,7 +248,7 @@ final class ReviewSession {
         }
     }
 
-    /// The outcome of a pull request action taken from the window (merge): a failure shows in the bar,
+    /// The outcome of a pull request action taken from the window (merge, approve, comment): a failure shows in the bar,
     /// success stays quiet; either way the review state is refreshed.
     func report(_ result: ActionResult) async {
         if case .failure(let message) = result { notice = .error(message) }
@@ -259,6 +275,6 @@ final class ReviewSession {
         }
         busy = false
         await recount()
-        await refreshFileCounts(generation: generation)
+        await refreshFileCounts()
     }
 }

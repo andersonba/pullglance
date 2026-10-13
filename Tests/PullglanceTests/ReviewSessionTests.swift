@@ -207,9 +207,55 @@ final class FakeScripting: ReviewScripting {
         #expect(s.notice == .error("Merge blocked"))
     }
 
+    @Test func samePageReportedTwiceFetchesCountsOnce() async {
+        let (s, gh, _, _) = await make(mine: [pr7])
+        await gh.setPullRequestFiles([.success(filesEnvelope(total: 3, viewed: [true, false, false], next: nil))])
+        let url = URL(string: "https://github.com/acme/web/pull/7/files")
+        s.pageChanged(to: url)
+        s.pageChanged(to: url)
+        await s.settle()
+        #expect(await gh.fileLookups.count == 1)
+        #expect(s.fileCounts == FileCounts(total: 3, viewed: 1))
+    }
+
+    /// URL KVO starts the fetch; didFinish reports the same document while it is still in flight.
+    @Test func samePageReportedWhileCountsAreInFlightFetchesOnce() async {
+        let (s, gh, _, _) = await make(mine: [pr7])
+        await gh.setPullRequestFiles([.success(filesEnvelope(total: 3, viewed: [true, false, false], next: nil))])
+        await gh.holdFileLookups()
+        let url = URL(string: "https://github.com/acme/web/pull/7/files")
+        s.pageChanged(to: url)
+        while await gh.fileLookups.isEmpty { await Task.yield() }
+        s.pageChanged(to: url)
+        await gh.releaseFileLookups()
+        await s.settle()
+        #expect(await gh.fileLookups.count == 1)
+        #expect(s.fileCounts == FileCounts(total: 3, viewed: 1))
+    }
+
+    @Test func undoWithoutAnUndoableMarkingDoesNothing() async {
+        let (s, _, scripting, _) = await make(mine: [pr7])
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        await s.undo()
+        #expect(!scripting.calls.contains { $0.function == "undo" })
+        #expect(s.notice == nil)
+    }
+
+    @Test func editingInThePageIsTracked() async {
+        let (s, _, _, _) = await make(mine: [pr7])
+        #expect(!s.isEditingInPage)
+        s.scriptEvent("editing", ["active": true])
+        #expect(s.isEditingInPage)
+        s.scriptEvent("editing", ["active": false])
+        #expect(!s.isEditingInPage)
+    }
+
     @Test func reviewShortcutsNeedPageFocusAndNoModal() {
-        #expect(ReviewWindowController.handlesReviewShortcut(focusInWebView: true, modalPresented: false))
-        #expect(!ReviewWindowController.handlesReviewShortcut(focusInWebView: false, modalPresented: false))
-        #expect(!ReviewWindowController.handlesReviewShortcut(focusInWebView: true, modalPresented: true))
+        #expect(ReviewWindowController.handlesReviewShortcut(focusInWebView: true, modalPresented: false, editingInPage: false))
+        #expect(!ReviewWindowController.handlesReviewShortcut(focusInWebView: false, modalPresented: false, editingInPage: false))
+        #expect(!ReviewWindowController.handlesReviewShortcut(focusInWebView: true, modalPresented: true, editingInPage: false))
+        // A GitHub textarea keeps ⇧⌘V (Paste and Match Style) and ⌘↑/⌘↓.
+        #expect(!ReviewWindowController.handlesReviewShortcut(focusInWebView: true, modalPresented: false, editingInPage: true))
     }
 }

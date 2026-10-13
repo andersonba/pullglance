@@ -136,7 +136,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
             let focusInWebView = window.firstResponder is WKWebView || (window.firstResponder as? NSView)?.superview is WKWebView
             guard focusInWebView || flags.contains(.command) else { return event }
             let key = event.charactersIgnoringModifiers ?? ""
-            let reviewKeys = Self.handlesReviewShortcut(focusInWebView: focusInWebView, modalPresented: self.modalHost != nil)
+            let reviewKeys = Self.handlesReviewShortcut(focusInWebView: focusInWebView, modalPresented: self.modalHost != nil, editingInPage: self.session.isEditingInPage)
             switch (flags, key) {
             case (.command, "r"): self.reload()
             case (.command, "l"): self.focusAddress()
@@ -183,9 +183,10 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         }
     }
 
-    /// The review shortcuts belong to the page: never while typing in the address, find or modal fields.
-    nonisolated static func handlesReviewShortcut(focusInWebView: Bool, modalPresented: Bool) -> Bool {
-        focusInWebView && !modalPresented
+    /// The review shortcuts belong to the page: never while typing in the address, find or modal fields, nor in
+    /// the page's own fields (a GitHub comment box keeps ⇧⌘V Paste and Match Style and ⌘↑/⌘↓).
+    nonisolated static func handlesReviewShortcut(focusInWebView: Bool, modalPresented: Bool, editingInPage: Bool) -> Bool {
+        focusInWebView && !modalPresented && !editingInPage
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
@@ -247,7 +248,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     private func loadingChanged(_ loading: Bool) {
         reloadButton.image = NSImage(systemSymbolName: loading ? "xmark" : "arrow.clockwise", accessibilityDescription: nil)
         reloadButton.toolTip = loading ? String(localized: "Stop (⌘.)", bundle: .app) : String(localized: "Reload (⌘R)", bundle: .app)
-        reloadButton.setAccessibilityTitle(loading ? "Stop" : "Reload")
+        reloadButton.setAccessibilityTitle(loading ? String(localized: "Stop", bundle: .app) : String(localized: "Reload", bundle: .app))
         if loading {
             progress.doubleValue = max(progress.doubleValue, 0.1)
             NSAnimationContext.runAnimationGroup { $0.duration = 0.1; progress.animator().alphaValue = 1 }
@@ -289,7 +290,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         field.placeholderString = "github.com/owner/repo"
         field.cell?.sendsActionOnEndEditing = false
         field.cell?.lineBreakMode = .byTruncatingTail
-        field.setAccessibilityLabel("Address")
+        field.setAccessibilityLabel(String(localized: "Address", bundle: .app))
         field.setAccessibilityIdentifier("ReviewWindow.Address")
         addressBar = AddressBarController(field: field) { [weak self] text, inBrowser in
             guard let self else { return }
@@ -441,12 +442,26 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     @objc func approvePR() {
         guard modalHost == nil else { return }   // no stacked modals from the menu
-        presentModal { pr, store, done in AnyView(ApproveView(pr: pr, store: store, onDone: { _ in done() })) }
+        presentModal { pr, store, done in
+            // The result refreshes the review state, which moves the decision chip; a failure shows in the bar.
+            AnyView(ApproveView(pr: pr, store: store, onDone: { [weak self] result in
+                done()
+                guard let result else { return }
+                Task { await self?.session.report(result) }
+            }))
+        }
     }
 
     @objc func commentPR() {
         guard modalHost == nil else { return }   // no stacked modals from the menu
-        presentModal { pr, store, done in AnyView(CommentView(pr: pr, store: store, onDone: { _ in done() })) }
+        presentModal { pr, store, done in
+            // The result refreshes the review state, which moves the decision chip; a failure shows in the bar.
+            AnyView(CommentView(pr: pr, store: store, onDone: { [weak self] result in
+                done()
+                guard let result else { return }
+                Task { await self?.session.report(result) }
+            }))
+        }
     }
 
     @objc func mergePR() {

@@ -304,7 +304,7 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
         window.isReleasedWhenClosed = false   // ARC owns it through `popups`; AppKit must not release it too
         window.isRestorable = false
         window.tabbingMode = .disallowed
-        window.title = navigationAction.request.url?.host ?? "Sign in"
+        window.title = navigationAction.request.url?.host ?? String(localized: "Sign in", bundle: .app)
         window.contentView = popup
         // Centred over the review window, clamped to its screen.
         if let parent = self.webView.window?.frame {
@@ -354,16 +354,16 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
 
     private func dialog(_ message: String, origin: WKFrameInfo) -> NSAlert {
         let alert = NSAlert()
-        let host = origin.securityOrigin.host.isEmpty ? "This page" : origin.securityOrigin.host
-        alert.messageText = String(format: "%@ says", host)
+        let host = origin.securityOrigin.host.isEmpty ? String(localized: "This page", bundle: .app) : origin.securityOrigin.host
+        alert.messageText = String(format: String(localized: "%@ says", bundle: .app), host)
         alert.informativeText = String(message.prefix(2000))
         return alert
     }
 
     func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo) async -> Bool {
         let alert = dialog(message, origin: frame)
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "OK", bundle: .app))
+        alert.addButton(withTitle: String(localized: "Cancel", bundle: .app))
         let response = await sheet(alert, on: webView)
         log("js.confirm → \(response == .alertFirstButtonReturn)")
         return response == .alertFirstButtonReturn
@@ -371,8 +371,8 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
 
     func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?, initiatedByFrame frame: WKFrameInfo) async -> String? {
         let alert = dialog(prompt, origin: frame)
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "OK", bundle: .app))
+        alert.addButton(withTitle: String(localized: "Cancel", bundle: .app))
         let field = NSTextField(string: defaultText ?? "")
         field.frame = NSRect(x: 0, y: 0, width: 300, height: 24)
         alert.accessoryView = field
@@ -387,7 +387,7 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
         panel.canChooseDirectories = parameters.allowsDirectories
         panel.canChooseFiles = !parameters.allowsDirectories
         panel.resolvesAliases = true
-        panel.message = "Choose a file for \(frame.securityOrigin.host)"
+        panel.message = String(format: String(localized: "Choose a file for %@", bundle: .app), frame.securityOrigin.host)
         let response: NSApplication.ModalResponse
         if let window = webView.window, window.isVisible { response = await panel.beginSheetModal(for: window) } else { response = panel.runModal() }
         return response == .OK ? panel.urls : nil
@@ -396,7 +396,7 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo) async {
         log("js.alert")
         let alert = dialog(message, origin: frame)
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: String(localized: "OK", bundle: .app))
         _ = await sheet(alert, on: webView)
     }
 }
@@ -410,7 +410,7 @@ final class ReviewWebView: WKWebView {
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
         for item in menu.items where item.identifier?.rawValue == "WKMenuItemIdentifierOpenLinkInNewWindow" {
-            item.title = "Open Link in Browser"
+            item.title = String(localized: "Open Link in Browser", bundle: .app)
             item.target = self
             item.action = #selector(openLinkInBrowser(_:))
             item.representedObject = contextLink

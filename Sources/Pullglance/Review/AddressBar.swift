@@ -143,10 +143,10 @@ final class AddressBarController: NSObject, NSTextFieldDelegate, NSTableViewData
                 .prefix(limit)
                 .map { Row(section: section, value: $0.0.url, title: $0.0.title) }
         }
-        let recent = ranked(history.map { ($0.key, $0.value.title, $0.value.visits) }, "Recent", 6)
-        let prs = ranked(pullRequests.map { ($0.url, $0.title, 0) }, "Pull request", 6)
-        let owners = ranked(known.filter { $0.split(separator: "/").count == 3 }.map { ($0, nil, 0) }, "Owner", 4)
-        let repos = ranked(known.filter { $0.split(separator: "/").count > 3 && !$0.hasSuffix("/pulls") }.map { ($0, nil, 0) }, "Repository", 6)
+        let recent = ranked(history.map { ($0.key, $0.value.title, $0.value.visits) }, String(localized: "Recent", bundle: .app), 6)
+        let prs = ranked(pullRequests.map { ($0.url, $0.title, 0) }, String(localized: "Pull request", bundle: .app), 6)
+        let owners = ranked(known.filter { $0.split(separator: "/").count == 3 }.map { ($0, nil, 0) }, String(localized: "Owner", bundle: .app), 4)
+        let repos = ranked(known.filter { $0.split(separator: "/").count > 3 && !$0.hasSuffix("/pulls") }.map { ($0, nil, 0) }, String(localized: "Repository", bundle: .app), 6)
         var seen = Set<String>()
         return (recent + prs + owners + repos).filter { seen.insert(Self.display($0.value).lowercased()).inserted }
     }

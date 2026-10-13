@@ -262,3 +262,45 @@
 "Previous Unviewed File" = "Arquivo não visto anterior";
 "Refresh Review State" = "Atualizar estado da review";
 "Toggle Review Bar" = "Mostrar/ocultar barra de review";
+
+/* Review menu */
+"Back" = "Voltar";
+"Forward" = "Avançar";
+"Reload Page" = "Recarregar página";
+"Stop" = "Parar";
+"Open Location" = "Abrir endereço";
+"Open Page in Browser" = "Abrir página no navegador";
+"Find…" = "Buscar…";
+"Zoom In" = "Ampliar";
+"Zoom Out" = "Reduzir";
+"Actual Size" = "Tamanho real";
+
+/* Review window */
+"Back (⌘[)" = "Voltar (⌘[)";
+"Forward (⌘])" = "Avançar (⌘])";
+"Reload (⌘R)" = "Recarregar (⌘R)";
+"Stop (⌘.)" = "Parar (⌘.)";
+"Reload" = "Recarregar";
+"Address" = "Endereço";
+"Open page in browser (⇧⌘O)" = "Abrir página no navegador (⇧⌘O)";
+"Find in page" = "Buscar na página";
+"Next (⌘G)" = "Próximo (⌘G)";
+"Previous (⇧⌘G)" = "Anterior (⇧⌘G)";
+"Not found" = "Não encontrado";
+"Try Again" = "Tentar de novo";
+"Could not load the page" = "Não foi possível carregar a página";
+"The page keeps crashing" = "A página continua travando";
+"WebKit stopped rendering this page twice in a row." = "O WebKit parou de renderizar esta página duas vezes seguidas.";
+"Downloaded %@ · Show in Finder" = "%@ baixado · Mostrar no Finder";
+"Recent" = "Recentes";
+"Pull request" = "Pull request";
+"Owner" = "Dono";
+"Repository" = "Repositório";
+
+/* Review page dialogs */
+"Sign in" = "Entrar";
+"This page" = "Esta página";
+"%@ says" = "%@ diz";
+"OK" = "OK";
+"Choose a file for %@" = "Escolha um arquivo para %@";
+"Open Link in Browser" = "Abrir link no navegador";

@@ -93,6 +93,19 @@ export function install(deps: Deps) {
   })
   deps.post({ name: 'context', payload: context() })
 
+  // The app's review shortcuts (⇧⌘V, ⌘↑/⌘↓) must leave the keys to a field the caret is in.
+  let editing = false
+  const updateEditing = () => {
+    const el = document.activeElement as HTMLElement | null
+    const active = el != null && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable === true)
+    if (active === editing) return
+    editing = active
+    deps.post({ name: 'editing', payload: { active } })
+  }
+  document.addEventListener('focusin', updateEditing)
+  // On focusout the next element is not active yet; read it after the focus move settles.
+  document.addEventListener('focusout', () => { queueMicrotask(updateEditing) })
+
   const api = {
     context,
     setSettings: (s: Partial<Settings>) => {

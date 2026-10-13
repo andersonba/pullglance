@@ -113,6 +113,23 @@ describe('review script API', () => {
     expect(events.filter((e) => e.name === 'context').length).toBeGreaterThanOrEqual(2)
   })
 
+  it('reports when the caret enters and leaves a page field, once per change', async () => {
+    mountComparePage({ files: [{ path: 'a.ts' }] })
+    const events: Event[] = []
+    install({ post: (e) => events.push(e) })
+    const editingOf = () => events.filter((e) => e.name === 'editing').map((e) => e.payload)
+    const textarea = document.createElement('textarea')
+    const button = document.createElement('button')
+    document.body.append(textarea, button)
+    textarea.focus()
+    await vi.waitFor(() => expect(editingOf()).toEqual([{ active: true }]))
+    textarea.blur()
+    await vi.waitFor(() => expect(editingOf()).toEqual([{ active: true }, { active: false }]))
+    button.focus()                                  // not a field: no change, no event
+    await wait(10)
+    expect(editingOf()).toEqual([{ active: true }, { active: false }])
+  })
+
   it('posts an empty listing once when the file list goes away', async () => {
     mountComparePage({ files: [{ path: 'a.ts' }] })
     const events: Event[] = []

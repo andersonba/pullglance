@@ -95,8 +95,14 @@ actor FakeGH: GHRunning {
     private var fileOutcomes: [GHOutcome] = []
     private(set) var fileLookups: [(number: Int, after: String?)] = []
     func setPullRequestFiles(_ outcomes: [GHOutcome]) { fileOutcomes = outcomes }
+    /// When set, file lookups suspend (already recorded) until `releaseFileLookups()`.
+    private var holdingFiles = false
+    private var heldFiles: [CheckedContinuation<Void, Never>] = []
+    func holdFileLookups() { holdingFiles = true }
+    func releaseFileLookups() { holdingFiles = false; let waiting = heldFiles; heldFiles = []; waiting.forEach { $0.resume() } }
     func pullRequestFiles(owner: String, name: String, number: Int, after: String?) async -> GHOutcome {
         fileLookups.append((number, after))
+        if holdingFiles { await withCheckedContinuation { heldFiles.append($0) } }
         return fileOutcomes.isEmpty ? .failure("no scripted files page") : fileOutcomes.removeFirst()
     }
 
