@@ -299,6 +299,7 @@ final class PRStore {
             defaults.set(verboseLogging, forKey: Self.verboseLoggingKey)
             appLog.isVerbose = verboseLogging
             appLog.info("verbose logging \(verboseLogging ? "on" : "off")")
+            if verboseLogging, appLog === AppLog.shared { MainThreadWatchdog.shared.start() }
         }
     }
 
@@ -351,6 +352,7 @@ final class PRStore {
         let verbose = defaults.bool(forKey: Self.verboseLoggingKey)
         self.verboseLogging = verbose
         log.isVerbose = verbose
+        if verbose, log === AppLog.shared { MainThreadWatchdog.shared.start() }
         self.isViaTeamExpanded = defaults.bool(forKey: Self.expandedKey)
         self.hiddenOwners = Set(defaults.stringArray(forKey: Self.hiddenOwnersKey) ?? [])
         var rules = (defaults.data(forKey: Self.repoRulesKey)).flatMap { try? JSONDecoder().decode([String: RepoRule].self, from: $0) } ?? [:]
