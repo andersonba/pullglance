@@ -70,6 +70,9 @@ struct ReviewCommands: Commands {
             // equivalent here so the always-enabled menu cannot take Paste and Match Style or ⌘↓/⌘↑ from a text field.
             Button { ReviewWindowController.shared?.markTests() } label: { Text("Mark Tests as Viewed", bundle: .app) }
             Button { ReviewWindowController.shared?.undoMarking() } label: { Text("Undo Last Marking", bundle: .app) }
+            Button { ReviewWindowController.shared?.markViewedAndNext() } label: { Text("Mark Viewed and Go to Next", bundle: .app) }
+            Button { ReviewWindowController.shared?.nextFile() } label: { Text("Next File", bundle: .app) }
+            Button { ReviewWindowController.shared?.previousFile() } label: { Text("Previous File", bundle: .app) }
             Button { ReviewWindowController.shared?.nextUnviewed() } label: { Text("Next Unviewed File", bundle: .app) }
             Button { ReviewWindowController.shared?.previousUnviewed() } label: { Text("Previous Unviewed File", bundle: .app) }
             Divider()

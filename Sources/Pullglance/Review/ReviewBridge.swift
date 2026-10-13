@@ -34,10 +34,41 @@ final class ReviewBridge: NSObject, ReviewScripting, WKScriptMessageHandlerWithR
     func attach(to webView: WKWebView) { self.webView = webView }
 
     /// Positional arguments go in `["args": [...]]`, e.g. `call("mark", ["args": [NSNull()]])` for `mark(null)`.
+    /// A call to a document that gets replaced mid-flight may never answer; nothing upstream may wait forever.
+    static let timeout: Duration = .seconds(10)
+
     func call(_ function: String, _ arguments: [String: Any]) async throws -> Any? {
         guard let webView else { throw ReviewBridgeError.notAttached }
         let body = "const api = window.__pullglanceReview; if (!api) throw new Error('review script not loaded'); return await api[fn].apply(api, args);"
-        return try await webView.callAsyncJavaScript(body, arguments: ["fn": function, "args": arguments["args"] ?? []], in: nil, contentWorld: Self.world)
+        let args: [String: Any] = ["fn": function, "args": arguments["args"] ?? []]
+        // WebKit's call cannot be cancelled; race it against the clock and take whichever answers first.
+        let settled = Settled()
+        let boxed: Boxed = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Boxed, Error>) in
+            Task { @MainActor in
+                do {
+                    let value = try await webView.callAsyncJavaScript(body, arguments: args, in: nil, contentWorld: Self.world)
+                    if settled.claim() { continuation.resume(returning: Boxed(value)) }
+                } catch {
+                    if settled.claim() { continuation.resume(throwing: error) }
+                }
+            }
+            Task { @MainActor in
+                try? await Task.sleep(for: Self.timeout)
+                if settled.claim() { continuation.resume(throwing: ReviewBridgeError.timedOut) }
+            }
+        }
+        return boxed.value
+    }
+
+    @MainActor private final class Settled {
+        private var done = false
+        func claim() -> Bool { if done { return false }; done = true; return true }
+    }
+
+    /// `callAsyncJavaScript` hands back `Any?`; boxing it is how it crosses the continuation under strict concurrency.
+    private final class Boxed: @unchecked Sendable {
+        let value: Any?
+        init(_ value: Any?) { self.value = value }
     }
 
     func userContentController(_ ucc: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping @MainActor (Any?, String?) -> Void) {
@@ -57,4 +88,4 @@ final class ReviewBridge: NSObject, ReviewScripting, WKScriptMessageHandlerWithR
     }
 }
 
-enum ReviewBridgeError: Error { case notAttached }
+enum ReviewBridgeError: Error { case notAttached, timedOut }

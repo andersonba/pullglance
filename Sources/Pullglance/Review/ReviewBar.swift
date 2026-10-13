@@ -18,14 +18,15 @@ struct ReviewBarActions {
 struct ReviewBar: View {
     let session: ReviewSession
     let actions: ReviewBarActions
-    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        HStack(spacing: 8) {
-            leading
-            Spacer(minLength: 8)
-            trailing
+        // Left: the pull request and its progress, read as one line. Right: its actions. A centered middle
+        // zone left a small element floating in wide windows.
+        HStack(spacing: 12) {
+            HStack(spacing: 8) { leading; progress }.frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 8) { trailing }.fixedSize()
         }
+        .controlSize(.small)
         .padding(.horizontal, 12)
         .frame(height: 32)
         .background(.bar)
@@ -50,15 +51,25 @@ struct ReviewBar: View {
         }
     }
 
+    /// Right zone: one primary action for the pull request's state, with the rest in its attached menu.
+    /// The same button-plus-menu as the pill's "Mark tests". File work lives in the pill.
     @ViewBuilder private var trailing: some View {
-        progress
-        if case .pullRequest(_, _, let tab) = session.page, tab != .files {
-            Button { actions.reviewFiles() } label: { Text("Review files →", bundle: .app) }.buttonStyle(.borderedProminent).controlSize(.small)
+        if case .pullRequest(_, _, let tab) = session.page {
+            if tab != .files {
+                Button { actions.reviewFiles() } label: {
+                    Label { Text("Review files", bundle: .app) } icon: { Image(systemName: "arrow.right") }.labelStyle(.titleAndIcon)
+                }
+            }
+            PRActionsComboButton(session: session, actions: actions, primary: showsMerge ? .merge : .approve).fixedSize()
         } else {
-            markButton
+            moreMenu
         }
-        Button { Task { await session.scroll(.next) } } label: { Text("Next ↓", bundle: .app) }.controlSize(.small).disabled(session.busy)
-        moreMenu
+    }
+
+    /// Same rule as the popover: Merge is offered where merging is the point.
+    private var showsMerge: Bool {
+        guard let pr = session.pullRequest else { return false }
+        return mineSection(for: pr) == .readyToMerge
     }
 
     @ViewBuilder private var progress: some View {
@@ -87,53 +98,9 @@ struct ReviewBar: View {
     }
 
     private func counter(viewed: Int, total: Int) -> some View {
-        HStack(spacing: 6) {
-            Text(verbatim: "\(viewed)/\(total)").font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
-            ProgressView(value: total == 0 ? 0 : Double(viewed) / Double(total)).progressViewStyle(.linear).frame(width: 70).controlSize(.mini)
-        }
-    }
-
-    private var markButton: some View {
-        HStack(spacing: 0) {
-            Button { Task { await session.mark() } } label: { Text("Mark tests · \(session.matchCount)", bundle: .app) }
-                .buttonStyle(.borderedProminent).controlSize(.small)
-                .disabled(session.busy || session.pageCounts == nil)
-            Menu {
-                presetItems
-            } label: { Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)) }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 18)
-                .disabled(session.busy)
-        }
-    }
-
-    @ViewBuilder private var presetItems: some View {
-        let counts = session.pageCounts?.perRule ?? [:]
-        Picker(selection: Binding(get: { session.presetChoice }, set: { session.choose($0) })) {
-            Text("Auto (enabled presets)", bundle: .app).tag(ReviewPresetChoice.auto)
-            ForEach(ReviewPresets.all) { preset in
-                Text(verbatim: "\(preset.group) · \(preset.label) · \(counts[preset.id] ?? 0)").tag(ReviewPresetChoice.preset(preset.id))
-            }
-            Text(verbatim: String(localized: "Custom globs", bundle: .app) + " · \(counts["custom"] ?? 0)").tag(ReviewPresetChoice.custom)
-        } label: { Text("Preset", bundle: .app) }
-        .pickerStyle(.inline)
-        Divider()
-        Button { editRules() } label: { Text("Edit rules…", bundle: .app) }
-    }
-
-    /// Settings › Review. The scene's own `openSettings` first; a hosted view outside a SwiftUI scene may not
-    /// reach it, so if no Settings window shows up the legacy responder action is the fallback.
-    private func editRules() {
-        SettingsSelection.shared.tab = .review
-        SettingsOpener.activate()
-        openSettings()
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(300))
-            if SettingsOpener.settingsWindow?.isVisible == true {
-                AppLog.shared.info("review bar: Settings opened via openSettings")
-            } else {
-                AppLog.shared.info("review bar: openSettings showed no window; falling back to showSettingsWindow:")
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            }
+        HStack(spacing: 8) {
+            ProgressView(value: total == 0 ? 0 : Double(viewed) / Double(total)).progressViewStyle(.linear).frame(width: 64).controlSize(.mini)
+            Text("\(viewed) of \(total) viewed", bundle: .app).font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
         }
     }
 
@@ -153,12 +120,10 @@ struct ReviewBar: View {
             Button { Task { await session.unmarkAll() } } label: { Text("Unmark all", bundle: .app) }
             if case .pullRequest = session.page {
                 Divider()
-                Button { actions.approve() } label: { Text("Approve…", bundle: .app) }.keyboardShortcut("a", modifiers: [.command, .shift])
-                    .disabled(session.pullRequest == nil)
-                Button { actions.comment() } label: { Text("Comment…", bundle: .app) }.keyboardShortcut("c", modifiers: [.command, .shift])
-                    .disabled(session.pullRequest == nil)
-                Button { actions.merge() } label: { Text("Merge…", bundle: .app) }.keyboardShortcut("m", modifiers: [.command, .shift])
-                    .disabled(session.pullRequest == nil)
+                if !showsMerge {
+                    Button { actions.merge() } label: { Text("Merge…", bundle: .app) }.keyboardShortcut("m", modifiers: [.command, .shift])
+                        .disabled(session.pullRequest == nil)
+                }
                 Button { actions.snooze() } label: { Text(isDormant ? "Wake" : "Snooze", bundle: .app) }
                     .disabled(session.pullRequest == nil)
             }

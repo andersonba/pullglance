@@ -16,6 +16,19 @@ struct ReviewSettingsView: View {
     var body: some View {
         Form {
             SwiftUI.Section {
+                Picker(selection: $store.settings.filePill) {
+                    Text("Top", bundle: .app).tag(FilePillPosition.top)
+                    Text("Bottom", bundle: .app).tag(FilePillPosition.bottom)
+                } label: {
+                    Text("File controls", bundle: .app)
+                }
+                .pickerStyle(.segmented)
+                Text("Floating over the page on Files and compare pages: previous and next file, viewed and next.", bundle: .app)
+                    .font(.caption2).foregroundStyle(.tertiary)
+            } header: {
+                Text("Review window", bundle: .app)
+            }
+            SwiftUI.Section {
                 ForEach(groups, id: \.name) { group in
                     VStack(alignment: .leading, spacing: 4) {
                         Text(verbatim: group.name).font(.caption).foregroundStyle(.secondary)

@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import QuartzCore
 import WebKit
 
 /// The review window: GitHub inside the app, with the native review bar driven by the page script, and
@@ -39,6 +40,8 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     private var errorRetryURL: URL?
     private var downloadNotice: NSView?
     private var barHost: NSHostingView<ReviewBar>!
+    private var pillHost: NSHostingView<ReviewFilePill>!
+    private var pillEdge: NSLayoutConstraint?
     private var barHeight: NSLayoutConstraint!
     private var modalHost: NSView?
 
@@ -68,6 +71,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         window.setFrameAutosaveName("ReviewWindow")
         if !window.setFrameUsingName("ReviewWindow") { window.center() }
         observe()
+        observePill()
         observeBar()
         installKeyMonitor()
     }
@@ -87,6 +91,9 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     func open(url: URL) {
         PopoverDismissal.dismiss()
+        // While the window is up the app behaves like a regular one: Dock icon and ⌘-Tab, so the user can
+        // come back to it after switching apps. Back to accessory when it closes.
+        NSApp.setActivationPolicy(.regular)
         showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
@@ -94,6 +101,8 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         // key view), which opens the suggestions over the page and freezes the field's text mid-edit.
         window?.makeFirstResponder(host.webView)
         refreshSuggestions()
+        // Same pull request already on screen, whatever the tab: keep the page the user is on.
+        if ReviewPage.classify(host.webView.url).isSamePullRequest(as: ReviewPage.classify(url)) { return }
         if host.webView.url != url { host.webView.load(URLRequest(url: url)) }
     }
 
@@ -120,6 +129,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         Task { _ = try? await bridge.call("flush", ["args": []]) }
         host.closeOwnedPopups()
         sender.orderOut(nil)
+        NSApp.setActivationPolicy(.accessory)
         return false
     }
 
@@ -156,6 +166,9 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
             case ([.command, .shift], "V"), ([.command, .shift], "v"):
                 guard reviewKeys, self.session.page.showsBar else { return event }
                 self.markTests()
+            case (.command, "\r"), ([.command, .numericPad, .function], "\u{3}"):
+                guard reviewKeys, self.session.showsFilePill else { return event }
+                self.markViewedAndNext()
             case (.command, "\u{F701}"), ([.command, .function], "\u{F701}"), ([.command, .numericPad, .function], "\u{F701}"):
                 guard reviewKeys, self.session.page.showsBar else { return event }
                 self.nextUnviewed()
@@ -321,6 +334,12 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         host.webView.translatesAutoresizingMaskIntoConstraints = false
         page.addSubview(host.webView)
         page.addSubview(errorOverlay)
+        pillHost = NSHostingView(rootView: ReviewFilePill(session: session))
+        pillHost.translatesAutoresizingMaskIntoConstraints = false
+        pillHost.isHidden = true
+        pillHost.alphaValue = 0
+        page.addSubview(pillHost)
+        NSLayoutConstraint.activate([pillHost.centerXAnchor.constraint(equalTo: page.centerXAnchor)])
 
         root.addArrangedSubview(bar)
         root.addArrangedSubview(progress)
@@ -335,10 +354,8 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         NSLayoutConstraint.activate([barHost.widthAnchor.constraint(equalTo: root.widthAnchor), barHeight])
         root.addArrangedSubview(findBar)
         root.addArrangedSubview(page)
-        let addressWidth = field.widthAnchor.constraint(equalTo: root.widthAnchor, multiplier: 0.6)
-        addressWidth.priority = NSLayoutConstraint.Priority(250)
-        let addressCenter = field.centerXAnchor.constraint(equalTo: root.centerXAnchor)
-        addressCenter.priority = NSLayoutConstraint.Priority(100)
+        // The field takes every point the buttons leave; hugging well below the buttons' keeps it the one that grows.
+        field.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         field.setContentCompressionResistancePriority(NSLayoutConstraint.Priority(250), for: .horizontal)
         NSLayoutConstraint.activate([
             bar.widthAnchor.constraint(equalTo: root.widthAnchor),
@@ -355,9 +372,55 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
             errorOverlay.topAnchor.constraint(equalTo: page.topAnchor),
             errorOverlay.bottomAnchor.constraint(equalTo: page.bottomAnchor),
             field.widthAnchor.constraint(greaterThanOrEqualToConstant: 212),
-            addressWidth, addressCenter,
         ])
         return root
+    }
+
+    // MARK: file pill
+
+    /// Follows `session.showsFilePill` and the position setting; fades rather than moving the page.
+    private func observePill() {
+        let (shows, position) = withObservationTracking { (session.showsFilePill, ReviewSettingsStore.shared.settings.filePill) } onChange: { [weak self] in
+            Task { @MainActor in self?.observePill() }
+        }
+        placePill(position)
+        guard pillHost.isHidden == shows, let edge = pillEdge else { return }
+        // Slides in from its own edge (up from the bottom, down from the top) while fading; out the same way.
+        let rest = Self.pillRest(position)
+        let away = rest + (position == .bottom ? 14 : -14)
+        if shows {
+            edge.constant = away
+            pillHost.superview?.layoutSubtreeIfNeeded()
+            pillHost.isHidden = false
+        }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = shows ? 0.22 : 0.15
+            context.timingFunction = CAMediaTimingFunction(name: shows ? .easeOut : .easeIn)
+            context.allowsImplicitAnimation = true
+            edge.animator().constant = shows ? rest : away
+            pillHost.animator().alphaValue = shows ? 1 : 0
+            pillHost.superview?.layoutSubtreeIfNeeded()
+        }) { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                if !self.session.showsFilePill { self.pillHost.isHidden = true }
+                self.pillEdge?.constant = rest
+            }
+        }
+    }
+
+    private static func pillRest(_ position: FilePillPosition) -> CGFloat { position == .top ? 12 : -16 }
+
+    private func placePill(_ position: FilePillPosition) {
+        guard let page = pillHost.superview else { return }
+        let wanted: NSLayoutConstraint = switch position {
+        case .top: pillHost.topAnchor.constraint(equalTo: page.topAnchor, constant: Self.pillRest(.top))
+        case .bottom: pillHost.bottomAnchor.constraint(equalTo: page.bottomAnchor, constant: Self.pillRest(.bottom))
+        }
+        if let pillEdge, pillEdge.firstAttribute == wanted.firstAttribute { return }
+        pillEdge?.isActive = false
+        wanted.isActive = true
+        pillEdge = wanted
     }
 
     // MARK: review bar
@@ -408,6 +471,14 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     }
 
     /// The popover's modals, centered over the page; Esc or the modal's own buttons close it.
+    private static func firstTextView(in view: NSView) -> NSTextView? {
+        for sub in view.subviews {
+            if let text = sub as? NSTextView { return text }
+            if let found = firstTextView(in: sub) { return found }
+        }
+        return nil
+    }
+
     private func presentModal(_ make: (PullRequest, PRStore, @escaping @MainActor () -> Void) -> AnyView) {
         guard let pr = session.pullRequest, let content = window?.contentView, modalHost == nil else { return }
         let view = NSHostingView(rootView: make(pr, store, { [weak self] in self?.dismissModal() }))
@@ -423,7 +494,15 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
             view.centerYAnchor.constraint(equalTo: content.centerYAnchor, constant: -40),
         ])
         modalHost = view
-        window?.makeFirstResponder(view)
+        // SwiftUI's own focus request fires before the hosted view is in a window; hand the keyboard to the
+        // text view once it exists, so typing can start at once.
+        Task { @MainActor [weak self, weak view] in
+            for _ in 0..<10 {
+                try? await Task.sleep(for: .milliseconds(40))
+                guard let self, let view, self.modalHost === view else { return }
+                if let text = Self.firstTextView(in: view) { self.window?.makeFirstResponder(text); return }
+            }
+        }
     }
 
     private func dismissModal() {
@@ -434,6 +513,9 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     // The SwiftUI menu does not consult `validateMenuItem`, so each action checks it applies to the page.
     @objc func markTests() { if session.page.showsBar { Task { await session.mark() } } }
+    @objc func markViewedAndNext() { if session.showsFilePill { Task { await session.markCurrentAndNext() } } }
+    @objc func nextFile() { if session.showsFilePill { Task { await session.stepFile(1) } } }
+    @objc func previousFile() { if session.showsFilePill { Task { await session.stepFile(-1) } } }
     @objc func undoMarking() { if session.page.showsBar { Task { await session.undo() } } }
     @objc func nextUnviewed() { if session.page.showsBar { Task { await session.scroll(.next) } } }
     @objc func previousUnviewed() { if session.page.showsBar { Task { await session.scroll(.previous) } } }

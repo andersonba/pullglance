@@ -30,6 +30,18 @@ import Testing
         #expect(ReviewSettings.load(testDefaults()) == .default)
     }
 
+    @Test func settingsSavedBeforeThePillDecodeWithTheDefaultPosition() throws {
+        let old = Data(#"{"presets":{"go":false},"customGlobsText":"","autoMark":true,"rememberCompare":true,"verify":true,"loadBeforeMark":true}"#.utf8)
+        let decoded = try JSONDecoder().decode(ReviewSettings.self, from: old)
+        #expect(decoded.filePill == .bottom)
+        #expect(decoded.autoMark)
+        var s = ReviewSettings.default
+        s.filePill = .top
+        let defaults = testDefaults()
+        s.save(defaults)
+        #expect(ReviewSettings.load(defaults).filePill == .top)
+    }
+
     @Test func presetChoiceIsPerRepository() {
         let defaults = testDefaults()
         ReviewPresetChoice.preset("python").save(defaults, repo: "acme/web")

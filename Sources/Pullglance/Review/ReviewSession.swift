@@ -57,6 +57,33 @@ final class ReviewSession {
     private(set) var presetChoice: ReviewPresetChoice = .auto
     /// The caret is in a page field (textarea, input, contenteditable): review shortcuts leave the keys to it.
     private(set) var isEditingInPage = false
+    /// The file the reader is on, from the script; nil off file pages or before the first scroll report.
+    private(set) var currentFile: FileCursor?
+
+    struct FileCursor: Equatable {
+        var id: String
+        var path: String
+        var index: Int
+        var total: Int
+        var viewed: Bool
+        var name: String { path.split(separator: "/").last.map(String.init) ?? path }
+
+        init?(_ payload: Any?) {
+            guard let d = payload as? [String: Any], let id = d["id"] as? String, let path = d["path"] as? String,
+                  let index = d["index"] as? Int, let total = d["total"] as? Int else { return nil }
+            self.id = id; self.path = path; self.index = index; self.total = total; self.viewed = d["viewed"] as? Bool ?? false
+        }
+    }
+
+    /// The pill shows where there is a file list and a file under the cursor.
+    var showsFilePill: Bool {
+        guard currentFile != nil, !isBarHidden else { return false }
+        switch page {
+        case .pullRequest(_, _, let tab): return tab == .files
+        case .compare: return true
+        case .other: return false
+        }
+    }
     var isBarHidden: Bool { didSet { defaults.set(isBarHidden, forKey: "reviewBarHidden") } }
 
     var showsBar: Bool { page.showsBar && !isBarHidden }
@@ -84,7 +111,7 @@ final class ReviewSession {
         page = newPage
         if let repo = newPage.repo { presetChoice = ReviewPresetChoice.load(defaults, repo: repo) }
         // Another page: the old document's focused field is gone with it (its focusout may never arrive).
-        if !samePR { notice = nil; fileCounts = nil; pageCounts = nil; countsEpoch += 1 }
+        if !samePR { notice = nil; fileCounts = nil; pageCounts = nil; countsEpoch += 1; currentFile = nil }
         // Every load reinstalls the script, and a fresh document only posts `editing` on a change: a reload
         // while typing would otherwise leave the flag stuck and the review shortcuts dead.
         isEditingInPage = false
@@ -93,9 +120,10 @@ final class ReviewSession {
         generation += 1
         guard newPage.showsBar else { inFlight?.cancel(); inFlight = nil; return }
         let gen = generation
-        let previous = inFlight
+        // A navigation makes the old chain irrelevant, and possibly dead: a call made to the document that
+        // was just replaced may never answer. Start fresh instead of queueing behind it.
+        inFlight?.cancel()
         inFlight = Task { [weak self] in
-            await previous?.value
             guard let self, gen == self.generation else { return }
             await self.pushSettingsAndCount()
             if case .pullRequest(let repo, let number, _) = newPage,
@@ -107,10 +135,18 @@ final class ReviewSession {
     }
 
     func scriptEvent(_ name: String, _ payload: Any?) {
+        if name == "current" {
+            let none = (payload as? [String: Any])?["none"] as? String
+            AppLog.shared.debug("review event current cursor=\(FileCursor(payload) != nil)\(none.map { " (\($0))" } ?? "")")
+        } else {
+            AppLog.shared.debug("review event \(name)")
+        }
         switch name {
         case "context":
             // The page moved under us (Turbo). A new diff means undo no longer applies.
             if let dict = payload as? [String: Any], let base = dict["basePath"] as? String, base != currentBasePath { notice = nil }
+        case "current":
+            currentFile = FileCursor(payload)
         case "editing":
             if let dict = payload as? [String: Any], let active = dict["active"] as? Bool { isEditingInPage = active }
         case "listing":
@@ -258,9 +294,81 @@ final class ReviewSession {
         await refresh()
     }
 
+    /// Previous (-1) or next (+1) file in page order, whatever its viewed state.
+    func stepFile(_ delta: Int) async {
+        do {
+            try await ensureSettingsPushed()
+            let report = try await scripting.call("stepFile", ["args": [delta]]) as? [String: Any] ?? [:]
+            AppLog.shared.debug("review step \(delta > 0 ? "next" : "prev"): \(Self.describeStep(report))")
+        } catch {
+            AppLog.shared.debug("review step \(delta > 0 ? "next" : "prev") failed: \(type(of: error))")
+        }
+    }
+
+    /// Indices and positions only: nothing from the page's content reaches the log.
+    private static func describeStep(_ r: [String: Any]) -> String {
+        let f = (r["from"] as? Int).map(String.init) ?? "-", t = (r["to"] as? Int).map(String.init) ?? "-"
+        return "from \(f) to \(t) of \(r["total"] ?? 0), via \(r["via"] ?? "none"), target top \(r["top"] ?? "-"), scrollY \(r["scrollY"] ?? "-")"
+    }
+
+    /// Marks the file under the cursor as viewed and moves to the next unviewed one. No notice: the
+    /// page shows the result; counts follow.
+    func markCurrentAndNext() async {
+        guard !busy else { return }
+        busy = true
+        do {
+            try await ensureSettingsPushed()
+            _ = try await scripting.call("markCurrentAndNext", ["args": []])
+        } catch {
+            notice = .error(String(localized: "The page did not respond. Reload and try again.", bundle: .app))
+            AppLog.shared.info("review markCurrentAndNext failed: \(type(of: error))")
+        }
+        busy = false
+        await recount()
+        await refreshFileCounts()
+    }
+
+    /// Takes the viewed mark off the file under the cursor. Separate from "Mark viewed" on purpose: the
+    /// primary button never toggles, so pressing it repeatedly can only advance.
+    func unmarkCurrent() async {
+        guard !busy else { return }
+        busy = true
+        do {
+            try await ensureSettingsPushed()
+            _ = try await scripting.call("setCurrentViewed", ["args": [false]])
+        } catch {
+            notice = .error(String(localized: "The page did not respond. Reload and try again.", bundle: .app))
+            AppLog.shared.info("review unmarkCurrent failed: \(type(of: error))")
+        }
+        busy = false
+        await recount()
+        await refreshFileCounts()
+    }
+
     func scroll(_ direction: ScrollDirection) async {
         guard (try? await ensureSettingsPushed()) != nil else { return }
         _ = try? await scripting.call("scrollToUnviewed", ["args": [direction.rawValue]])
+    }
+
+    /// How long a result stays in the bar before the progress returns. Errors stay until the next action.
+    var noticeLifetime: Duration = .seconds(4)
+    private var noticeClear: Task<Void, Never>?
+
+    /// Results are transient; an empty result ("0 marked") is not worth showing at all.
+    private func scheduleNoticeClear(after result: Notice) {
+        noticeClear?.cancel()
+        switch result {
+        case .marked(0, 0, _), .undone(0):
+            notice = nil
+        case .marked, .undone:
+            noticeClear = Task { [weak self, lifetime = noticeLifetime] in
+                try? await Task.sleep(for: lifetime)
+                guard let self, !Task.isCancelled, self.notice == result else { return }
+                self.notice = nil
+            }
+        case .loading, .error:
+            break
+        }
     }
 
     private func perform(_ action: @MainActor () async throws -> Notice) async {
@@ -271,7 +379,7 @@ final class ReviewSession {
         do {
             try await ensureSettingsPushed()
             let result = try await action()
-            if notice == .loading { notice = result }
+            if notice == .loading { notice = result; scheduleNoticeClear(after: result) }
         } catch {
             if notice == .loading { notice = .error(String(localized: "The page did not respond. Reload and try again.", bundle: .app)) }
             AppLog.shared.info("review action failed: \(type(of: error))")

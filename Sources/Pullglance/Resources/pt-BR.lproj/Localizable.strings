@@ -304,3 +304,27 @@
 "OK" = "OK";
 "Choose a file for %@" = "Escolha um arquivo para %@";
 "Open Link in Browser" = "Abrir link no navegador";
+
+/* Review window: file pill */
+"Previous file" = "Arquivo anterior";
+"Next file" = "Próximo arquivo";
+"Viewed → next" = "Visto → próximo";
+"Next unviewed" = "Próximo não visto";
+"File controls" = "Controles de arquivo";
+"Top" = "Em cima";
+"Bottom" = "Embaixo";
+"Review window" = "Janela de review";
+"Floating over the page on Files and compare pages: previous and next file, viewed and next." = "Flutuando sobre a página em Files e no compare: arquivo anterior e próximo, visto e próximo.";
+"Mark Viewed and Go to Next" = "Marcar como visto e ir ao próximo";
+"Next File" = "Próximo arquivo";
+"Previous File" = "Arquivo anterior";
+
+/* Review window: pill redesign */
+"Mark viewed" = "Marcar como visto";
+"Mark this file as viewed and go to the next unviewed one (⌘↩)" = "Marcar este arquivo como visto e ir ao próximo não visto (⌘↩)";
+"%lld of %lld" = "%lld de %lld";
+"%lld of %lld viewed" = "%lld de %lld vistos";
+"Tests · %lld" = "Testes · %lld";
+"Review files" = "Revisar arquivos";
+"Viewed" = "Visto";
+"Unmark" = "Desmarcar";

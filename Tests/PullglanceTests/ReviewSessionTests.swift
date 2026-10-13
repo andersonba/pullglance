@@ -262,6 +262,58 @@ final class FakeScripting: ReviewScripting {
         #expect(!s.isEditingInPage)
     }
 
+    @Test func fileCursorComesFromTheScriptAndDrivesThePill() async {
+        let (s, _, scripting, _) = await make(mine: [pr7])
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        #expect(!s.showsFilePill)
+        s.scriptEvent("current", ["id": "h1", "path": "src/checkout/api.ts", "index": 12, "total": 34, "viewed": false])
+        #expect(s.currentFile?.name == "api.ts")
+        #expect(s.currentFile?.index == 12)
+        #expect(s.showsFilePill)
+        await s.stepFile(1)
+        await s.markCurrentAndNext()
+        await s.unmarkCurrent()
+        #expect(scripting.calls.map(\.function).filter { ["stepFile", "markCurrentAndNext", "setCurrentViewed"].contains($0) } == ["stepFile", "markCurrentAndNext", "setCurrentViewed"])
+        #expect(scripting.calls.first { $0.function == "setCurrentViewed" }?.args.first as? Bool == false)
+        #expect(scripting.calls.first { $0.function == "stepFile" }?.args.first as? Int == 1)
+        #expect(s.busy == false)
+        // Conversation has no file list: no pill. Another PR: cursor dropped.
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7"))
+        await s.settle()
+        #expect(!s.showsFilePill)
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/8/files"))
+        await s.settle()
+        #expect(s.currentFile == nil)
+    }
+
+    @Test func resultsAreTransientAndEmptyOnesNeverShow() async throws {
+        let (s, gh, scripting, _) = await make(mine: [pr7])
+        await gh.setPullRequestFiles([.success(filesEnvelope(total: 3, viewed: [true, false, false], next: nil)), .success(filesEnvelope(total: 3, viewed: [true, true, true], next: nil))])
+        s.noticeLifetime = .milliseconds(30)
+        scripting.results["mark"] = .success(["marked": 2, "failed": 0, "skipped": 0, "unknown": 0, "canUndo": true])
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        await s.mark()
+        #expect(s.notice == .marked(count: 2, failed: 0, canUndo: true))
+        try await Task.sleep(for: .milliseconds(120))
+        #expect(s.notice == nil)
+        scripting.results["mark"] = .success(["marked": 0, "failed": 0, "skipped": 0, "unknown": 0, "canUndo": false])
+        await s.mark()
+        #expect(s.notice == nil)
+    }
+
+    @Test func aNavigationDoesNotWaitForACallTheOldDocumentWillNeverAnswer() async {
+        let (s, _, scripting, _) = await make(mine: [pr7])
+        scripting.holds = ["counts"]                                      // the first document dies mid-call (a redirect)
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        try? await Task.sleep(for: .milliseconds(30))
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/changes"))   // the document GitHub redirected to
+        await s.settle()
+        #expect(scripting.calls.filter { $0.function == "setSettings" }.count == 2)
+        #expect(s.pageCounts?.total == 3)
+    }
+
     @Test func reviewShortcutsNeedPageFocusAndNoModal() {
         #expect(ReviewWindowController.handlesReviewShortcut(focusInWebView: true, modalPresented: false, editingInPage: false))
         #expect(!ReviewWindowController.handlesReviewShortcut(focusInWebView: false, modalPresented: false, editingInPage: false))

@@ -20,6 +20,12 @@ enum ReviewPresets {
     }()
 }
 
+/// Where the floating file pill sits over the page.
+enum FilePillPosition: String, Codable, CaseIterable, Sendable {
+    case top
+    case bottom
+}
+
 struct ReviewSettings: Codable, Equatable, Sendable {
     var presets: [String: Bool]
     var customGlobsText: String
@@ -27,10 +33,33 @@ struct ReviewSettings: Codable, Equatable, Sendable {
     var rememberCompare: Bool
     var verify: Bool
     var loadBeforeMark: Bool
+    var filePill: FilePillPosition = .bottom
 
     static let `default` = ReviewSettings(
         presets: Dictionary(uniqueKeysWithValues: ReviewPresets.all.map { ($0.id, $0.enabled) }),
         customGlobsText: "", autoMark: false, rememberCompare: true, verify: true, loadBeforeMark: true)
+
+    init(presets: [String: Bool], customGlobsText: String, autoMark: Bool, rememberCompare: Bool, verify: Bool, loadBeforeMark: Bool, filePill: FilePillPosition = .bottom) {
+        self.presets = presets
+        self.customGlobsText = customGlobsText
+        self.autoMark = autoMark
+        self.rememberCompare = rememberCompare
+        self.verify = verify
+        self.loadBeforeMark = loadBeforeMark
+        self.filePill = filePill
+    }
+
+    /// Settings saved before a field existed decode with that field's default.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        presets = try c.decode([String: Bool].self, forKey: .presets)
+        customGlobsText = try c.decode(String.self, forKey: .customGlobsText)
+        autoMark = try c.decode(Bool.self, forKey: .autoMark)
+        rememberCompare = try c.decode(Bool.self, forKey: .rememberCompare)
+        verify = try c.decode(Bool.self, forKey: .verify)
+        loadBeforeMark = try c.decode(Bool.self, forKey: .loadBeforeMark)
+        filePill = try c.decodeIfPresent(FilePillPosition.self, forKey: .filePill) ?? .bottom
+    }
 
     static let key = "reviewSettings"
 
