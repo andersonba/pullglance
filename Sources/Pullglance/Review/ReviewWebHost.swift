@@ -1,12 +1,12 @@
 import AppKit
 import WebKit
 
-/// Spike-only plumbing: a WKWebView with the gh-review-assistant content script injected into an isolated
-/// content world, plus the native side of the `chrome.*` shim (storage in UserDefaults, log capture, popups).
+/// The review window's web view: navigation, popups, downloads, logging, and the page script through
+/// `ReviewBridge` (injected into its own content world, storage in UserDefaults).
 enum ExtensionEngine { case shim, webext }
 
 @MainActor
-final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandlerWithReply, WKWebExtensionControllerDelegate, WKDownloadDelegate {
+final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKWebExtensionControllerDelegate, WKDownloadDelegate {
     static let extensionID = "ghra-pullglance"
 
     /// Window-side hooks (the host stays UI-agnostic).
@@ -29,17 +29,16 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKScrip
     private var extensionWindow: ExtensionWindow?
     private var extensionTab: ExtensionTab?
     static let world = WKContentWorld.world(name: "ghra")
-    static let defaultsSuite = "com.pullglance.reviewwindow-spike"
 
     let webView: WKWebView
-    let defaults = UserDefaults(suiteName: ReviewWebHost.defaultsSuite)!
+    /// The page script's native half: the only script message handler on this web view.
+    let bridge: ReviewBridge
     private(set) var logs: [String] = []
     private(set) var navigations: [String] = []
-    private var sessionArea: [String: Any] = [:]
     var popups: [NSWindow] = []
     var onLog: ((String) -> Void)?
 
-    init(injectExtension: Bool = false, userAgent: String? = nil, engine: ExtensionEngine = .webext) {
+    init(userAgent: String? = nil, engine: ExtensionEngine = .webext) {
         self.engine = engine
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()            // persistent cookies / local storage
@@ -63,18 +62,13 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKScrip
         let ucc = config.userContentController
         let view = ReviewWebView(frame: NSRect(x: 0, y: 0, width: 1400, height: 1000), configuration: config)
         webView = view
+        bridge = ReviewBridge(storage: ReviewStorage(defaults: .standard), log: { line in AppLog.shared.debug("review: \(line)") })
+        bridge.attach(to: view)
         super.init()
         view.openInBrowser = { [weak self] url in self?.openInBrowser(url) }
         extensionController?.delegate = self
 
-        for name in ["ghraStorage", "ghraRuntime", "ghraLog"] {
-            ucc.addScriptMessageHandler(self, contentWorld: Self.world, name: name)
-        }
-        if injectExtension, engine == .shim {
-            let shim = Self.shimSource()
-            ucc.addUserScript(WKUserScript(source: shim, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: Self.world))
-            ucc.addUserScript(WKUserScript(source: Self.resource("ghra-content.js"), injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: Self.world))
-        }
+        bridge.install(into: ucc)
         if let userAgent { webView.customUserAgent = userAgent }
         webView.allowsBackForwardNavigationGestures = true
         webView.allowsMagnification = true
@@ -316,13 +310,6 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKScrip
         return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
     }
 
-    static func shimSource() -> String {
-        let css = Data(resource("ghra-content.css").utf8).base64EncodedString()
-        return resource("chrome-shim.js")
-            .replacingOccurrences(of: "__GHRA_CSS_B64__", with: css)
-            .replacingOccurrences(of: "__GHRA_EXT_ID__", with: extensionID)
-    }
-
     // MARK: logging
 
     /// Set by the interactive window: every line is appended here as it happens, so a test session can be
@@ -348,77 +335,6 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKScrip
             _ = try? handle.seekToEnd()
             try? handle.write(contentsOf: Data((full + "\n").utf8))
         }
-    }
-
-    // MARK: WKScriptMessageHandlerWithReply (the native half of the chrome.* shim)
-
-    func userContentController(_ ucc: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping @MainActor (Any?, String?) -> Void) {
-        let body = message.body as? [String: Any] ?? [:]
-        switch message.name {
-        case "ghraLog":
-            log("js.\(body["level"] ?? "log")")
-            replyHandler(nil, nil)
-        case "ghraRuntime":
-            // Future bridge: `chrome.runtime.sendMessage(...)` reaches the app here (gh CLI, local model, ...).
-            log("runtime.sendMessage")
-            replyHandler(["ok": true, "host": "pullglance-spike"], nil)
-        case "ghraStorage":
-            handleStorage(body, reply: replyHandler)
-        default:
-            replyHandler(nil, "unknown handler \(message.name)")
-        }
-    }
-
-    private func storageKey(_ area: String) -> String { "ghra.storage.\(area)" }
-
-    /// Persisted as JSON bytes, not as a plist dictionary: `null` is a legal chrome.storage value and a
-    /// legal JSON value, but `NSNull` inside a dictionary makes `UserDefaults.set` throw.
-    private func readArea(_ area: String) -> [String: Any] {
-        if area == "session" { return sessionArea }
-        guard let data = defaults.data(forKey: storageKey(area)),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
-        return object
-    }
-
-    private func writeArea(_ area: String, _ dict: [String: Any]) {
-        if area == "session" { sessionArea = dict; return }
-        guard JSONSerialization.isValidJSONObject(dict), let data = try? JSONSerialization.data(withJSONObject: dict) else {
-            return log("storage.\(area): value is not JSON, not persisted")
-        }
-        defaults.set(data, forKey: storageKey(area))
-    }
-
-    private func handleStorage(_ body: [String: Any], reply: (Any?, String?) -> Void) {
-        guard let area = body["area"] as? String, let op = body["op"] as? String else { return reply(nil, "bad storage request") }
-        let before = readArea(area)
-        var dict = before
-        switch op {
-        case "get":
-            return reply(dict, nil)
-        case "set":
-            for (k, v) in body["items"] as? [String: Any] ?? [:] { dict[k] = v }
-        case "remove":
-            for k in body["keys"] as? [String] ?? [] { dict.removeValue(forKey: k) }
-        case "clear":
-            dict = [:]
-        default:
-            return reply(nil, "unknown op \(op)")
-        }
-        writeArea(area, dict)
-        // Mutation and change computation happen here, serially on the main actor, so `oldValue` is always the
-        // value this mutation actually replaced (chrome.storage semantics), whatever the page does concurrently.
-        var changes: [String: [String: Any]] = [:]
-        for key in Set(before.keys).union(dict.keys) {
-            let old = before[key], new = dict[key]
-            if let old, let new, (old as AnyObject).isEqual(new) { continue }
-            if old == nil && new == nil { continue }
-            var change: [String: Any] = [:]
-            if let old { change["oldValue"] = old }
-            if let new { change["newValue"] = new }
-            changes[key] = change
-        }
-        log("storage.\(area).\(op) changed=\(Array(changes.keys).sorted()) keys=\(Array(dict.keys).sorted())")
-        reply(changes, nil)
     }
 
     // MARK: WKNavigationDelegate
