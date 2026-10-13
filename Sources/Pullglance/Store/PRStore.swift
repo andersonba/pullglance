@@ -557,8 +557,17 @@ final class PRStore {
         if !listed.hasMergeState, let ref = PullRequestRef(repo: listed.repo, number: listed.number),
            case .success(let data) = await client.pullRequest(owner: ref.owner, name: ref.name, number: ref.number, includeMergeState: true),
            case .open(let fresh)? = try? parsePullRequestResponse(data) {
-            pr = fresh
             replaceLocally(fresh)
+            // The lookup settles the mechanism, never the commit: merging what the user did not see is what
+            // --match-head-commit exists to prevent. The row now shows the newer head; a retry merges that.
+            guard fresh.headRefOid == listed.headRefOid else {
+                // Worded like gh's own refusal so the row and the modal classify it as "branch changed".
+                let message = "Head branch was modified. Review and try the merge again."
+                setActionState(.failed(.merge, message), for: listed)
+                appLog.info("merge \(listed.id): refused, head moved between list and lookup")
+                return .failure(message)
+            }
+            pr = fresh
         }
         var deleting = deleteBranch
         var note: String? = nil

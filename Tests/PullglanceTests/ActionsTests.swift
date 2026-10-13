@@ -242,6 +242,25 @@ import Testing
         #expect(store.actionState(for: pr) == .failed(.merge, "Pull request is already queued to merge"))
     }
 
+    /// The lookup settles the mechanism, never the commit: what gets merged is what the user saw listed.
+    @Test func aLookupThatFindsANewerHeadRefusesInsteadOfMergingIt() async throws {
+        let gh = FakeGH()
+        await gh.set(.success(try fixture("search-mine.json")), for: SearchQuery.mine)
+        await gh.set(.success(envelope(nodes: [node(number: 7, ci: "SUCCESS", decision: "APPROVED", mergeable: nil, headRefOid: "seen")])), for: SearchQuery.direct)
+        let moved = node(number: 7, ci: "SUCCESS", decision: "APPROVED", headRefOid: "newer", prExtra: "\"id\":\"PR_seven\",\"isMergeQueueEnabled\":true,\"mergeQueueEntry\":null")
+        await gh.setPullRequest(.success(pullRequestEnvelope(moved)), number: 7)
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() })
+        await store.refresh()
+        let pr = try #require(store.directList.first { $0.number == 7 })
+        let result = await store.merge(pr, method: .squash, deleteBranch: false)
+        guard case .failure(let message) = result else { Issue.record("expected a failure, got \(result)"); return }
+        #expect(MergeFailure(ghMessage: message) == .changedSinceShown)
+        #expect(await gh.enqueues.isEmpty)
+        #expect(await gh.merges.isEmpty)
+        // The row now shows the newer head, so a retry merges what is on screen.
+        #expect(store.directList.first { $0.number == 7 }?.headRefOid == "newer")
+    }
+
     @Test func keepsTheBranchWhenOpenPullRequestsAreBasedOnIt() async throws {
         let gh = try await gh()
         await gh.setOpenPullRequests(.success(Data("[{\"number\":8},{\"number\":9}]".utf8)))
