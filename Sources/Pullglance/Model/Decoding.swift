@@ -76,6 +76,39 @@ func parsePullRequestResponse(_ data: Data) throws -> PullRequestLookup {
     return .open(pullRequest)
 }
 
+/// The batch form: alias → what that lookup said. Aliases whose node lacks required fields are left out,
+/// so the caller keeps what it had for them.
+func parsePullRequestsResponse(_ data: Data) throws -> [String: PullRequestLookup] {
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    let envelope: BatchEnvelope
+    do {
+        envelope = try decoder.decode(BatchEnvelope.self, from: data)
+    } catch {
+        throw DecodingFailure.malformed(String(describing: error))
+    }
+    let errors = envelope.errors?.map(\.message) ?? []
+    guard let payload = envelope.data else { throw DecodingFailure.noData(errors: errors) }
+    // A null alias means "gone" only when every error is a "could not resolve"; any other error (rate
+    // limit, server trouble) leaves those aliases out so the caller keeps what it had.
+    let onlyUnresolved = errors.allSatisfy { $0.localizedCaseInsensitiveContains("could not resolve") }
+    var result: [String: PullRequestLookup] = [:]
+    for (alias, repository) in payload {
+        guard let repository, let node = repository.pullRequest?.value else {
+            if onlyUnresolved { result[alias] = .notFound }
+            continue
+        }
+        if let state = node.state, state != "OPEN" { result[alias] = .closed; continue }
+        if let pullRequest = node.pullRequest { result[alias] = .open(pullRequest) }
+    }
+    return result
+}
+
+private struct BatchEnvelope: Decodable {
+    let data: [String: RepositoryPayload?]?
+    let errors: [GraphQLError]?
+}
+
 /// Decodes to nil instead of failing the enclosing array when the element is null or malformed.
 struct Lossy<Wrapped: Decodable>: Decodable {
     let value: Wrapped?

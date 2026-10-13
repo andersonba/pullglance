@@ -81,6 +81,15 @@ actor FakeGH: GHRunning {
         return pullRequestOutcomes[number] ?? .failure("no scripted pull request \(number)")
     }
 
+    private var pullRequestsOutcome: GHOutcome = .failure("no scripted batch lookup")
+    private(set) var batchLookups: [[PullRequestRef]] = []
+    func setPullRequests(_ outcome: GHOutcome) { pullRequestsOutcome = outcome }
+    func pullRequests(_ refs: [PullRequestRef], includeMergeState: Bool) async -> GHOutcome {
+        batchLookups.append(refs)
+        if delay > .zero { try? await Task.sleep(for: delay) }
+        return pullRequestsOutcome
+    }
+
     private var openPullRequestsOutcome: GHOutcome = .success(Data("[]".utf8))
     private(set) var dependentQueries: [(repo: String, base: String)] = []
 

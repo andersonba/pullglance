@@ -65,6 +65,24 @@ struct GHClient: GHRunning {
         await run(Self.pullRequestArguments(owner: owner, name: name, number: number, includeMergeState: includeMergeState))
     }
 
+    /// The fragment shared with `pull-request.graphql`, so both lookups decode the same way.
+    static let pullRequestFragment: String = {
+        guard let range = pullRequestQuery.range(of: "fragment PullRequestFields") else { fatalError("pull-request.graphql lost its fragment") }
+        return String(pullRequestQuery[range.lowerBound...])
+    }()
+
+    /// One document with one aliased field per pull request. Names were validated by `PullRequestRef`.
+    static func pullRequestsQuery(_ refs: [PullRequestRef]) -> String {
+        let fields = refs.enumerated().map { index, ref in
+            "  p\(index): repository(owner: \"\(ref.owner)\", name: \"\(ref.name)\") { pullRequest(number: \(ref.number)) { ...PullRequestFields } }"
+        }
+        return "query($withMerge: Boolean!) {\n" + fields.joined(separator: "\n") + "\n}\n\n" + pullRequestFragment
+    }
+
+    func pullRequests(_ refs: [PullRequestRef], includeMergeState: Bool) async -> GHOutcome {
+        await run(["api", "graphql", "-f", "query=\(Self.pullRequestsQuery(refs))", "-F", "withMerge=\(includeMergeState)"])
+    }
+
     func searchRepos(query: String) async -> GHOutcome {
         await run(["api", "graphql", "-f", "query=\(Self.repoSearchQuery)", "-f", "q=\(query)"])
     }

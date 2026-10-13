@@ -850,7 +850,7 @@ final class PRStore {
         let (m, d, t) = await (mineOutcome, directOutcome, teamOutcome)
 
         var errors: [ErrorKind] = []
-        if let error = apply(m, to: &mine, search: .mine) { errors.append(error) }
+        if let error = apply(m, to: &mine, search: .mine) { errors.append(error) } else { await reconcileMine() }
         if let error = apply(d, to: &direct, search: .direct) { errors.append(error) }
 
         if let t {
@@ -867,6 +867,42 @@ final class PRStore {
         // After every snapshot is in place (no inout borrow left): snoozed PRs with new activity wake up.
         wakeChanged(in: mine.value + direct.value + (viaTeam?.value ?? []))
         finish(errors: errors)
+    }
+
+    /// The search index lags the repository by minutes (an approval showed up five refreshes late). The
+    /// user's own pull requests are few, so one direct lookup after the search makes them authoritative.
+    /// Any failure keeps the search result: this is a correction, never a condition.
+    private func reconcileMine() async {
+        let refs = mine.value.compactMap { PullRequestRef(repo: $0.repo, number: $0.number) }
+        guard !refs.isEmpty else { return }
+        let outcome = await client.pullRequests(refs, includeMergeState: true)
+        guard case .success(let data) = outcome else {
+            appLog.debug("reconcile mine skipped: \(outcomeResult(outcome))")
+            return
+        }
+        do {
+            let lookups = try parsePullRequestsResponse(data)
+            var value = mine.value
+            var changed = 0
+            for (index, ref) in refs.enumerated() {
+                guard let lookup = lookups["p\(index)"] else { continue }
+                let position = value.firstIndex { $0.number == ref.number && $0.repo == "\(ref.owner)/\(ref.name)" }
+                guard let position else { continue }
+                switch lookup {
+                case .open(let fresh):
+                    if value[position] != fresh { value[position] = fresh; changed += 1 }
+                case .closed, .notFound:
+                    value.remove(at: position)
+                    changed += 1
+                }
+            }
+            var snapshot = mine
+            snapshot.value = value
+            mine = snapshot
+            appLog.debug("reconcile mine: \(refs.count) looked up, \(changed) changed")
+        } catch {
+            appLog.debug("reconcile mine failed: \(error)")
+        }
     }
 
     /// A refresh caused by a settings change; flagged until that cycle (and any coalesced follow-up) ends.
