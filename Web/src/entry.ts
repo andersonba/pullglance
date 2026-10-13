@@ -72,25 +72,35 @@ export function install(deps: Deps) {
 
   async function scrollToUnviewed(direction: 'next' | 'previous'): Promise<boolean> {
     const listing = await adapter.listFiles()
-    const nodes = listing.files.filter((f) => !f.viewed).map((f) => document.getElementById(`diff-${f.id}`)).filter((n): n is HTMLElement => n !== null)
-    const top = (n: HTMLElement) => n.getBoundingClientRect().top
+    // The header comes from the adapter: the PR Files UI has no #diff-<id> element, only `h3 a[href="#diff-<id>"]`.
+    const nodes = listing.files.filter((f) => !f.viewed).map((f) => adapter.resolver.headerById(f.id)?.el).filter((n): n is Element => n != null)
+    const top = (n: Element) => n.getBoundingClientRect().top
     const target = direction === 'next' ? nodes.find((n) => top(n) > 80) : [...nodes].reverse().find((n) => top(n) < -8)
     if (!target) return false
     target.scrollIntoView({ block: 'start', behavior: 'smooth' })
     return true
   }
 
+  // Nothing reads the file list (which restores and writes compare memory) before the app's settings arrive:
+  // the listing watcher starts on the first setSettings.
+  let listingWatch: ListingWatch | null = null
+
   adapter.onContextChange((ctx) => {
     if (ctx === null || ctx.key !== lastReceipt?.context.key) lastReceipt = null
     lock.cancel()
     deps.post({ name: 'context', payload: context() })
+    listingWatch?.reset()
   })
   deps.post({ name: 'context', payload: context() })
-  watchListing(adapter, (payload) => deps.post({ name: 'listing', payload }))
 
   const api = {
     context,
-    setSettings: (s: Partial<Settings>) => { settings = normalize(s); rules = rulesFromSettings(settings); adapter.configure({ rememberCompare: settings.rememberCompare }) },
+    setSettings: (s: Partial<Settings>) => {
+      settings = normalize(s)
+      rules = rulesFromSettings(settings)
+      adapter.configure({ rememberCompare: settings.rememberCompare })
+      listingWatch ??= watchListing(adapter, (payload) => deps.post({ name: 'listing', payload }))
+    },
     counts, mark, undo, unmarkAll, scrollToUnviewed,
     flush: () => adapter.flushMemory(),
   }
@@ -98,19 +108,30 @@ export function install(deps: Deps) {
 }
 
 const LISTING_DEBOUNCE_MS = 200
+const EMPTY_LISTING = { total: 0, viewed: 0, partial: false }
 
-/** Posts `{ total, viewed, partial }` once on install and again whenever it changes (debounced DOM observation). */
-function watchListing(adapter: GitHubAdapter, post: (listing: { total: number; viewed: number; partial: boolean }) => void) {
-  let last = ''
+interface ListingWatch { reset(): void }
+
+/**
+ * Posts `{ total, viewed, partial }` now and again whenever it changes (debounced DOM observation).
+ * `reset()` forgets the last value (a new context posts even with the same numbers). When the file list
+ * goes away after a success, the empty listing is posted once.
+ */
+function watchListing(adapter: GitHubAdapter, post: (listing: typeof EMPTY_LISTING) => void): ListingWatch {
+  let last = ''          // dedupe key of the last post; reset() clears it
+  let showing = false    // the app is showing a non-empty listing from this page
   let timer: ReturnType<typeof setTimeout> | null = null
-  const check = async () => {
-    const listing = await adapter.listFiles().catch(() => null)
-    if (!listing) return
-    const payload = { total: listing.files.length, viewed: listing.files.filter((f) => f.viewed).length, partial: listing.completeness === 'partial' }
+  const emit = (payload: typeof EMPTY_LISTING) => {
     const key = JSON.stringify(payload)
     if (key === last) return
     last = key
+    showing = payload.total > 0
     post(payload)
+  }
+  const check = async () => {
+    const listing = await adapter.listFiles().catch(() => null)
+    if (!listing) { if (showing) emit(EMPTY_LISTING); return }
+    emit({ total: listing.files.length, viewed: listing.files.filter((f) => f.viewed).length, partial: listing.completeness === 'partial' })
   }
   const schedule = () => { if (timer) clearTimeout(timer); timer = setTimeout(() => { timer = null; void check() }, LISTING_DEBOUNCE_MS) }
   // Viewed state lives in classes and ARIA attributes (classic collapse, aria-pressed buttons), not only in child lists.
@@ -118,6 +139,7 @@ function watchListing(adapter: GitHubAdapter, post: (listing: { total: number; v
     childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'aria-pressed', 'aria-expanded'],
   })
   void check()
+  return { reset: () => { last = ''; schedule() } }
 }
 
 // Installed by the app's WKUserScript in the isolated world; tests call install() directly.
