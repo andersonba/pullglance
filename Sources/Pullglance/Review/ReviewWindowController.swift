@@ -446,14 +446,17 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     @objc func toggleReviewBar() { session.isBarHidden.toggle() }
 
     @objc func approvePR() {
+        guard modalHost == nil else { return }   // no stacked modals from the menu
         presentModal { pr, store, done in AnyView(ApproveView(pr: pr, store: store, onDone: { _ in done() })) }
     }
 
     @objc func commentPR() {
+        guard modalHost == nil else { return }   // no stacked modals from the menu
         presentModal { pr, store, done in AnyView(CommentView(pr: pr, store: store, onDone: { _ in done() })) }
     }
 
     @objc func mergePR() {
+        guard modalHost == nil else { return }   // no stacked modals from the menu
         presentModal { pr, store, done in
             // Same "previous failure" line as the popover's merge sheet.
             let previous: String? = if case .failed(.merge, let message) = store.actionState(for: pr) { message } else { nil }

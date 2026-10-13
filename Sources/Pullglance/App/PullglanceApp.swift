@@ -66,9 +66,9 @@ struct ReviewCommands: Commands {
             Button { ReviewWindowController.shared?.zoomOut() } label: { Text("Zoom Out", bundle: .app) }.keyboardShortcut("-")
             Button { ReviewWindowController.shared?.zoomReset() } label: { Text("Actual Size", bundle: .app) }.keyboardShortcut("0")
             Divider()
-            // Shortcuts live in the window's key monitor (page focus only); the arrows have no key equivalent
-            // here so the always-enabled menu cannot take ⌘↓/⌘↑ from a text field.
-            Button { ReviewWindowController.shared?.markTests() } label: { Text("Mark Tests as Viewed", bundle: .app) }.keyboardShortcut("v", modifiers: [.command, .shift])
+            // Shortcuts live in the window's key monitor (page focus only). ⇧⌘V and the arrows have no key
+            // equivalent here so the always-enabled menu cannot take Paste and Match Style or ⌘↓/⌘↑ from a text field.
+            Button { ReviewWindowController.shared?.markTests() } label: { Text("Mark Tests as Viewed", bundle: .app) }
             Button { ReviewWindowController.shared?.undoMarking() } label: { Text("Undo Last Marking", bundle: .app) }
             Button { ReviewWindowController.shared?.nextUnviewed() } label: { Text("Next Unviewed File", bundle: .app) }
             Button { ReviewWindowController.shared?.previousUnviewed() } label: { Text("Previous Unviewed File", bundle: .app) }
