@@ -238,3 +238,27 @@
 "Behavior" = "Behavior";
 
 "The page did not respond. Reload and try again." = "The page did not respond. Reload and try again.";
+
+/* Review bar */
+"Review files →" = "Review files →";
+"Next ↓" = "Next ↓";
+"%lld marked" = "%lld marked";
+"%lld marked · %lld failed" = "%lld marked · %lld failed";
+"%lld unmarked" = "%lld unmarked";
+"Loading files…" = "Loading files…";
+"Mark tests · %lld" = "Mark tests · %lld";
+"Auto (enabled presets)" = "Auto (enabled presets)";
+"Preset" = "Preset";
+"Edit rules…" = "Edit rules…";
+"Undo last marking" = "Undo last marking";
+"Unmark all" = "Unmark all";
+"Refresh review state" = "Refresh review state";
+"Open in Browser" = "Open in Browser";
+"Hide review bar" = "Hide review bar";
+"Undo" = "Undo";
+"Mark Tests as Viewed" = "Mark Tests as Viewed";
+"Undo Last Marking" = "Undo Last Marking";
+"Next Unviewed File" = "Next Unviewed File";
+"Previous Unviewed File" = "Previous Unviewed File";
+"Refresh Review State" = "Refresh Review State";
+"Toggle Review Bar" = "Toggle Review Bar";

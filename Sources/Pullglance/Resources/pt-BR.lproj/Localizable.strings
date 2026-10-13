@@ -238,3 +238,27 @@
 "Behavior" = "Comportamento";
 
 "The page did not respond. Reload and try again." = "A página não respondeu. Recarregue e tente de novo.";
+
+/* Review bar */
+"Review files →" = "Revisar arquivos →";
+"Next ↓" = "Próximo ↓";
+"%lld marked" = "%lld marcados";
+"%lld marked · %lld failed" = "%lld marcados · %lld falharam";
+"%lld unmarked" = "%lld desmarcados";
+"Loading files…" = "Carregando arquivos…";
+"Mark tests · %lld" = "Marcar testes · %lld";
+"Auto (enabled presets)" = "Auto (presets ativos)";
+"Preset" = "Preset";
+"Edit rules…" = "Editar regras…";
+"Undo last marking" = "Desfazer última marcação";
+"Unmark all" = "Desmarcar tudo";
+"Refresh review state" = "Atualizar estado da review";
+"Open in Browser" = "Abrir no navegador";
+"Hide review bar" = "Ocultar barra de review";
+"Undo" = "Desfazer";
+"Mark Tests as Viewed" = "Marcar testes como vistos";
+"Undo Last Marking" = "Desfazer última marcação";
+"Next Unviewed File" = "Próximo arquivo não visto";
+"Previous Unviewed File" = "Arquivo não visto anterior";
+"Refresh Review State" = "Atualizar estado da review";
+"Toggle Review Bar" = "Mostrar/ocultar barra de review";

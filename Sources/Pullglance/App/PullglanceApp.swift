@@ -65,6 +65,17 @@ struct ReviewCommands: Commands {
             Button { ReviewWindowController.shared?.zoomIn() } label: { Text("Zoom In", bundle: .app) }.keyboardShortcut("+")
             Button { ReviewWindowController.shared?.zoomOut() } label: { Text("Zoom Out", bundle: .app) }.keyboardShortcut("-")
             Button { ReviewWindowController.shared?.zoomReset() } label: { Text("Actual Size", bundle: .app) }.keyboardShortcut("0")
+            Divider()
+            Button { ReviewWindowController.shared?.markTests() } label: { Text("Mark Tests as Viewed", bundle: .app) }.keyboardShortcut("v", modifiers: [.command, .shift])
+            Button { ReviewWindowController.shared?.undoMarking() } label: { Text("Undo Last Marking", bundle: .app) }
+            Button { ReviewWindowController.shared?.nextUnviewed() } label: { Text("Next Unviewed File", bundle: .app) }.keyboardShortcut(.downArrow, modifiers: .command)
+            Button { ReviewWindowController.shared?.previousUnviewed() } label: { Text("Previous Unviewed File", bundle: .app) }.keyboardShortcut(.upArrow, modifiers: .command)
+            Divider()
+            Button { ReviewWindowController.shared?.approvePR() } label: { Text("Approve…", bundle: .app) }.keyboardShortcut("a", modifiers: [.command, .shift])
+            Button { ReviewWindowController.shared?.commentPR() } label: { Text("Comment…", bundle: .app) }.keyboardShortcut("c", modifiers: [.command, .shift])
+            Button { ReviewWindowController.shared?.mergePR() } label: { Text("Merge…", bundle: .app) }.keyboardShortcut("m", modifiers: [.command, .shift])
+            Button { ReviewWindowController.shared?.refreshReview() } label: { Text("Refresh Review State", bundle: .app) }.keyboardShortcut("r", modifiers: [.command, .shift])
+            Button { ReviewWindowController.shared?.toggleReviewBar() } label: { Text("Toggle Review Bar", bundle: .app) }.keyboardShortcut("b", modifiers: [.command, .option])
         }
     }
 }

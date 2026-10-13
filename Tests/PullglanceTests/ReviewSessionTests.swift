@@ -179,4 +179,22 @@ final class FakeScripting: ReviewScripting {
         let again = ReviewSession(store: store, client: gh, scripting: FakeScripting(), settings: ReviewSettingsStore(defaults: testDefaults()), defaults: defaults)
         #expect(again.isBarHidden)
     }
+    @Test func autoMarkMarksOncePerPullRequest() async {
+        let gh = FakeGH()
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() })
+        let scripting = FakeScripting()
+        scripting.results["counts"] = .success(["total": 3, "viewed": 1, "matching": 2, "partial": false, "perRule": ["js-unit": 2]])
+        scripting.results["mark"] = .success(["marked": 2, "failed": 0, "canUndo": true])
+        let settings = ReviewSettingsStore(defaults: testDefaults())
+        settings.settings.autoMark = true
+        let s = ReviewSession(store: store, client: gh, scripting: scripting, settings: settings, defaults: testDefaults())
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        #expect(scripting.calls.filter { $0.function == "mark" }.count == 1)
+        #expect(s.notice == .marked(count: 2, failed: 0, canUndo: true))
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7"))
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        #expect(scripting.calls.filter { $0.function == "mark" }.count == 1)
+    }
 }

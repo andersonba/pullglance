@@ -39,6 +39,8 @@ final class ReviewSession {
     @ObservationIgnored private var pendingSettingsPush: Task<Void, Never>?
     /// Bumped whenever the pull request under the bar may change; a GraphQL answer for an older value is dropped.
     @ObservationIgnored private var generation = 0
+    /// `repo#number` of pull requests auto-marked in this app run; auto-mark happens once per pull request.
+    @ObservationIgnored private var autoMarked: Set<String> = []
 
     private(set) var page: ReviewPage = .other
     private(set) var pullRequest: PullRequest?
@@ -86,6 +88,7 @@ final class ReviewSession {
             guard let self, gen == self.generation else { return }
             await self.pushSettingsAndCount()
             if case .pullRequest = newPage, !samePR || self.fileCounts == nil { await self.refreshFileCounts(generation: gen) }
+            await self.autoMarkIfNeeded(generation: gen)
         }
     }
 
@@ -95,7 +98,8 @@ final class ReviewSession {
             // The page moved under us (Turbo). A new diff means undo no longer applies.
             if let dict = payload as? [String: Any], let base = dict["basePath"] as? String, base != currentBasePath { notice = nil }
         case "listing":
-            track { await $0.recount() }
+            let gen = generation
+            track { await $0.recount(); await $0.autoMarkIfNeeded(generation: gen) }
         default: break
         }
     }
@@ -121,6 +125,15 @@ final class ReviewSession {
             guard let self else { return }
             await work(self)
         }
+    }
+
+    /// Settings › Review "Mark automatically": once the Files tab of a pull request has matching files, mark them,
+    /// once per pull request per app run (a later visit respects what the user unmarked).
+    private func autoMarkIfNeeded(generation gen: Int) async {
+        guard gen == generation, settingsStore.settings.autoMark, matchCount > 0, !busy,
+              case .pullRequest(let repo, let number, .files) = page else { return }
+        guard autoMarked.insert("\(repo)#\(number)").inserted else { return }
+        await mark()
     }
 
     // MARK: counts

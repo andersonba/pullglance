@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import WebKit
 
 /// The review window: GitHub inside the app, with the review extension loaded by WebKit's own extension
@@ -18,6 +19,8 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     let store: PRStore
     let host: ReviewWebHost
+    /// What the review bar shows and does for the page on screen.
+    let session: ReviewSession
     private var observations: [NSKeyValueObservation] = []
     private var keyMonitor: Any?
     private var extensionLoaded = false
@@ -36,16 +39,21 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     private var errorMessage: NSTextField!
     private var errorRetryURL: URL?
     private var downloadNotice: NSView?
+    private var barHost: NSHostingView<ReviewBar>!
+    private var barHeight: NSLayoutConstraint!
+    private var modalHost: NSView?
 
     private init(store: PRStore) {
         self.store = store
         host = ReviewWebHost(engine: .webext)
+        session = ReviewSession(store: store, client: GHClient(), scripting: host.bridge, settings: .shared, defaults: .standard)
         let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let initial = NSRect(x: 0, y: 0, width: min(1600, screen.width * 0.9), height: min(1200, screen.height * 0.9))
         let window = NSWindow(contentRect: initial,
                               styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView], backing: .buffered, defer: false)
         super.init(window: window)
         host.onLog = { line in AppLog.shared.debug("review: \(line)") }
+        host.bridge.onEvent = { [weak self] name, payload in self?.session.scriptEvent(name, payload) }
         window.title = Self.defaultTitle
         window.isReleasedWhenClosed = false
         window.titlebarAppearsTransparent = true
@@ -61,6 +69,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         window.setFrameAutosaveName("ReviewWindow")
         if !window.setFrameUsingName("ReviewWindow") { window.center() }
         observe()
+        observeBar()
         installKeyMonitor()
     }
 
@@ -112,6 +121,9 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         saveHistory()
+        // The page script batches remembered compare state; write it before the window goes away.
+        let bridge = host.bridge
+        Task { _ = try? await bridge.call("flush", ["args": []]) }
         host.closeOwnedPopups()
         sender.orderOut(nil)
         return false
@@ -124,6 +136,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     private func installKeyMonitor() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, let window = self.window, NSApp.keyWindow === window else { return event }
+            if event.keyCode == 53, self.modalHost != nil { self.dismissModal(); return nil }   // Escape
             if event.keyCode == 53, !self.findBar.isHidden { self.hideFind(); return nil }   // Escape
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             let focusInWebView = window.firstResponder is WKWebView || (window.firstResponder as? NSView)?.superview is WKWebView
@@ -143,6 +156,30 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
             case (.command, "-"): self.zoomOut()
             case (.command, "0"): self.zoomReset()
             case ([.command, .shift], "O"), ([.command, .shift], "o"): self.openInBrowser()
+            // Review keys only act on review pages; elsewhere the page keeps them (⌘↓ scrolls to the end, etc.).
+            case ([.command, .shift], "V"), ([.command, .shift], "v"):
+                guard self.session.page.showsBar else { return event }
+                self.markTests()
+            case (.command, "\u{F701}"), ([.command, .function], "\u{F701}"), ([.command, .numericPad, .function], "\u{F701}"):
+                guard self.session.page.showsBar else { return event }
+                self.nextUnviewed()
+            case (.command, "\u{F700}"), ([.command, .function], "\u{F700}"), ([.command, .numericPad, .function], "\u{F700}"):
+                guard self.session.page.showsBar else { return event }
+                self.previousUnviewed()
+            case ([.command, .shift], "A"), ([.command, .shift], "a"):
+                guard self.session.pullRequest != nil else { return event }
+                self.approvePR()
+            case ([.command, .shift], "C"), ([.command, .shift], "c"):
+                guard self.session.pullRequest != nil else { return event }
+                self.commentPR()
+            case ([.command, .shift], "M"), ([.command, .shift], "m"):
+                guard self.session.pullRequest != nil else { return event }
+                self.mergePR()
+            case ([.command, .shift], "R"), ([.command, .shift], "r"):
+                guard self.session.page.showsBar else { return event }
+                self.refreshReview()
+            case ([.command, .option], "b"), ([.command, .option], "∫"):
+                self.toggleReviewBar()
             default: return event
             }
             return nil
@@ -154,6 +191,11 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         case #selector(goBack): return activeWebView.canGoBack
         case #selector(goForward): return activeWebView.canGoForward
         case #selector(stop): return activeWebView.isLoading
+        case #selector(markTests), #selector(undoMarking), #selector(nextUnviewed), #selector(previousUnviewed), #selector(refreshReview):
+            return session.page.showsBar
+        case #selector(approvePR), #selector(commentPR), #selector(mergePR), #selector(snoozePR):
+            return session.pullRequest != nil
+        case #selector(toggleReviewBar): return session.page.showsBar
         default: return true
         }
     }
@@ -167,6 +209,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
                 guard let self else { return }
                 self.addressBar.pageURL = w.url?.absoluteString ?? ""
                 self.applyZoom(for: w.url)
+                self.session.pageChanged(to: w.url)
             } },
             web.observe(\.title, options: [.new]) { [weak self] w, _ in Task { @MainActor in
                 guard let self else { return }
@@ -185,7 +228,11 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
             self?.errorOverlay.isHidden = true
             if self?.findBar.isHidden == false { self?.hideFind() }
         }
-        host.onNavigationFinished = { [weak self] url, title in self?.remember(url, title: title) }
+        host.onNavigationFinished = { [weak self] url, title in
+            self?.remember(url, title: title)
+            // Turbo can fire the `url` change before the content is there; a finished load settles it.
+            self?.session.pageChanged(to: url)
+        }
         host.onNavigationError = { [weak self] url, error in
             self?.showError(title: String(localized: "Could not load the page", bundle: .app), message: error.localizedDescription, retry: url)
         }
@@ -274,6 +321,15 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
         root.addArrangedSubview(bar)
         root.addArrangedSubview(progress)
+        barHost = NSHostingView(rootView: ReviewBar(session: session, actions: barActions()))
+        barHost.translatesAutoresizingMaskIntoConstraints = false
+        // The height constraint owns the size (0 when hidden); SwiftUI's own min-height would fight it.
+        barHost.sizingOptions = []
+        barHost.clipsToBounds = true
+        barHeight = barHost.heightAnchor.constraint(equalToConstant: 0)
+        barHost.isHidden = true
+        root.addArrangedSubview(barHost)
+        NSLayoutConstraint.activate([barHost.widthAnchor.constraint(equalTo: root.widthAnchor), barHeight])
         root.addArrangedSubview(findBar)
         root.addArrangedSubview(page)
         let addressWidth = field.widthAnchor.constraint(equalTo: root.widthAnchor, multiplier: 0.6)
@@ -299,6 +355,109 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
             addressWidth, addressCenter,
         ])
         return root
+    }
+
+    // MARK: review bar
+
+    /// Follows `session.showsBar`, re-arming after each change; the bar's height animates between 0 and 32.
+    private func observeBar() {
+        let shows = withObservationTracking { session.showsBar } onChange: { [weak self] in
+            Task { @MainActor in self?.observeBar() }
+        }
+        setBarVisible(shows)
+    }
+
+    private func setBarVisible(_ shows: Bool) {
+        let target: CGFloat = shows ? 32 : 0
+        guard barHeight.constant != target || barHost.isHidden == shows else { return }
+        if shows { barHost.isHidden = false }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.15
+            context.allowsImplicitAnimation = true
+            barHeight.animator().constant = target
+            barHost.superview?.layoutSubtreeIfNeeded()
+        }) { [weak self] in
+            Task { @MainActor in
+                guard let self, !self.session.showsBar else { return }
+                self.barHost.isHidden = true
+            }
+        }
+    }
+
+    private func barActions() -> ReviewBarActions {
+        ReviewBarActions(
+            approve: { [weak self] in self?.approvePR() },
+            comment: { [weak self] in self?.commentPR() },
+            merge: { [weak self] in self?.mergePR() },
+            snooze: { [weak self] in self?.snoozePR() },
+            openInBrowser: { [weak self] in self?.openInBrowser() },
+            copyLink: { [weak self] in
+                guard let url = self?.host.webView.url else { return }
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(url.absoluteString, forType: .string)
+            },
+            hide: { [weak self] in self?.session.isBarHidden = true },
+            reviewFiles: { [weak self] in
+                guard let self, case .pullRequest(let repo, let number, _) = session.page,
+                      let url = URL(string: "https://github.com/\(repo)/pull/\(number)/files") else { return }
+                host.webView.load(URLRequest(url: url))
+            })
+    }
+
+    /// The popover's modals, centered over the page; Esc or the modal's own buttons close it.
+    private func presentModal(_ make: (PullRequest, PRStore, @escaping @MainActor () -> Void) -> AnyView) {
+        guard let pr = session.pullRequest, let content = window?.contentView, modalHost == nil else { return }
+        let view = NSHostingView(rootView: make(pr, store, { [weak self] in self?.dismissModal() }))
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.wantsLayer = true
+        let shadow = NSShadow()
+        shadow.shadowBlurRadius = 16
+        shadow.shadowColor = .black.withAlphaComponent(0.25)
+        view.shadow = shadow
+        content.addSubview(view)
+        NSLayoutConstraint.activate([
+            view.centerXAnchor.constraint(equalTo: content.centerXAnchor),
+            view.centerYAnchor.constraint(equalTo: content.centerYAnchor, constant: -40),
+        ])
+        modalHost = view
+        window?.makeFirstResponder(view)
+    }
+
+    private func dismissModal() {
+        modalHost?.removeFromSuperview()
+        modalHost = nil
+        window?.makeFirstResponder(host.webView)
+    }
+
+    // The SwiftUI menu does not consult `validateMenuItem`, so each action checks it applies to the page.
+    @objc func markTests() { if session.page.showsBar { Task { await session.mark() } } }
+    @objc func undoMarking() { if session.page.showsBar { Task { await session.undo() } } }
+    @objc func nextUnviewed() { if session.page.showsBar { Task { await session.scroll(.next) } } }
+    @objc func previousUnviewed() { if session.page.showsBar { Task { await session.scroll(.previous) } } }
+    @objc func refreshReview() { if session.page.showsBar { Task { await session.refresh() } } }
+    @objc func toggleReviewBar() { session.isBarHidden.toggle() }
+
+    @objc func approvePR() {
+        presentModal { pr, store, done in AnyView(ApproveView(pr: pr, store: store, onDone: { _ in done() })) }
+    }
+
+    @objc func commentPR() {
+        presentModal { pr, store, done in AnyView(CommentView(pr: pr, store: store, onDone: { _ in done() })) }
+    }
+
+    @objc func mergePR() {
+        presentModal { pr, store, done in
+            AnyView(MergeConfirmView(pr: pr, store: store) { options in
+                done()
+                guard let options else { return }
+                Task { _ = await store.merge(pr, method: options.method, deleteBranch: options.deleteBranch) }
+            })
+        }
+    }
+
+    @objc func snoozePR() {
+        guard let pr = session.pullRequest else { return }
+        if store.isDormant(pr) { store.wake(pr) } else { store.snooze(pr) }
     }
 
     // MARK: error overlay

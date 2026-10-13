@@ -43,6 +43,26 @@ import Testing
         print("[snap] png: \(url.path) scale=\(rep.pixelsWide)/\(Int(host.bounds.width))")
         #expect(fractional.isEmpty, "row scroll views on fractional pixels: \(fractional)")
     }
+
+    @Test func reviewBarRendersForAPullRequest() async throws {
+        let gh = FakeGH()
+        await gh.set(.success(envelope(nodes: [node(number: 7, ci: "SUCCESS", decision: "APPROVED")])), for: SearchQuery.mine)
+        await gh.set(.success(envelope(nodes: [])), for: SearchQuery.direct)
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() })
+        await store.refresh()
+        let session = ReviewSession(store: store, client: gh, scripting: FakeScripting(), settings: ReviewSettingsStore(defaults: testDefaults()), defaults: testDefaults())
+        session.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await session.settle()
+        let host = NSHostingView(rootView: ReviewBar(session: session, actions: ReviewBarActions()).frame(width: 900))
+        host.frame = NSRect(origin: .zero, size: host.fittingSize)
+        host.layoutSubtreeIfNeeded()
+        #expect(host.fittingSize.height == 32)
+        let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds)!
+        host.cacheDisplay(in: host.bounds, to: rep)
+        let url = FileManager.default.temporaryDirectory.appending(path: "pullglance-review-bar.png")
+        try rep.representation(using: .png, properties: [:])!.write(to: url)
+        print("[snap] png: \(url.path)")
+    }
 }
 
 @Suite struct SnapshotOptionsTests {
