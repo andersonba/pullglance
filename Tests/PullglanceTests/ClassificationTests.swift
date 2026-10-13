@@ -19,6 +19,15 @@ import Testing
         #expect(mineSection(for: makePR(reviewDecision: .approved, ciState: .success, isBehindBase: true)) == .needsAction)
     }
 
+    /// Queued or scheduled, there is nothing left to do: GitHub merges by itself. Out of Ready to merge (and
+    /// so out of the default badge), into the waiting section, unless something broke meanwhile.
+    @Test func queuedOrScheduledPullRequestsWait() {
+        #expect(mineSection(for: makePR(reviewDecision: .approved, ciState: .success, usesMergeQueue: true, mergeQueuePosition: 2)) == .waitingForReview)
+        #expect(mineSection(for: makePR(reviewDecision: .approved, ciState: .pending, isBlocked: true, autoMergeMethod: .squash)) == .waitingForReview)
+        #expect(mineSection(for: makePR(reviewDecision: .approved, ciState: .failure, usesMergeQueue: true, mergeQueuePosition: 2)) == .needsAction, "a failure still asks for a hand")
+        #expect(mineSection(for: makePR(reviewDecision: .approved, ciState: .success, usesMergeQueue: true)) == .readyToMerge, "not queued yet: ready")
+    }
+
     @Test func openThreadsAloneDoNotNeedAction() {
         #expect(mineSection(for: makePR(reviewDecision: .approved, ciState: .success, unresolvedThreads: 3)) == .readyToMerge)
     }
