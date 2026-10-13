@@ -145,6 +145,12 @@ final class ReviewSession {
         case "context":
             // The page moved under us (Turbo). A new diff means undo no longer applies.
             if let dict = payload as? [String: Any], let base = dict["basePath"] as? String, base != currentBasePath { notice = nil }
+            // A fresh document without settings: the URL changed before it existed, so the push made then landed
+            // on the document being replaced (a redirect, a reload). The script says so; push again.
+            if let dict = payload as? [String: Any], dict["ready"] as? Bool == false {
+                settingsEpoch += 1
+                track { await $0.pushSettingsAndCount() }
+            }
         case "current":
             currentFile = FileCursor(payload)
         case "editing":

@@ -36,6 +36,16 @@ describe('review script API', () => {
     expect(events.some((e) => e.name === 'context')).toBe(true)
   })
 
+  it('tells the app whether it has settings yet, so a fresh document gets them again', async () => {
+    mountComparePage({ files: [{ path: 'a.test.ts' }] })
+    const events: Event[] = []
+    const api = install({ post: (e) => events.push(e) })
+    const first = events.find((e) => e.name === 'context')!.payload as { ready: boolean }
+    expect(first.ready).toBe(false)
+    api.setSettings({})
+    expect((api.context() as { ready?: boolean }).ready).toBe(true)
+  })
+
   it('marks by rule ids, then undoes', async () => {
     mountComparePage({ files: [{ path: 'a.test.ts' }, { path: 'b.ts' }] })
     const api = install({ post: () => {} })

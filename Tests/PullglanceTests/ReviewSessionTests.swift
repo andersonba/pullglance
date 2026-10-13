@@ -36,6 +36,22 @@ final class FakeScripting: ReviewScripting {
         return (session, gh, scripting, store)
     }
 
+    /// The URL changes before the new document exists, so the first push can land on the document being
+    /// replaced. The fresh document's script posts `context` with `ready: false`: that is the cue to push again.
+    @Test func aFreshDocumentWithoutSettingsGetsThemPushedAgain() async {
+        let (s, gh, scripting, _) = await make(mine: [pr7])
+        await gh.setPullRequestFiles([.success(filesEnvelope(total: 3, viewed: [true, false, false], next: nil))])
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        #expect(scripting.calls.map(\.function) == ["setSettings", "counts"])
+        s.scriptEvent("context", ["kind": "pull", "basePath": "/acme/web/pull/7", "key": "k", "ready": true])
+        await s.settle()
+        #expect(scripting.calls.map(\.function) == ["setSettings", "counts"], "a document that has settings is left alone")
+        s.scriptEvent("context", ["kind": "pull", "basePath": "/acme/web/pull/7", "key": "k", "ready": false])
+        await s.settle()
+        #expect(scripting.calls.map(\.function) == ["setSettings", "counts", "setSettings", "counts"])
+    }
+
     @Test func enteringAPullRequestPicksTheStoresPRAndFetchesCounts() async {
         let (s, gh, scripting, _) = await make(mine: [pr7])
         await gh.setPullRequestFiles([.success(filesEnvelope(total: 3, viewed: [true, false, false], next: nil))])

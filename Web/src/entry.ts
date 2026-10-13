@@ -5,7 +5,8 @@ import { OperationLock } from '@/core/lock'
 import { DEFAULT_SETTINGS, normalize, rulesFromSettings, type Settings } from '@/features/tests/settings'
 import { createGitHubAdapter, type GitHubAdapter } from '@/hosts/github/adapter'
 
-export interface Context { kind: 'pull' | 'compare' | 'other'; basePath: string; key: string | null }
+/** `ready` is whether this document's script has received the app's settings: a fresh document says no. */
+export interface Context { kind: 'pull' | 'compare' | 'other'; basePath: string; key: string | null; ready: boolean }
 export interface Counts { total: number; viewed: number; matching: number; partial: boolean; perRule: Record<string, number> }
 export interface MarkResult { marked: number; failed: number; skipped: number; unknown: number; canUndo: boolean }
 export interface Deps { post(event: { name: string; payload: unknown }): void; adapter?: GitHubAdapter }
@@ -31,7 +32,7 @@ export function install(deps: Deps) {
   const context = (): Context => {
     const kind = adapter.pageKind() === 'pull' ? 'pull' : adapter.pageKind() === 'compare' ? 'compare' : 'other'
     const ctx = adapter.currentContext()
-    return { kind, basePath: ctx?.basePath ?? location.pathname, key: ctx?.key ?? null }
+    return { kind, basePath: ctx?.basePath ?? location.pathname, key: ctx?.key ?? null, ready: settingsReady }
   }
 
   const selectRules = (ruleIds: string[] | null): Rule[] =>
