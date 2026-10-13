@@ -83,6 +83,18 @@ struct GHClient: GHRunning {
         await run(["api", "graphql", "-f", "query=\(Self.pullRequestsQuery(refs))", "-F", "withMerge=\(includeMergeState)"])
     }
 
+    static let pullRequestFilesQuery = document("pull-request-files")
+
+    static func pullRequestFilesArguments(owner: String, name: String, number: Int, after: String?) -> [String] {
+        var args = ["api", "graphql", "-f", "query=\(pullRequestFilesQuery)", "-f", "owner=\(owner)", "-f", "name=\(name)", "-F", "number=\(number)"]
+        if let after { args += ["-f", "after=\(after)"] }
+        return args
+    }
+
+    func pullRequestFiles(owner: String, name: String, number: Int, after: String?) async -> GHOutcome {
+        await run(Self.pullRequestFilesArguments(owner: owner, name: name, number: number, after: after))
+    }
+
     func searchRepos(query: String) async -> GHOutcome {
         await run(["api", "graphql", "-f", "query=\(Self.repoSearchQuery)", "-f", "q=\(query)"])
     }

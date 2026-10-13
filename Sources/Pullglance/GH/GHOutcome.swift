@@ -25,6 +25,8 @@ protocol GHRunning: Sendable {
     /// Several pull requests in one request, aliased `p0`, `p1`, … in the order given. The search index
     /// GitHub serves lists from lags the repository by minutes; this is the authoritative read.
     func pullRequests(_ refs: [PullRequestRef], includeMergeState: Bool) async -> GHOutcome
+    /// `pull-request-files.graphql`: one page (100) of changed files with the viewer's viewed state.
+    func pullRequestFiles(owner: String, name: String, number: Int, after: String?) async -> GHOutcome
     /// `gh --version`, for the diagnostics summary.
     func version() async -> GHOutcome
     /// `gh auth status`; success means logged in. Output is never stored.

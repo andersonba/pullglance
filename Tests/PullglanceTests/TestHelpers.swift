@@ -90,6 +90,14 @@ actor FakeGH: GHRunning {
         return pullRequestsOutcome
     }
 
+    private var fileOutcomes: [GHOutcome] = []
+    private(set) var fileLookups: [(number: Int, after: String?)] = []
+    func setPullRequestFiles(_ outcomes: [GHOutcome]) { fileOutcomes = outcomes }
+    func pullRequestFiles(owner: String, name: String, number: Int, after: String?) async -> GHOutcome {
+        fileLookups.append((number, after))
+        return fileOutcomes.isEmpty ? .failure("no scripted files page") : fileOutcomes.removeFirst()
+    }
+
     private var openPullRequestsOutcome: GHOutcome = .success(Data("[]".utf8))
     private(set) var dependentQueries: [(repo: String, base: String)] = []
 

@@ -253,3 +253,48 @@ private struct PRNode: Decodable {
         )
     }
 }
+
+struct FileCounts: Equatable, Sendable {
+    var total: Int
+    var viewed: Int
+}
+
+struct FileCountsPage: Equatable, Sendable {
+    let total: Int
+    let viewedOnPage: Int
+    let nextCursor: String?
+}
+
+func parsePullRequestFilesResponse(_ data: Data) throws -> FileCountsPage {
+    struct Envelope: Decodable {
+        struct Payload: Decodable { let repository: Repository? }
+        struct Repository: Decodable { let pullRequest: PR? }
+        struct PR: Decodable { let changedFiles: Int; let files: Files }
+        struct Files: Decodable { let pageInfo: PageInfo; let nodes: [Node] }
+        struct PageInfo: Decodable { let hasNextPage: Bool; let endCursor: String? }
+        struct Node: Decodable { let viewerViewedState: String? }
+        let data: Payload?
+        let errors: [GraphQLError]?
+    }
+    let envelope: Envelope
+    do { envelope = try JSONDecoder().decode(Envelope.self, from: data) } catch { throw DecodingFailure.malformed(String(describing: error)) }
+    guard let pr = envelope.data?.repository?.pullRequest else { throw DecodingFailure.noData(errors: envelope.errors?.map(\.message) ?? []) }
+    return FileCountsPage(total: pr.changedFiles,
+                          viewedOnPage: pr.files.nodes.filter { $0.viewerViewedState == "VIEWED" }.count,
+                          nextCursor: pr.files.pageInfo.hasNextPage ? pr.files.pageInfo.endCursor : nil)
+}
+
+/// Every page, or nothing: a partial count would look final.
+func fetchFileCounts(_ client: GHRunning, ref: PullRequestRef) async -> FileCounts? {
+    var viewed = 0
+    var total = 0
+    var cursor: String? = nil
+    repeat {
+        guard case .success(let data) = await client.pullRequestFiles(owner: ref.owner, name: ref.name, number: ref.number, after: cursor),
+              let page = try? parsePullRequestFilesResponse(data) else { return nil }
+        total = page.total
+        viewed += page.viewedOnPage
+        cursor = page.nextCursor
+    } while cursor != nil
+    return FileCounts(total: total, viewed: viewed)
+}
