@@ -24,6 +24,10 @@ Hold a row for a moment, or click *Reorder* on a section title, to drag rows int
 
 While the popover is open, rows with CI still running are checked every 20 seconds, so a finished run moves the row and brings *Merge* with it. Everything refreshes every 2 minutes.
 
+## Review window
+
+One click opens the pull request in a window of its own, with a review bar above the page: mark the test files as viewed by preset, jump to the next unviewed file, and approve, comment or merge without leaving the bar. Compare pages remember what you collapsed. The GitHub session lives in the app, separate from your browser.
+
 ## Settings (⌘,)
 
 - **General**: launch at login, refresh interval, language.

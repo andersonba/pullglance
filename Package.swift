@@ -4,12 +4,12 @@ import PackageDescription
 let package = Package(
     name: "Pullglance",
     defaultLocalization: "en",
-    platforms: [.macOS("15.4")],   // WKWebExtensionController
+    platforms: [.macOS(.v15)],
     targets: [
         .executableTarget(
             name: "Pullglance",
             path: "Sources/Pullglance",
-            resources: [.process("Resources"), .copy("WebExtension/gh-review-assistant")],
+            resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(

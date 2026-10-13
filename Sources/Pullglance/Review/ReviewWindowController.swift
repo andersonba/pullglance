@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 import WebKit
 
-/// The review window: GitHub inside the app, with the review extension loaded by WebKit's own extension
-/// engine, and the handful of browser behaviors a page needs (address field with suggestions, back and
+/// The review window: GitHub inside the app, with the native review bar driven by the page script, and
+/// the handful of browser behaviors a page needs (address field with suggestions, back and
 /// forward, reload or stop, find, zoom, downloads, popups for sign-in, error overlay). One window, reused.
 ///
 /// Chrome follows the DuckDuckGo/Beam recipe: full-size content, transparent title bar, an empty toolbar
@@ -23,7 +23,6 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     let session: ReviewSession
     private var observations: [NSKeyValueObservation] = []
     private var keyMonitor: Any?
-    private var extensionLoaded = false
 
     private var urlField: NSTextField!
     private var addressBar: AddressBarController!
@@ -45,7 +44,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     private init(store: PRStore) {
         self.store = store
-        host = ReviewWebHost(engine: .webext)
+        host = ReviewWebHost()
         session = ReviewSession(store: store, client: GHClient(), scripting: host.bridge, settings: .shared, defaults: .standard)
         let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let initial = NSRect(x: 0, y: 0, width: min(1600, screen.width * 0.9), height: min(1200, screen.height * 0.9))
@@ -95,12 +94,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         // key view), which opens the suggestions over the page and freezes the field's text mid-edit.
         window?.makeFirstResponder(host.webView)
         refreshSuggestions()
-        Task { @MainActor in
-            if !extensionLoaded {
-                do { try await host.loadWebExtension(); extensionLoaded = true } catch { AppLog.shared.info("review extension failed to load: \(error)") }
-            }
-            if host.webView.url != url { host.webView.load(URLRequest(url: url)) }
-        }
+        if host.webView.url != url { host.webView.load(URLRequest(url: url)) }
     }
 
     /// Owners after the owner filter, repositories, and the pull requests on screen: what the app already
