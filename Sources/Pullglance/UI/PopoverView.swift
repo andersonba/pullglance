@@ -4,6 +4,13 @@ import SwiftUI
 struct PopoverView: View {
     @Bindable var store: PRStore
     @State private var tab: Tab = .mine
+    @State private var pull = PullToRefreshState()
+    @State private var listAtTop = true
+    @State private var wheelSettle: Task<Void, Never>?
+    @State private var lastWheelAt = Date.distantPast
+    @State private var wheelProbeStart: Date?
+    @State private var topGlow = false
+    @State private var glowFade: Task<Void, Never>?
     @State private var listHeight: CGFloat = 0
     /// Quick filter per tab. Not persisted: the popover always opens on "All".
     @State private var mineFilter: Section? = nil
@@ -143,10 +150,22 @@ struct PopoverView: View {
                     }
                 }
                 .padding(.bottom, 6)
+                .offset(y: pull.stretch)
+                .animation(pull.dragging ? nil : .spring(duration: 0.3), value: pull.stretch)
                 .coordinateSpace(name: Self.listSpace)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
             }
             .scrollIndicators(.never)
+            .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top <= 0.5 } action: { _, top in listAtTop = top }
+            // The pull is measured from the trackpad itself (no rubber band when the list fits); the list
+            // slides down with it and the ring sits in the gap it opens.
+            .background(ScrollWheelMonitor { event in handlePull(event) })
+            .overlay(alignment: .top) {
+                PullRing(state: pull, refreshing: store.phase == .loading && pull.stretch > 0)
+                    .frame(height: max(pull.stretch, 1))
+                    .opacity(pull.stretch > 4 ? 1 : 0)
+            }
+            .overlay(alignment: .top) { TopEdgeGlow(visible: topGlow) }
             // Scrolling the list puts a revealed row away.
             .onScrollPhaseChange { _, phase in
                 if phase == .interacting || phase == .decelerating { openRow = nil }
@@ -156,6 +175,65 @@ struct PopoverView: View {
             // Only the measured height must not animate (it caused a visible jump); row changes may.
             .animation(nil, value: listHeight)
         }
+    }
+
+    /// Trackpad phases: `began` opens a gesture, `changed` steps feed the pull while the list is at its top
+    /// (those steps are swallowed so the list does not scroll under the pull), `ended` lifts. Momentum
+    /// events are never a pull.
+    private func handlePull(_ event: NSEvent) -> Bool {
+        guard event.momentumPhase.isEmpty, !reordering else { return false }
+        // A mouse wheel has no phases: each notch at the top is a step of the pull, and half a second of
+        // silence after the last notch is the lift.
+        if event.phase.isEmpty {
+            let step = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY * 0.5 : event.scrollingDeltaY * 10
+            let now = Date()
+            defer { lastWheelAt = now }
+            if !pull.dragging {
+                // A fresh movement at the top, not the tail of a spin that just arrived there.
+                guard listAtTop, step > 0, now.timeIntervalSince(lastWheelAt) > 0.3 || wheelProbeStart != nil else { return false }
+                // The first stretch of notches only answers "you are at the top" with a glow; a flick ends
+                // inside it. Keeping the wheel going past the probe starts the pull.
+                let start = wheelProbeStart ?? now
+                wheelProbeStart = start
+                topGlow = true
+                glowFade?.cancel()
+                glowFade = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(600))
+                    guard !Task.isCancelled else { return }
+                    topGlow = false
+                    wheelProbeStart = nil
+                }
+                guard now.timeIntervalSince(start) >= PullToRefreshState.wheelProbeDuration else { return false }
+                wheelProbeStart = nil
+                topGlow = false
+                pull.began(atTop: true)
+            }
+            let took = pull.drag(by: step, atTop: listAtTop)
+            wheelSettle?.cancel()
+            wheelSettle = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(500))
+                guard !Task.isCancelled else { return }
+                if pull.ended(), manualRefreshAllowed { await store.refresh() }
+            }
+            return took
+        }
+        switch event.phase {
+        case .began:
+            pull.began(atTop: listAtTop)
+            return false
+        case .changed:
+            return pull.drag(by: event.scrollingDeltaY, atTop: listAtTop)
+        case .ended, .cancelled:
+            if pull.ended(), manualRefreshAllowed { Task { await store.refresh() } }
+            return false
+        default:
+            return false
+        }
+    }
+
+    /// Same rule as the footer's status button: not while refreshing, not right after "Updated now".
+    private var manualRefreshAllowed: Bool {
+        footerStatus(phase: store.phase, hasData: store.hasAnyData, nextRefresh: store.nextRefreshAt, now: Date()).allowsManualRefresh
     }
 
     private func show(toast text: String) {
