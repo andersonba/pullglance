@@ -62,6 +62,7 @@ final class PRStore {
     static let hiddenOwnersKey = "hiddenOwners"
     static let repoRulesKey = "repoRules"
     static let dormantKey = "dormant"
+    static let pinnedKey = "pinned"
     static let manualOrdersKey = "manualOrders"
     static let verboseLoggingKey = "verboseLogging"
     static let hiddenSectionsKey = "hiddenSections"
@@ -123,6 +124,13 @@ final class PRStore {
         }
     }
     private var dormantIDs: Set<String> { Set(dormant.keys) }
+    /// Pinned PR ids. Stored per machine; a mark for a PR that is gone is harmless and ignored.
+    private(set) var pinned: Set<String> = [] {
+        didSet {
+            guard pinned != oldValue else { return }
+            defaults.set(pinned.sorted(), forKey: Self.pinnedKey)
+        }
+    }
 
     /// Per-PR action state, so a row can show its own spinner, "merged", or a failure.
     private(set) var actionStates: [String: ActionState] = [:]
@@ -368,10 +376,11 @@ final class PRStore {
         }
         self.repoRules = rules
         self.dormant = defaults.data(forKey: Self.dormantKey).flatMap { try? JSONDecoder().decode([String: DormantMark].self, from: $0) } ?? [:]
+        self.pinned = Set(defaults.stringArray(forKey: Self.pinnedKey) ?? [])
         self.manualOrders = defaults.data(forKey: Self.manualOrdersKey).flatMap { try? JSONDecoder().decode([String: [String]].self, from: $0) } ?? [:]
         if let legacyVisible = Self.sections(in: defaults, key: "visibleSections") {
-            // Older builds stored the visible set, before the Snoozed sections existed; those must not come up hidden.
-            let hidden = Set(Section.allCases).subtracting(legacyVisible).filter { !$0.isSnoozed }
+            // Older builds stored the visible set, before the Snoozed and Pinned sections existed; those must not come up hidden.
+            let hidden = Set(Section.allCases).subtracting(legacyVisible).filter { !$0.isFixed }
             defaults.set(hidden.map(\.rawValue).sorted(), forKey: Self.hiddenSectionsKey)
             defaults.removeObject(forKey: "visibleSections")
         }
@@ -396,9 +405,10 @@ final class PRStore {
 
     // MARK: Section order
 
-    /// Work sections of a tab in display order. The snoozed section is not here: it is always rendered last.
+    /// Work sections of a tab in display order. Pinned and Snoozed are not here: they are always rendered
+    /// first and last.
     func orderedSections(_ tab: Section.Tab) -> [Section] {
-        sectionOrder.filter { $0.tab == tab && !$0.isSnoozed }
+        sectionOrder.filter { $0.tab == tab && !$0.isFixed }
     }
 
 
@@ -477,18 +487,26 @@ final class PRStore {
     }
 
     var mineGroups: MineGroups {
-        var groups = groupMine(lens(mine.value), dormant: dormantIDs)
+        var groups = groupMine(lens(mine.value), dormant: dormantIDs, pinned: pinned)
+        groups.pinned = manuallyOrdered(groups.pinned, .pinnedMine)
         groups.needsAction = manuallyOrdered(groups.needsAction, .needsAction)
         groups.readyToMerge = manuallyOrdered(groups.readyToMerge, .readyToMerge)
         groups.waitingForReview = manuallyOrdered(groups.waitingForReview, .waitingForReview)
         groups.drafts = manuallyOrdered(groups.drafts, .drafts)
         return groups
     }
+    /// Snoozed and pinned rows live in their own sections.
+    private func inPlace(_ pr: PullRequest) -> Bool { !dormantIDs.contains(pr.id) && !pinned.contains(pr.id) }
     var directList: [PullRequest] {
-        manuallyOrdered(sortedByRecency(lens(direct.value)).filter { !dormantIDs.contains($0.id) }, .needsYourReview)
+        manuallyOrdered(sortedByRecency(lens(direct.value)).filter(inPlace), .needsYourReview)
     }
     var viaTeamList: [PullRequest] {
-        filterViaTeam(all: lens(viaTeam?.value ?? []), direct: direct.value, viewerLogin: viewerLogin).filter { !dormantIDs.contains($0.id) }
+        filterViaTeam(all: lens(viaTeam?.value ?? []), direct: direct.value, viewerLogin: viewerLogin).filter(inPlace)
+    }
+    /// Pinned review requests, direct and team, in the user's order.
+    var pinnedReviewList: [PullRequest] {
+        let team = filterViaTeam(all: lens(viaTeam?.value ?? []), direct: direct.value, viewerLogin: viewerLogin, limit: .max)
+        return manuallyOrdered(sortedByRecency((lens(direct.value) + team).filter { pinned.contains($0.id) }), .pinnedReview)
     }
     /// Snoozed review requests, direct and team, newest first.
     var snoozedReviewList: [PullRequest] {
@@ -496,7 +514,8 @@ final class PRStore {
         return sortedByRecency((lens(direct.value) + team).filter { dormantIDs.contains($0.id) })
     }
 
-    /// Where a PR would sit if it were not snoozed; shown on snoozed rows.
+    /// Where a PR would sit if it were not snoozed or pinned; shown on snoozed rows, and the source of a
+    /// pinned row's actions.
     func originSection(of pr: PullRequest) -> Section {
         if mine.value.contains(where: { $0.id == pr.id }) { return mineSection(for: pr) }
         if direct.value.contains(where: { $0.id == pr.id }) { return .needsYourReview }
@@ -511,9 +530,26 @@ final class PRStore {
     // in-place subscript write would overlap that read in an exclusivity violation.
     func snooze(_ pr: PullRequest) {
         appLog.info("snooze \(pr.id)")
+        unpin(pr)   // one special state at a time
         var marks = dormant
         marks[pr.id] = DormantMark(pr)
         dormant = marks
+    }
+
+    // MARK: Pinning
+
+    func isPinned(_ pr: PullRequest) -> Bool { pinned.contains(pr.id) }
+
+    /// To the top of its tab. A snoozed PR wakes: pinning says "this one, next".
+    func pin(_ pr: PullRequest) {
+        appLog.info("pin \(pr.id)")
+        wake(pr)
+        pinned.insert(pr.id)
+    }
+
+    func unpin(_ pr: PullRequest) {
+        if pinned.contains(pr.id) { appLog.info("unpin \(pr.id)") }
+        pinned.remove(pr.id)
     }
 
     func wake(_ pr: PullRequest) {

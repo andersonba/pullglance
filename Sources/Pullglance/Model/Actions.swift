@@ -53,19 +53,26 @@ enum PRAction: Equatable, Sendable {
     case refresh
     /// Only on a row with auto-merge on: GitHub's "Disable auto-merge".
     case disableAutoMerge
+    /// Pin to the top of the tab, or unpin when already there.
+    case pin
 }
 
-/// The two buttons revealed by a swipe, per section. Merge only where merging is the point.
+/// The two buttons revealed by a swipe, per section. Merge only where merging is the point. Review rows
+/// open the review window on a click, so their first tile is Pin rather than Open.
 func quickActions(for section: Section, dormant: Bool = false) -> [PRAction] {
     if dormant { return [.snooze, .open] }
-    return section == .readyToMerge ? [.merge, .comment] : [.open, .comment]
+    switch section {
+    case .readyToMerge: return [.merge, .comment]
+    case .needsYourReview, .needsTeamsReview: return [.pin, .comment]
+    default: return [.open, .comment]
+    }
 }
 
 /// The full context menu, per section. `offersMerge` is "Merge when checks pass" outside Ready to merge;
 /// `autoMergeOn` replaces Merge with the way to call it off.
 func allActions(for section: Section, dormant: Bool = false, offersMerge: Bool = false, autoMergeOn: Bool = false) -> [PRAction] {
     let merge: [PRAction] = autoMergeOn ? [.disableAutoMerge] : (section == .readyToMerge || offersMerge) ? [.merge] : []
-    return (dormant ? [.snooze] + merge + [.comment, .open, .copyLink] : merge + [.comment, .snooze, .open, .copyLink]) + [.refresh]
+    return (dormant ? [.snooze, .pin] + merge + [.comment, .open, .copyLink] : [.pin] + merge + [.comment, .snooze, .open, .copyLink]) + [.refresh]
 }
 
 /// Why a merge did not happen, in words a person can act on. Built from `gh pr merge` output.

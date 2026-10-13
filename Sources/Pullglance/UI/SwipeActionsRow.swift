@@ -13,6 +13,7 @@ struct SwipeActionsRow<Content: View, MenuContent: View>: View {
     let actions: [PRAction]
     @Binding var openRow: PullRequest.ID?
     var isDormant = false
+    var isPinned = false
     var isRunning = false
     /// Reorder mode: no swiping.
     var isLocked = false
@@ -37,7 +38,7 @@ struct SwipeActionsRow<Content: View, MenuContent: View>: View {
                             close()
                             onAction(action)
                         } label: {
-                            SwipeTile(action: action, isDormant: isDormant)
+                            SwipeTile(action: action, isDormant: isDormant, isPinned: isPinned)
                         }
                         .buttonStyle(.plain)
                         .disabled(isRunning && (action == .merge || action == .comment))
@@ -115,6 +116,8 @@ struct SwipeTile: View {
     let action: PRAction?
     /// Snoozed rows show the snooze action as Wake.
     var isDormant = false
+    /// Pinned rows show the pin action as Unpin.
+    var isPinned = false
 
     var body: some View {
         VStack(spacing: 4) {
@@ -142,6 +145,7 @@ struct SwipeTile: View {
         case .approve: Text("Approve", bundle: .app)
         case .open: Text("Open", bundle: .app)
         case .snooze: Text(isDormant ? "Wake" : "Snooze", bundle: .app)
+        case .pin: Text(isPinned ? "Unpin" : "Pin", bundle: .app)
         default: Text("More", bundle: .app)
         }
     }
@@ -153,6 +157,7 @@ struct SwipeTile: View {
         case .approve: "checkmark.circle"
         case .open: "arrow.up.forward.square"
         case .snooze: isDormant ? "sun.max" : "moon.zzz"
+        case .pin: isPinned ? "pin.slash.fill" : "pin.fill"
         default: "ellipsis"
         }
     }
@@ -164,6 +169,7 @@ struct SwipeTile: View {
         case .approve: .green
         case .open: .teal
         case .snooze: .orange
+        case .pin: .yellow
         default: .gray
         }
     }

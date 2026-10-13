@@ -81,6 +81,7 @@ private struct Chip: View {
         case .needsYourReview: .blue
         case .needsTeamsReview: .purple
         case .snoozedMine, .snoozedReview: .gray
+        case .pinnedMine, .pinnedReview: .yellow
         }
     }
 }

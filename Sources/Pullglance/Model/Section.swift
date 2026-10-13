@@ -9,33 +9,41 @@ enum Section: String, CaseIterable, Sendable, Identifiable {
     case drafts
     case needsYourReview
     case needsTeamsReview
-    /// Snoozed PRs of each tab. Pinned last, never counted, never a chip.
+    /// Snoozed PRs of each tab. Always last, never counted, never a chip.
     case snoozedMine
     case snoozedReview
+    /// PRs the user pinned, per tab. Always first, shown only when there are any, counted where they came
+    /// from (pinning is a view preference, not a state change), never a chip.
+    case pinnedMine
+    case pinnedReview
 
     var id: String { rawValue }
 
     var isSnoozed: Bool { self == .snoozedMine || self == .snoozedReview }
+    var isPinned: Bool { self == .pinnedMine || self == .pinnedReview }
+    /// Sections that sit at a fixed edge of the tab, outside the user's section order.
+    var isFixed: Bool { isSnoozed || isPinned }
 
     enum Tab: Sendable { case mine, review }
 
     var tab: Tab {
         switch self {
-        case .needsAction, .readyToMerge, .waitingForReview, .drafts, .snoozedMine: .mine
-        case .needsYourReview, .needsTeamsReview, .snoozedReview: .review
+        case .needsAction, .readyToMerge, .waitingForReview, .drafts, .snoozedMine, .pinnedMine: .mine
+        case .needsYourReview, .needsTeamsReview, .snoozedReview, .pinnedReview: .review
         }
     }
 
     static let reviewSections: [Section] = [.needsYourReview, .needsTeamsReview]
 
     static func snoozed(for tab: Tab) -> Section { tab == .mine ? .snoozedMine : .snoozedReview }
+    static func pinned(for tab: Tab) -> Section { tab == .mine ? .pinnedMine : .pinnedReview }
 
     /// Everything that depends on you: fix it, merge it, or review it.
     static let defaultBadge: Set<Section> = [.needsAction, .readyToMerge, .needsYourReview]
 
-    /// The sections a user can reorder in a tab: everything but Snoozed, which is always last.
+    /// The sections a user can reorder in a tab: everything but Pinned (always first) and Snoozed (always last).
     static func reorderable(in tab: Tab) -> [Section] {
-        allCases.filter { $0.tab == tab && !$0.isSnoozed }
+        allCases.filter { $0.tab == tab && !$0.isFixed }
     }
 
     var title: String {
@@ -47,6 +55,7 @@ enum Section: String, CaseIterable, Sendable, Identifiable {
         case .needsYourReview: String(localized: "Needs your review", bundle: .app)
         case .needsTeamsReview: String(localized: "Needs your teams' review", bundle: .app)
         case .snoozedMine, .snoozedReview: String(localized: "Snoozed", bundle: .app)
+        case .pinnedMine, .pinnedReview: String(localized: "Pinned", bundle: .app)
         }
     }
 
@@ -59,6 +68,7 @@ enum Section: String, CaseIterable, Sendable, Identifiable {
         case .needsYourReview: String(localized: "Requested from you directly", bundle: .app)
         case .needsTeamsReview: String(localized: "Requested from a team you belong to", bundle: .app)
         case .snoozedMine, .snoozedReview: String(localized: "Snoozed here until a new commit, review decision or CI result", bundle: .app)
+        case .pinnedMine, .pinnedReview: String(localized: "Pinned by you, always on top", bundle: .app)
         }
     }
 }

@@ -42,6 +42,7 @@ extension Section {
         case .needsYourReview: String(localized: "Yours", bundle: .app)
         case .needsTeamsReview: String(localized: "Teams", bundle: .app)
         case .snoozedMine, .snoozedReview: String(localized: "Snoozed", bundle: .app)
+        case .pinnedMine, .pinnedReview: String(localized: "Pinned", bundle: .app)
         }
     }
 }

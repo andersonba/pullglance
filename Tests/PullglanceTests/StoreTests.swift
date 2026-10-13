@@ -208,7 +208,7 @@ import Testing
         let defaults = testDefaults()
         defaults.set(["needsAction", "needsYourReview"], forKey: "visibleSections")
         let store = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })
-        #expect(store.visibleSections == [.needsAction, .needsYourReview, .snoozedMine, .snoozedReview])
+        #expect(store.visibleSections == [.needsAction, .needsYourReview, .snoozedMine, .snoozedReview, .pinnedMine, .pinnedReview])
         #expect(defaults.object(forKey: "visibleSections") == nil)
         #expect(Set(defaults.stringArray(forKey: PRStore.hiddenSectionsKey) ?? []) == ["drafts", "needsTeamsReview", "readyToMerge", "waitingForReview"])
         store.visibleSections.remove(.snoozedMine)

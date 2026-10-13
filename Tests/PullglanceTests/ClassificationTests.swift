@@ -28,6 +28,18 @@ import Testing
         #expect(mineSection(for: makePR(reviewDecision: .approved, ciState: .success, usesMergeQueue: true)) == .readyToMerge, "not queued yet: ready")
     }
 
+    @Test func pinnedLeavesItsSectionForTheTopAndIsNeverReorderedAmongSections() {
+        let ready = makePR(number: 1, reviewDecision: .approved, ciState: .success)
+        let draft = makePR(number: 2, isDraft: true)
+        let groups = groupMine([ready, draft], pinned: [ready.id])
+        #expect(groups.pinned.map(\.number) == [1])
+        #expect(groups.readyToMerge.isEmpty)
+        #expect(groups[.pinnedMine].map(\.number) == [1])
+        #expect(Section.reorderable(in: .mine).contains(.pinnedMine) == false)
+        #expect(Section.reorderable(in: .review).contains(.pinnedReview) == false)
+        #expect(Section.pinnedMine.tab == .mine && Section.pinnedReview.tab == .review)
+    }
+
     @Test func openThreadsAloneDoNotNeedAction() {
         #expect(mineSection(for: makePR(reviewDecision: .approved, ciState: .success, unresolvedThreads: 3)) == .readyToMerge)
     }
@@ -95,11 +107,13 @@ import Testing
         #expect(filterViaTeam(all: prs, direct: [], viewerLogin: nil).count == 2)
     }
 
-    @Test func snoozedSectionsArePinnedLastAndNeverCounted() {
+    @Test func snoozedSectionsAreFixedLastAndNeverCounted() {
         #expect(Section.snoozedMine.tab == .mine)
         #expect(Section.snoozedReview.tab == .review)
         #expect(Section.snoozedMine.isSnoozed && Section.snoozedReview.isSnoozed)
-        #expect(Section.allCases.suffix(2) == [.snoozedMine, .snoozedReview])
+        // Fixed sections (Pinned first, Snoozed last) are outside the user's section order.
+        #expect(Section.allCases.filter(\.isFixed) == [.snoozedMine, .snoozedReview, .pinnedMine, .pinnedReview])
+        #expect(Section.reorderable(in: .mine).allSatisfy { !$0.isFixed })
         #expect(Section.defaultBadge.contains(.snoozedMine) == false)
         #expect(Section.reviewSections == [.needsYourReview, .needsTeamsReview])
     }

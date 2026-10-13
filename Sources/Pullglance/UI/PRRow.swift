@@ -10,6 +10,8 @@ struct PRRow: View {
     var isDormant = false
     /// Where a snoozed PR came from; shown in its metadata.
     var originSection: Section? = nil
+    /// Pinned rows carry a small pin before the title: the section says it, the mark travels with the row.
+    var isPinned = false
     var actionState: ActionState? = nil
     var onAction: (PRAction) -> Void = { _ in }
     /// Reorder mode has no clicks; the row's tap stays off there.
@@ -79,7 +81,7 @@ struct PRRow: View {
                 PopoverDismissal.open(pr.url)
             }
         }
-        .contextMenu { PRRowMenu(section: section, isDormant: isDormant, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, onAction: onAction) }
+        .contextMenu { PRRowMenu(section: section, isDormant: isDormant, isPinned: isPinned, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, onAction: onAction) }
     }
 
     /// Left column: CI dot normally; spinner, merged check or failure mark while an action is in play;
@@ -114,6 +116,11 @@ struct PRRow: View {
         return Text("Merged · ", bundle: .app)
     }
 
+    private var pinMark: Text {
+        guard isPinned else { return Text(verbatim: "") }
+        return Text(Image(systemName: "pin.fill")).font(.system(size: 9)).foregroundStyle(.orange) + Text(verbatim: " ")
+    }
+
     /// The title carries the action's status so the row needs no extra line.
     private var title: Text {
         switch actionState {
@@ -126,7 +133,7 @@ struct PRRow: View {
         case .failed(.merge, let message): Text("Merge failed: \(MergeFailure(ghMessage: message).shortDescription)", bundle: .app).foregroundStyle(.red)
         case .failed(.refresh, let message): Text("Refresh failed: \(message)", bundle: .app).foregroundStyle(.red)
         case .failed(_, let message): Text(verbatim: message).foregroundStyle(.red)
-        case nil: Text(verbatim: pr.title).foregroundStyle(.primary)
+        case nil: pinMark + Text(verbatim: pr.title).foregroundStyle(.primary)
         }
     }
 
@@ -136,6 +143,7 @@ struct PRRow: View {
 struct PRRowMenu: View {
     let section: Section
     var isDormant = false
+    var isPinned = false
     /// "Merge when checks pass" outside Ready to merge (see `PullRequest.offersAutoMerge`).
     var offersMerge = false
     var autoMergeOn = false
@@ -150,6 +158,7 @@ struct PRRowMenu: View {
                 switch action {
                 case .merge: Label { Text(offersMerge ? "Merge when checks pass…" : "Merge…", bundle: .app) } icon: { Image(systemName: "arrow.triangle.merge") }
                 case .disableAutoMerge: Label { Text("Disable auto-merge", bundle: .app) } icon: { Image(systemName: "arrow.triangle.merge") }
+                case .pin: Label { Text(isPinned ? "Unpin" : "Pin to top", bundle: .app) } icon: { Image(systemName: isPinned ? "pin.slash" : "pin") }
                 case .comment: Label { Text("Comment…", bundle: .app) } icon: { Image(systemName: "text.bubble") }
                 case .approve: Label { Text("Approve…", bundle: .app) } icon: { Image(systemName: "checkmark.circle") }
                 case .snooze: Label { Text(isDormant ? "Wake" : "Snooze", bundle: .app) } icon: { Image(systemName: isDormant ? "sun.max" : "moon.zzz") }

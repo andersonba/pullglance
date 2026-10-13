@@ -274,6 +274,8 @@ struct PopoverView: View {
             Task { _ = await store.refreshOne(pr) }
         case .disableAutoMerge:
             Task { _ = await store.disableAutoMerge(pr) }
+        case .pin:
+            withAnimation(.easeInOut(duration: 0.3)) { store.isPinned(pr) ? store.unpin(pr) : store.pin(pr) }
         }
     }
 
@@ -296,9 +298,10 @@ struct PopoverView: View {
     /// drags, so a moving row never feeds back into its own position.
     private func row(_ pr: PullRequest, section: Section, showAuthor: Bool = false, teamLabel: String? = nil, among: [PullRequest] = []) -> some View {
         let dormant = store.isDormant(pr)
+        let pinnedRow = store.isPinned(pr)
         let reorderable = Self.isReorderable(section) && !dormant
         let lifted = rowDrag?.id == pr.id
-        return rowView(pr, section: section, showAuthor: showAuthor, teamLabel: teamLabel, dormant: dormant, reorderable: reorderable, among: among)
+        return rowView(pr, section: section, showAuthor: showAuthor, teamLabel: teamLabel, dormant: dormant, pinned: pinnedRow, reorderable: reorderable, among: among)
             .opacity(reordering && !reorderable ? 0.4 : 1)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.listSpace)) } action: { if rowDrag == nil { rowFrames[pr.id] = $0 } }
             .background(lifted ? AnyShapeStyle(.regularMaterial) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 8))
@@ -361,8 +364,9 @@ struct PopoverView: View {
         return .init(title: String(localized: "Reorder", bundle: .app)) { setReordering(true) }
     }
 
-    private func rowView(_ pr: PullRequest, section: Section, showAuthor: Bool, teamLabel: String?, dormant: Bool, reorderable: Bool, among: [PullRequest]) -> some View {
-        let actionSection = dormant ? store.originSection(of: pr) : section
+    private func rowView(_ pr: PullRequest, section: Section, showAuthor: Bool, teamLabel: String?, dormant: Bool, pinned: Bool, reorderable: Bool, among: [PullRequest]) -> some View {
+        // Snoozed and pinned rows act as the row they would be in their own section.
+        let actionSection = dormant || pinned ? store.originSection(of: pr) : section
         let actionState = store.actionState(for: pr)
         let running: Bool = { if case .running = actionState { return true }; return false }()
         return SwipeActionsRow(
@@ -370,10 +374,11 @@ struct PopoverView: View {
             actions: quickActions(for: actionSection, dormant: dormant),
             openRow: $openRow,
             isDormant: dormant,
+            isPinned: pinned,
             isRunning: running,
             isLocked: reordering,
             onAction: { handle($0, for: pr) },
-            menu: { PRRowMenu(section: actionSection, isDormant: dormant, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, onAction: { handle($0, for: pr) }) }
+            menu: { PRRowMenu(section: actionSection, isDormant: dormant, isPinned: pinned, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, onAction: { handle($0, for: pr) }) }
         ) {
             PRRow(
                 pr: pr,
@@ -382,6 +387,7 @@ struct PopoverView: View {
                 teamLabel: teamLabel,
                 isDormant: dormant,
                 originSection: dormant ? store.originSection(of: pr) : nil,
+                isPinned: pinned,
                 actionState: actionState,
                 onAction: { handle($0, for: pr) },
                 handlesTap: !reordering,
@@ -397,6 +403,19 @@ struct PopoverView: View {
                 LongPressGesture(minimumDuration: Self.holdToReorder, maximumDistance: 6).onEnded { _ in setReordering(true) },
                 including: reorderable && !reordering ? .all : .none
             )
+        }
+    }
+
+    /// The tab's pinned PRs, always first, only when there are any. A quick filter keeps the rows whose
+    /// origin matches: pinning never hides a row from its filter.
+    @ViewBuilder private func pinnedSection(_ section: Section, _ prs: [PullRequest], filter: Section?, showAuthor: Bool) -> some View {
+        let shown = prs.filter { filter == nil || store.originSection(of: $0) == filter }
+        if !shown.isEmpty {
+            SectionHeader(title: section.title, count: shown.count, hoverAction: headerAction(for: section))
+            ForEach(shown) { pr in
+                row(pr, section: section, showAuthor: showAuthor, among: shown)
+                Divider()
+            }
         }
     }
 
@@ -422,9 +441,10 @@ struct PopoverView: View {
     @ViewBuilder private var mineList: some View {
         let groups = store.mineGroups
         let shown = store.orderedSections(.mine).filter { store.visibleSections.contains($0) && (mineFilter == nil || mineFilter == $0) }
-        if shown.allSatisfy({ groups[$0].isEmpty }), groups.snoozed.isEmpty {
+        if shown.allSatisfy({ groups[$0].isEmpty }), groups.snoozed.isEmpty, groups.pinned.isEmpty {
             EmptyStateView(kind: .allClear)
         } else {
+            pinnedSection(.pinnedMine, groups.pinned, filter: mineFilter, showAuthor: false)
             ForEach(shown) { section in
                 mineSection(section, groups[section])
             }
@@ -445,6 +465,7 @@ struct PopoverView: View {
     }
 
     @ViewBuilder private var reviewList: some View {
+        pinnedSection(.pinnedReview, store.pinnedReviewList, filter: reviewFilter, showAuthor: true)
         ForEach(store.orderedSections(.review)) { section in
             if store.visibleSections.contains(section), reviewFilter == nil || reviewFilter == section {
                 switch section {

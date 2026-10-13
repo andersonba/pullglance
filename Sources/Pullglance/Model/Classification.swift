@@ -21,6 +21,7 @@ struct MineGroups: Sendable, Equatable {
     var waitingForReview: [PullRequest] = []
     var drafts: [PullRequest] = []
     var snoozed: [PullRequest] = []
+    var pinned: [PullRequest] = []
 
     subscript(section: Section) -> [PullRequest] {
         switch section {
@@ -29,7 +30,8 @@ struct MineGroups: Sendable, Equatable {
         case .waitingForReview: waitingForReview
         case .drafts: drafts
         case .snoozedMine: snoozed
-        case .needsYourReview, .needsTeamsReview, .snoozedReview: []
+        case .pinnedMine: pinned
+        case .needsYourReview, .needsTeamsReview, .snoozedReview, .pinnedReview: []
         }
     }
 }
@@ -38,17 +40,18 @@ func sortedByRecency(_ prs: [PullRequest]) -> [PullRequest] {
     prs.sorted { $0.updatedAt > $1.updatedAt }
 }
 
-/// Snoozed PRs leave their section for the tab's "Snoozed" one.
-func groupMine(_ prs: [PullRequest], dormant: Set<String> = []) -> MineGroups {
+/// Snoozed PRs leave their section for the tab's "Snoozed" one; pinned ones for "Pinned".
+func groupMine(_ prs: [PullRequest], dormant: Set<String> = [], pinned: Set<String> = []) -> MineGroups {
     var groups = MineGroups()
     for pr in sortedByRecency(prs) {
         if dormant.contains(pr.id) { groups.snoozed.append(pr); continue }
+        if pinned.contains(pr.id) { groups.pinned.append(pr); continue }
         switch mineSection(for: pr) {
         case .needsAction: groups.needsAction.append(pr)
         case .readyToMerge: groups.readyToMerge.append(pr)
         case .waitingForReview: groups.waitingForReview.append(pr)
         case .drafts: groups.drafts.append(pr)
-        case .needsYourReview, .needsTeamsReview, .snoozedMine, .snoozedReview: break
+        case .needsYourReview, .needsTeamsReview, .snoozedMine, .snoozedReview, .pinnedMine, .pinnedReview: break
         }
     }
     return groups
