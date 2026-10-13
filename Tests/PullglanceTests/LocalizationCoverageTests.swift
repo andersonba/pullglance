@@ -13,6 +13,7 @@ import Testing
         "%lld files", "%lld marked", "%lld marked · %lld failed", "%lld unmarked", "Mark tests · %lld",
         "Approve #%lld", "Comment on #%lld", "Downloaded %@ · Show in Finder",
         "%lld of %lld", "%lld of %lld viewed", "Tests · %lld",
+        "In queue · %lld", "The merge queue merges it with the strategy set for %@.",
     ]
 
     /// `Text("key", bundle: .app)`, `Text(flag ? "a" : "b", bundle: .app)` and `String(localized: "key", bundle: .app)`.

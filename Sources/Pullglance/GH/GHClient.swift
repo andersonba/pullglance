@@ -39,6 +39,7 @@ struct GHClient: GHRunning {
     static let searchQuery = document("search")
     static let repoSearchQuery = document("repo-search")
     static let pullRequestQuery = document("pull-request")
+    static let enqueueMutation = document("enqueue")
 
     private static func document(_ name: String) -> String {
         guard let url = Bundle.app.url(forResource: name, withExtension: "graphql"),
@@ -106,6 +107,10 @@ struct GHClient: GHRunning {
         return args
     }
 
+    static func enqueueArguments(pullRequestID: String, expectedHeadOid: String) -> [String] {
+        ["api", "graphql", "-f", "query=\(enqueueMutation)", "-f", "id=\(pullRequestID)", "-f", "oid=\(expectedHeadOid)"]
+    }
+
     static func commentArguments(url: URL, body: String) -> [String] {
         ["pr", "comment", url.absoluteString, "--body", body]
     }
@@ -129,6 +134,10 @@ struct GHClient: GHRunning {
 
     func merge(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?) async -> GHOutcome {
         await run(Self.mergeArguments(url: url, method: method, deleteBranch: deleteBranch, matchHeadCommit: matchHeadCommit))
+    }
+
+    func enqueue(pullRequestID: String, expectedHeadOid: String) async -> GHOutcome {
+        await run(Self.enqueueArguments(pullRequestID: pullRequestID, expectedHeadOid: expectedHeadOid))
     }
 
     func comment(url: URL, body: String) async -> GHOutcome {

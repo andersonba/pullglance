@@ -1,0 +1,5 @@
+mutation($id: ID!, $oid: GitObjectID!) {
+  enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: $oid }) {
+    mergeQueueEntry { position }
+  }
+}

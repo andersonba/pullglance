@@ -16,6 +16,9 @@ protocol GHRunning: Sendable {
     func searchRepos(query: String) async -> GHOutcome
     /// `gh pr merge`. `matchHeadCommit` makes GitHub refuse if the branch moved since the PR was shown.
     func merge(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?) async -> GHOutcome
+    /// `enqueue.graphql`: adds the pull request to its base branch's merge queue. The queue merges with the
+    /// strategy it is configured with; `expectedHeadOid` plays the part of `--match-head-commit`.
+    func enqueue(pullRequestID: String, expectedHeadOid: String) async -> GHOutcome
     /// `gh pr comment`.
     func comment(url: URL, body: String) async -> GHOutcome
     /// `gh pr review --approve`, with an optional comment.

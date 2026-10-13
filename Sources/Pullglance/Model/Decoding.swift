@@ -156,6 +156,7 @@ private struct SearchConnection: Decodable {
 }
 
 private struct PRNode: Decodable {
+    let id: String?
     let state: String?
     let number: Int?
     let title: String?
@@ -163,6 +164,9 @@ private struct PRNode: Decodable {
     let isDraft: Bool?
     let mergeable: String?
     let mergeStateStatus: String?
+    let isMergeQueueEnabled: Bool?
+    let mergeQueueEntry: QueueEntry?
+    let mergeQueue: Queue?
     let baseRefName: String?
     let headRefName: String?
     let headRefOid: String?
@@ -198,6 +202,11 @@ private struct PRNode: Decodable {
     struct Login: Decodable {
         let login: String
         let avatarUrl: URL?
+    }
+    struct QueueEntry: Decodable { let position: Int? }
+    struct Queue: Decodable {
+        let configuration: Configuration?
+        struct Configuration: Decodable { let mergeMethod: String? }
     }
     struct Threads: Decodable { let nodes: [Lossy<Thread>] }
     struct Thread: Decodable { let isResolved: Bool }
@@ -249,7 +258,12 @@ private struct PRNode: Decodable {
             baseRefName: baseRefName ?? "",
             headRefName: headRefName ?? "",
             headRefOid: headRefOid ?? "",
-            mergeOptions: repository.mergeOptions
+            mergeOptions: repository.mergeOptions,
+            nodeID: id ?? "",
+            hasMergeState: mergeable != nil,
+            usesMergeQueue: isMergeQueueEnabled ?? false,
+            mergeQueuePosition: mergeQueueEntry?.position,
+            queueMergeMethod: mergeQueue?.configuration?.mergeMethod.flatMap(MergeMethod.init(apiValue:))
         )
     }
 }
@@ -297,4 +311,30 @@ func fetchFileCounts(_ client: GHRunning, ref: PullRequestRef) async -> FileCoun
         cursor = page.nextCursor
     } while cursor != nil
     return FileCounts(total: total, viewed: viewed)
+}
+
+/// The queue position from `enqueue.graphql`, nil when GitHub returned the entry without one. GraphQL
+/// errors (already queued, not allowed, head moved) come back as `errors` next to a null payload.
+func parseEnqueueResponse(_ data: Data) throws -> Int? {
+    struct Envelope: Decodable {
+        let data: Payload?
+        let errors: [GraphQLError]?
+        struct Payload: Decodable { let enqueuePullRequest: Result? }
+        struct Result: Decodable { let mergeQueueEntry: Entry? }
+        struct Entry: Decodable { let position: Int? }
+    }
+    let envelope: Envelope
+    do {
+        envelope = try JSONDecoder().decode(Envelope.self, from: data)
+    } catch {
+        throw DecodingFailure.malformed(String(describing: error))
+    }
+    let errors = envelope.errors?.map(\.message) ?? []
+    guard let result = envelope.data?.enqueuePullRequest else { throw DecodingFailure.noData(errors: errors) }
+    guard let entry = result.mergeQueueEntry else {
+        // No entry and errors next to it: GitHub did not confirm anything.
+        if !errors.isEmpty { throw DecodingFailure.noData(errors: errors) }
+        return nil
+    }
+    return entry.position
 }

@@ -11,6 +11,14 @@ import Testing
         #expect(pills(for: makePR(reviewDecision: .approved, ciState: .success)) == [.approved, .readyToMerge])
     }
 
+    @Test func aQueuedPullRequestShowsItsPositionInsteadOfReady() {
+        #expect(pills(for: makePR(reviewDecision: .approved, ciState: .success, usesMergeQueue: true, mergeQueuePosition: 3)) == [.approved, .inMergeQueue(3)])
+        // Queue enabled but not queued yet: still "ready", the modal explains the queue.
+        #expect(pills(for: makePR(reviewDecision: .approved, ciState: .success, usesMergeQueue: true)) == [.approved, .readyToMerge])
+        // Queue membership does not depend on a review: repositories without required reviews queue too.
+        #expect(pills(for: makePR(reviewDecision: nil, ciState: .success, usesMergeQueue: true, mergeQueuePosition: 2)) == [.awaitingReview, .inMergeQueue(2)])
+    }
+
     @Test func approvedWithPendingCIIsNotReady() {
         #expect(pills(for: makePR(reviewDecision: .approved, ciState: .pending)) == [.ciRunning, .approved])
     }

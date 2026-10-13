@@ -37,6 +37,18 @@ struct PullRequest: Sendable, Equatable, Identifiable {
     /// wakes a snoozed PR.
     let headRefOid: String
     let mergeOptions: MergeOptions
+    /// GraphQL node id, needed by mutations that do not take a URL (`enqueuePullRequest`). Empty when the
+    /// list was fetched without merge fields.
+    let nodeID: String
+    /// Whether the merge fields were fetched at all. Review requests are listed without them, so for those
+    /// `usesMergeQueue` and friends are "unknown", not "no".
+    let hasMergeState: Bool
+    /// The base branch requires a merge queue: a strategy is refused and the queue merges when it decides.
+    let usesMergeQueue: Bool
+    /// 1-based place in that queue once added; nil until then.
+    let mergeQueuePosition: Int?
+    /// The strategy the queue is configured with, when there is one.
+    let queueMergeMethod: MergeMethod?
 
     var id: String { "\(repo)#\(number)" }
     var checksURL: URL { url.appendingPathComponent("checks") }

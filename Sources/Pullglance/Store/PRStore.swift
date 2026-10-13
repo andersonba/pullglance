@@ -549,28 +549,45 @@ final class PRStore {
     /// Merges on GitHub, pinned to the commit we are showing. The row shows the progress: running, then
     /// "merged" for `successLinger` (already out of the badge), then it leaves the list; the next cycle confirms.
     /// Failures stay on the row until dismissed. They are not logged: they belong to the row, not to the Logs tab.
-    func merge(_ pr: PullRequest, method: MergeMethod, deleteBranch: Bool) async -> ActionResult {
-        setActionState(.running(.merge), for: pr)
-        // Deleting a branch that other open pull requests are based on closes them (GitHub does not retarget
-        // when the deletion comes right after the merge). Keep the branch in that case, or when unsure.
+    func merge(_ listed: PullRequest, method: MergeMethod, deleteBranch: Bool) async -> ActionResult {
+        setActionState(.running(.merge), for: listed)
+        // Listed without merge fields (a review request): whether the base has a queue is unknown, and
+        // guessing "no" is how the wrong mechanism gets used. One lookup settles it.
+        var pr = listed
+        if !listed.hasMergeState, let ref = PullRequestRef(repo: listed.repo, number: listed.number),
+           case .success(let data) = await client.pullRequest(owner: ref.owner, name: ref.name, number: ref.number, includeMergeState: true),
+           case .open(let fresh)? = try? parsePullRequestResponse(data) {
+            pr = fresh
+            replaceLocally(fresh)
+        }
         var deleting = deleteBranch
         var note: String? = nil
-        if deleteBranch {
-            switch await client.openPullRequests(repo: pr.repo, base: pr.headRefName) {
-            case .success(let data):
-                let count = parseOpenPullRequestCount(data)
-                if count == nil || count! > 0 {
+        let result: ActionResult
+        if pr.usesMergeQueue {
+            // The queue refuses a strategy and merges (and deletes, if the repository does) on its own time.
+            result = enqueueResult(await client.enqueue(pullRequestID: pr.nodeID, expectedHeadOid: pr.headRefOid))
+            if case .success(let queueNote) = result { note = queueNote }
+            appLog.info("enqueue \(pr.id): \(result.logDescription)")
+        } else {
+            // Deleting a branch that other open pull requests are based on closes them (GitHub does not retarget
+            // when the deletion comes right after the merge). Keep the branch in that case, or when unsure.
+            if deleteBranch {
+                switch await client.openPullRequests(repo: pr.repo, base: pr.headRefName) {
+                case .success(let data):
+                    let count = parseOpenPullRequestCount(data)
+                    if count == nil || count! > 0 {
+                        deleting = false
+                        note = count.map { String(format: String(localized: "Branch kept: %lld open pull requests are based on it", bundle: .app), $0) }
+                            ?? String(localized: "Branch kept: could not check for pull requests based on it", bundle: .app)
+                    }
+                default:
                     deleting = false
-                    note = count.map { String(format: String(localized: "Branch kept: %lld open pull requests are based on it", bundle: .app), $0) }
-                        ?? String(localized: "Branch kept: could not check for pull requests based on it", bundle: .app)
+                    note = String(localized: "Branch kept: could not check for pull requests based on it", bundle: .app)
                 }
-            default:
-                deleting = false
-                note = String(localized: "Branch kept: could not check for pull requests based on it", bundle: .app)
             }
+            result = outcomeResult(await client.merge(url: pr.url, method: method, deleteBranch: deleting, matchHeadCommit: pr.headRefOid))
+            appLog.info("merge \(pr.id) \(method.ghFlag) delete-branch=\(deleting): \(result.logDescription)")
         }
-        let result = outcomeResult(await client.merge(url: pr.url, method: method, deleteBranch: deleting, matchHeadCommit: pr.headRefOid))
-        appLog.info("merge \(pr.id) \(method.ghFlag) delete-branch=\(deleting): \(result.logDescription)")
         switch result {
         case .success:
             setActionState(.succeeded(.merge), for: pr)
@@ -578,9 +595,15 @@ final class PRStore {
             recomputeBadge()
             Task { [successLinger] in
                 try? await Task.sleep(for: successLinger)
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    removeLocally(pr)
+                if pr.usesMergeQueue {
+                    // Queued is not merged: the row stays, and the lookup brings the queue entry in for the pill.
                     clearActionState(for: pr)
+                    _ = await refreshOne(pr, quiet: true)
+                } else {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        removeLocally(pr)
+                        clearActionState(for: pr)
+                    }
                 }
             }
             return .success(note: note)
@@ -610,6 +633,21 @@ final class PRStore {
         return result
     }
 
+    /// `gh api graphql` exits non-zero on GraphQL errors but still prints the envelope, so the note or the
+    /// failure both come out of the decoder. The note names the position when GitHub gives one.
+    private func enqueueResult(_ outcome: GHOutcome) -> ActionResult {
+        guard case .success(let data) = outcome else { return outcomeResult(outcome) }
+        do {
+            let note = try parseEnqueueResponse(data).map { String(format: String(localized: "Added to the merge queue · position %lld", bundle: .app), $0) }
+                ?? String(localized: "Added to the merge queue", bundle: .app)
+            return .success(note: note)
+        } catch DecodingFailure.noData(let errors) where !errors.isEmpty {
+            return .failure(errors.joined(separator: "; "))
+        } catch {
+            return .failure(String(localized: "GitHub returned an unexpected answer", bundle: .app))
+        }
+    }
+
     private func outcomeResult(_ outcome: GHOutcome) -> ActionResult {
         switch outcome {
         case .success: .success()
@@ -627,8 +665,9 @@ final class PRStore {
         if !quiet { setActionState(.running(.refresh), for: pr) }
         let parts = pr.repo.split(separator: "/", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { return fail(pr, "bad repository name", quiet: quiet) }
-        let inMine = mine.value.contains { $0.id == pr.id }
-        let outcome = await client.pullRequest(owner: parts[0], name: parts[1], number: pr.number, includeMergeState: inMine)
+        // One pull request is cheap to compute merge state for (the page-size limit is what keeps it off the
+        // review lists), and the review window merges review requests too.
+        let outcome = await client.pullRequest(owner: parts[0], name: parts[1], number: pr.number, includeMergeState: true)
         switch outcome {
         case .success(let data):
             do {

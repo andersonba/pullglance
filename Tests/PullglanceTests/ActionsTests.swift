@@ -18,6 +18,36 @@ import Testing
         #expect(pr.mergeOptions == MergeOptions(allowed: [.merge, .squash, .rebase], defaultMethod: .merge, deleteBranchOnMerge: false))
     }
 
+    @Test func decodesMergeQueueFields() throws {
+        let queued = node(number: 1, ci: "SUCCESS", prExtra: "\"id\":\"PR_kwDOabc\",\"isMergeQueueEnabled\":true,\"mergeQueueEntry\":{\"position\":3,\"state\":\"QUEUED\"},\"mergeQueue\":{\"configuration\":{\"mergeMethod\":\"SQUASH\"}}")
+        let waiting = node(number: 2, ci: "SUCCESS", prExtra: "\"id\":\"PR_kwDOdef\",\"isMergeQueueEnabled\":true,\"mergeQueueEntry\":null,\"mergeQueue\":{\"configuration\":{\"mergeMethod\":\"MERGE\"}}")
+        let page = try parseSearchResponse(envelope(nodes: [queued, waiting, node(number: 3, ci: nil), node(number: 4, ci: nil, mergeable: nil)]))
+        #expect(page.pullRequests.map(\.nodeID) == ["PR_kwDOabc", "PR_kwDOdef", "", ""])
+        #expect(page.pullRequests.map(\.usesMergeQueue) == [true, true, false, false])
+        #expect(page.pullRequests.map(\.mergeQueuePosition) == [3, nil, nil, nil])
+        #expect(page.pullRequests.map(\.queueMergeMethod) == [.squash, .merge, nil, nil])
+        // A list fetched without merge fields knows nothing about queues; the merge path must look first.
+        #expect(page.pullRequests.map(\.hasMergeState) == [true, true, true, false])
+    }
+
+    @Test func enqueueArgumentsMatchTheGhCLI() {
+        let args = GHClient.enqueueArguments(pullRequestID: "PR_1", expectedHeadOid: "abc")
+        #expect(Array(args.prefix(3)) == ["api", "graphql", "-f"])
+        #expect(args[3].hasPrefix("query=mutation"))
+        #expect(args[3].contains("enqueuePullRequest"))
+        #expect(Array(args.suffix(4)) == ["-f", "id=PR_1", "-f", "oid=abc"])
+    }
+
+    @Test func readsTheQueuePositionFromTheEnqueueResponse() throws {
+        #expect(try parseEnqueueResponse(Data(#"{"data":{"enqueuePullRequest":{"mergeQueueEntry":{"position":2}}}}"#.utf8)) == 2)
+        #expect(try parseEnqueueResponse(Data(#"{"data":{"enqueuePullRequest":{"mergeQueueEntry":null}}}"#.utf8)) == nil)
+        let failed = Data(#"{"data":{"enqueuePullRequest":null},"errors":[{"message":"Pull request is already queued to merge"}]}"#.utf8)
+        #expect(throws: DecodingFailure.noData(errors: ["Pull request is already queued to merge"])) { try parseEnqueueResponse(failed) }
+        // A payload without an entry next to errors is not a success either.
+        let partial = Data(#"{"data":{"enqueuePullRequest":{"mergeQueueEntry":null}},"errors":[{"message":"Something went wrong"}]}"#.utf8)
+        #expect(throws: DecodingFailure.noData(errors: ["Something went wrong"])) { try parseEnqueueResponse(partial) }
+    }
+
     @Test func defaultMethodOutsideTheAllowedSetIsReplaced() {
         let options = MergeOptions(allowed: [.rebase], defaultMethod: .squash, deleteBranchOnMerge: false)
         #expect(options.preselected == .rebase)
@@ -151,6 +181,67 @@ import Testing
         #expect(store.actionState(for: pr) == nil)
     }
 
+    /// A base that requires a merge queue refuses a strategy, and the repository may forbid auto-merge; the
+    /// only thing that works everywhere is the queue's own mutation. Branch deletion is the queue's business.
+    @Test func mergeOnAMergeQueueBaseEnqueuesInstead() async throws {
+        let gh = FakeGH()
+        let queued = node(number: 102, ci: "SUCCESS", decision: "APPROVED", headRefOid: "feedface", prExtra: "\"id\":\"PR_q\",\"isMergeQueueEnabled\":true,\"mergeQueueEntry\":null")
+        await gh.set(.success(envelope(nodes: [queued])), for: SearchQuery.mine)
+        await gh.set(.success(try fixture("search-direct.json")), for: SearchQuery.direct)
+        await gh.setEnqueueOutcome(.success(Data(#"{"data":{"enqueuePullRequest":{"mergeQueueEntry":{"position":2}}}}"#.utf8)))
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() }, successLinger: .milliseconds(150))
+        await store.refresh()
+        let pr = try #require(store.mineGroups.readyToMerge.first)
+        let result = await store.merge(pr, method: .squash, deleteBranch: true)
+        guard case .success(let note?) = result else { Issue.record("expected a note, got \(result)"); return }
+        #expect(note.contains("2"))
+        #expect(await gh.merges.isEmpty)
+        #expect(await gh.dependentQueries.isEmpty)
+        let call = try #require(await gh.enqueues.first)
+        #expect(call.id == "PR_q")
+        #expect(call.oid == "feedface")
+        #expect(store.actionState(for: pr) == .succeeded(.merge))
+        // Queued is not merged: the row stays, and a lookup brings the queue entry in for the pill.
+        let inQueue = node(number: 102, ci: "SUCCESS", decision: "APPROVED", headRefOid: "feedface", prExtra: "\"id\":\"PR_q\",\"isMergeQueueEnabled\":true,\"mergeQueueEntry\":{\"position\":2,\"state\":\"AWAITING_CHECKS\"}")
+        await gh.setPullRequest(.success(pullRequestEnvelope(inQueue)), number: 102)
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(store.actionState(for: pr) == nil)
+        let kept = try #require(store.mine.value.first { $0.id == pr.id })
+        #expect(kept.mergeQueuePosition == 2)
+        #expect(await gh.lookups.map(\.includeMergeState) == [true])
+    }
+
+    /// Review requests are listed without merge fields, and the review window can merge them: the merge path
+    /// looks the pull request up with those fields before choosing between the queue and a direct merge.
+    @Test func mergingAPullRequestListedWithoutMergeStateLooksItUpFirst() async throws {
+        let gh = FakeGH()
+        await gh.set(.success(try fixture("search-mine.json")), for: SearchQuery.mine)
+        await gh.set(.success(envelope(nodes: [node(number: 7, ci: "SUCCESS", decision: "APPROVED", mergeable: nil)])), for: SearchQuery.direct)
+        let fresh = node(number: 7, ci: "SUCCESS", decision: "APPROVED", prExtra: "\"id\":\"PR_seven\",\"isMergeQueueEnabled\":true,\"mergeQueueEntry\":null")
+        await gh.setPullRequest(.success(pullRequestEnvelope(fresh)), number: 7)
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() }, successLinger: .milliseconds(50))
+        await store.refresh()
+        let pr = try #require(store.directList.first { $0.number == 7 })
+        #expect(pr.hasMergeState == false)
+        guard case .success = await store.merge(pr, method: .squash, deleteBranch: false) else { Issue.record("expected success"); return }
+        #expect(await gh.lookups.first?.includeMergeState == true)
+        #expect(await gh.enqueues.first?.id == "PR_seven")
+        #expect(await gh.merges.isEmpty)
+    }
+
+    @Test func enqueueErrorsStayOnTheRow() async throws {
+        let gh = FakeGH()
+        let queued = node(number: 102, ci: "SUCCESS", decision: "APPROVED", prExtra: "\"id\":\"PR_q\",\"isMergeQueueEnabled\":true,\"mergeQueueEntry\":null")
+        await gh.set(.success(envelope(nodes: [queued])), for: SearchQuery.mine)
+        await gh.set(.success(try fixture("search-direct.json")), for: SearchQuery.direct)
+        await gh.setEnqueueOutcome(.success(Data(#"{"data":{"enqueuePullRequest":null},"errors":[{"message":"Pull request is already queued to merge"}]}"#.utf8)))
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() })
+        await store.refresh()
+        let pr = try #require(store.mineGroups.readyToMerge.first)
+        #expect(await store.merge(pr, method: .squash, deleteBranch: false) == .failure("Pull request is already queued to merge"))
+        #expect(store.actionState(for: pr) == .failed(.merge, "Pull request is already queued to merge"))
+    }
+
     @Test func keepsTheBranchWhenOpenPullRequestsAreBasedOnIt() async throws {
         let gh = try await gh()
         await gh.setOpenPullRequests(.success(Data("[{\"number\":8},{\"number\":9}]".utf8)))
@@ -261,6 +352,7 @@ private extension Data {
         ("GraphQL: Pull Request is not mergeable: the pull request is closed", .closed),
         ("GraphQL: Resource not accessible by integration (mergePullRequest)", .notAllowed),
         ("GraphQL: Base branch is protected and you do not have permission (mergePullRequest)", .notAllowed),
+        ("GraphQL: Pull request is already queued to merge (enqueuePullRequest)", .alreadyQueued),
         ("something else entirely", .other("something else entirely")),
     ])
     func classifiesGhMergeErrors(message: String, expected: MergeFailure) {
@@ -275,6 +367,9 @@ private extension Data {
         #expect(mergePreflight(makePR(reviewDecision: .changesRequested, ciState: .success)) == .reviewRequired)
         // Pending checks and a missing review are warnings for the modal, not blocks: branch protection decides.
         #expect(mergePreflight(makePR(reviewDecision: .reviewRequired, ciState: .pending)) == nil)
+        // Already in the queue: nothing left to ask for.
+        #expect(mergePreflight(makePR(reviewDecision: .approved, ciState: .success, usesMergeQueue: true, mergeQueuePosition: 1)) == .alreadyQueued)
+        #expect(mergePreflight(makePR(reviewDecision: .approved, ciState: .success, usesMergeQueue: true)) == nil)
     }
 }
 
@@ -358,11 +453,13 @@ private extension Data {
         _ = await store.refreshOne(team)
     }
 
-    @Test func reviewRequestsAreLookedUpWithoutMergeFields() async throws {
+    /// One pull request is cheap to compute merge state for, and the review window merges review requests
+    /// too, so the lookup it triggers must know about queues.
+    @Test func reviewRequestsAreLookedUpWithMergeFieldsToo() async throws {
         let (store, gh) = try await store()
         let pr = store.directList[0]
         await gh.setPullRequest(.success(pullRequestEnvelope(node(number: pr.number, ci: "SUCCESS"))), number: pr.number)
         _ = await store.refreshOne(pr)
-        #expect(await gh.lookups.first?.includeMergeState == false)
+        #expect(await gh.lookups.first?.includeMergeState == true)
     }
 }

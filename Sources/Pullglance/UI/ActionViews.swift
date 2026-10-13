@@ -32,16 +32,30 @@ struct MergeConfirmView: View {
                 .font(.caption)
                 .lineLimit(2)
 
-            SegmentedControl(
-                selection: $method,
-                segments: MergeMethod.allCases.map { candidate in
-                    .init(value: candidate, title: Text(verbatim: label(candidate)), enabled: pr.mergeOptions.allowed.contains(candidate))
-                },
-                fontSize: 12
-            )
-            .disabled(running)
+            if pr.usesMergeQueue {
+                // The base branch is behind a merge queue: GitHub refuses a strategy, the queue merges with the one
+                // it is configured with, when the checks it runs pass. Nothing to choose, but say what it will do.
+                Label { Text(verbatim: queueDescription) } icon: { Image(systemName: "list.number") }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                SegmentedControl(
+                    selection: $method,
+                    segments: MergeMethod.allCases.map { candidate in
+                        .init(value: candidate, title: Text(verbatim: label(candidate)), enabled: pr.mergeOptions.allowed.contains(candidate))
+                    },
+                    fontSize: 12
+                )
+                .disabled(running)
+            }
 
-            if pr.mergeOptions.deleteBranchOnMerge {
+            if pr.usesMergeQueue, !pr.mergeOptions.deleteBranchOnMerge {
+                // The merge happens later, out of our hands; only the repository setting could delete the branch.
+                Label { Text("The branch stays after the merge.", bundle: .app) } icon: { Image(systemName: "arrow.triangle.branch") }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if pr.mergeOptions.deleteBranchOnMerge {
                 // GitHub deletes it and retargets anything stacked on it; asking gh to delete it too would
                 // close those pull requests instead.
                 Label { Text("The repository deletes the branch after merge.", bundle: .app) } icon: { Image(systemName: "arrow.triangle.branch") }
@@ -92,10 +106,21 @@ struct MergeConfirmView: View {
 
     private var confirmLabel: String {
         if failure != nil, isRetryable, mergePreflight(pr) == nil { return String(localized: "Retry", bundle: .app) }
+        if pr.usesMergeQueue { return String(localized: "Add to merge queue", bundle: .app) }
         switch method {
         case .merge: return String(localized: "Merge", bundle: .app)
         case .squash: return String(localized: "Squash and merge", bundle: .app)
         case .rebase: return String(localized: "Rebase and merge", bundle: .app)
+        }
+    }
+
+    /// What the queue will do, with the strategy named when GitHub tells us.
+    private var queueDescription: String {
+        switch pr.queueMergeMethod {
+        case .merge: String(localized: "The merge queue creates a merge commit when its turn comes.", bundle: .app)
+        case .squash: String(localized: "The merge queue squashes and merges when its turn comes.", bundle: .app)
+        case .rebase: String(localized: "The merge queue rebases and merges when its turn comes.", bundle: .app)
+        case nil: String(format: String(localized: "The merge queue merges it with the strategy set for %@.", bundle: .app), pr.baseRefName)
         }
     }
 
@@ -117,6 +142,7 @@ struct MergeConfirmView: View {
         case .changedSinceShown: String(localized: "The branch changed since this list was loaded. Refresh and look again.", bundle: .app)
         case .temporarilyUnavailable: String(localized: "GitHub could not merge right now. Try again in a few seconds.", bundle: .app)
         case .alreadyMerged: String(localized: "Already merged.", bundle: .app)
+        case .alreadyQueued: String(localized: "Already in the merge queue. GitHub merges it when its turn comes.", bundle: .app)
         case .closed: String(localized: "This PR is closed.", bundle: .app)
         case .notAllowed: String(localized: "You do not have permission to merge here.", bundle: .app)
         case .other(let message): message

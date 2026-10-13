@@ -71,6 +71,7 @@ enum MergeFailure: Equatable, Sendable {
     case changedSinceShown
     case temporarilyUnavailable
     case alreadyMerged
+    case alreadyQueued
     case closed
     case notAllowed
     case other(String)
@@ -78,6 +79,7 @@ enum MergeFailure: Equatable, Sendable {
     init(ghMessage: String) {
         let m = ghMessage.lowercased()
         if m.contains("already merged") { self = .alreadyMerged }
+        else if m.contains("already queued") || m.contains("already in the merge queue") { self = .alreadyQueued }
         else if m.contains("is closed") { self = .closed }
         else if m.contains("head branch was modified") || m.contains("head commit") { self = .changedSinceShown }
         else if m.contains("conflict") || m.contains("cannot be cleanly created") { self = .conflicts }
@@ -100,6 +102,7 @@ extension MergeFailure {
         case .changedSinceShown: String(localized: "branch changed", bundle: .app)
         case .temporarilyUnavailable: String(localized: "try again", bundle: .app)
         case .alreadyMerged: String(localized: "already merged", bundle: .app)
+        case .alreadyQueued: String(localized: "already queued", bundle: .app)
         case .closed: String(localized: "closed", bundle: .app)
         case .notAllowed: String(localized: "not allowed", bundle: .app)
         case .other(let message): message
@@ -114,6 +117,7 @@ func mergePreflight(_ pr: PullRequest) -> MergeFailure? {
     if pr.hasConflicts { return .conflicts }
     if pr.ciState == .failure { return .checksNotPassing }
     if pr.reviewDecision == .changesRequested { return .reviewRequired }
+    if pr.mergeQueuePosition != nil { return .alreadyQueued }
     return nil
 }
 

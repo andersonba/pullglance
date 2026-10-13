@@ -23,7 +23,12 @@ func makePR(
     isBehindBase: Bool = false,
     authorAvatarURL: URL? = nil,
     headRefOid: String = "abc1234",
-    mergeOptions: MergeOptions = MergeOptions(allowed: [.squash, .merge], defaultMethod: .squash, deleteBranchOnMerge: true)
+    mergeOptions: MergeOptions = MergeOptions(allowed: [.squash, .merge], defaultMethod: .squash, deleteBranchOnMerge: true),
+    nodeID: String = "PR_1",
+    hasMergeState: Bool = true,
+    usesMergeQueue: Bool = false,
+    mergeQueuePosition: Int? = nil,
+    queueMergeMethod: MergeMethod? = nil
 ) -> PullRequest {
     PullRequest(
         repo: repo, number: number, title: title,
@@ -34,7 +39,9 @@ func makePR(
         hasConflicts: hasConflicts, isBehindBase: isBehindBase,
         authorAvatarURL: authorAvatarURL,
         baseRefName: "main", headRefName: "feature", headRefOid: headRefOid,
-        mergeOptions: mergeOptions
+        mergeOptions: mergeOptions,
+        nodeID: nodeID, hasMergeState: hasMergeState, usesMergeQueue: usesMergeQueue,
+        mergeQueuePosition: mergeQueuePosition, queueMergeMethod: queueMergeMethod
     )
 }
 
@@ -52,11 +59,14 @@ func pullRequestEnvelope(_ node: String?, state: String = "OPEN") -> Data {
     return Data(("{\"data\":{\"repository\":{\"pullRequest\":" + body + "}}}").utf8)
 }
 
-func node(number: Int, ci: String?, decision: String? = nil, draft: Bool = false, mergeable: String = "MERGEABLE", mergeState: String = "CLEAN", headRefOid: String = "abc1234", repo: String = "acme/web", repoExtra: String = "\"mergeCommitAllowed\":false,\"squashMergeAllowed\":true,\"rebaseMergeAllowed\":false,\"deleteBranchOnMerge\":true,\"viewerDefaultMergeMethod\":\"SQUASH\"") -> String {
+/// `mergeable: nil` writes a null, as a list fetched without merge fields decodes.
+func node(number: Int, ci: String?, decision: String? = nil, draft: Bool = false, mergeable: String? = "MERGEABLE", mergeState: String = "CLEAN", headRefOid: String = "abc1234", repo: String = "acme/web", repoExtra: String = "\"mergeCommitAllowed\":false,\"squashMergeAllowed\":true,\"rebaseMergeAllowed\":false,\"deleteBranchOnMerge\":true,\"viewerDefaultMergeMethod\":\"SQUASH\"", prExtra: String = "") -> String {
     let rollup = ci.map { "{\"state\":\"\($0)\"}" } ?? "null"
     let dec = decision.map { "\"\($0)\"" } ?? "null"
+    let extra = prExtra.isEmpty ? "" : prExtra + ","
+    let mergeableJSON = mergeable.map { "\"\($0)\"" } ?? "null"
     return """
-    {"number":\(number),"title":"PR \(number)","url":"https://github.com/\(repo)/pull/\(number)","isDraft":\(draft),"mergeable":"\(mergeable)","mergeStateStatus":"\(mergeState)","baseRefName":"main","headRefName":"feature-\(number)","headRefOid":"\(headRefOid)","updatedAt":"2026-10-10T10:00:00Z","repository":{"nameWithOwner":"\(repo)",\(repoExtra)},"author":{"login":"someone","avatarUrl":"https://example.com/someone.png"},"reviewDecision":\(dec),"reviewThreads":{"nodes":[]},"reviewRequests":{"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":\(rollup)}}]}}
+    {\(extra)"number":\(number),"title":"PR \(number)","url":"https://github.com/\(repo)/pull/\(number)","isDraft":\(draft),"mergeable":\(mergeableJSON),"mergeStateStatus":"\(mergeState)","baseRefName":"main","headRefName":"feature-\(number)","headRefOid":"\(headRefOid)","updatedAt":"2026-10-10T10:00:00Z","repository":{"nameWithOwner":"\(repo)",\(repoExtra)},"author":{"login":"someone","avatarUrl":"https://example.com/someone.png"},"reviewDecision":\(dec),"reviewThreads":{"nodes":[]},"reviewRequests":{"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":\(rollup)}}]}}
     """
 }
 
@@ -74,6 +84,14 @@ actor FakeGH: GHRunning {
     private(set) var comments: [(url: URL, body: String)] = []
     private var approveOutcome: GHOutcome = .success(Data())
     private(set) var approvals: [(url: URL, body: String?)] = []
+    private var enqueueOutcome: GHOutcome = .success(Data("{\"data\":{\"enqueuePullRequest\":{\"mergeQueueEntry\":null}}}".utf8))
+    private(set) var enqueues: [(id: String, oid: String)] = []
+    func setEnqueueOutcome(_ outcome: GHOutcome) { enqueueOutcome = outcome }
+    func enqueue(pullRequestID: String, expectedHeadOid: String) async -> GHOutcome {
+        enqueues.append((pullRequestID, expectedHeadOid))
+        if delay > .zero { try? await Task.sleep(for: delay) }
+        return enqueueOutcome
+    }
     private var pullRequestOutcomes: [Int: GHOutcome] = [:]
     private(set) var lookups: [(owner: String, name: String, number: Int, includeMergeState: Bool)] = []
     func setPullRequest(_ outcome: GHOutcome, number: Int) { pullRequestOutcomes[number] = outcome }

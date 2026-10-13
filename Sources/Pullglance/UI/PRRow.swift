@@ -104,10 +104,10 @@ struct PRRow: View {
     /// The title carries the action's status so the row needs no extra line.
     private var title: Text {
         switch actionState {
-        case .running(.merge): Text("Merging… ", bundle: .app).foregroundStyle(.secondary) + Text(verbatim: pr.title).foregroundStyle(.secondary)
+        case .running(.merge): Text(pr.usesMergeQueue ? "Adding to the queue… " : "Merging… ", bundle: .app).foregroundStyle(.secondary) + Text(verbatim: pr.title).foregroundStyle(.secondary)
         case .running(.comment): Text("Posting comment… ", bundle: .app).foregroundStyle(.secondary) + Text(verbatim: pr.title).foregroundStyle(.secondary)
         case .running: Text(verbatim: pr.title).foregroundStyle(.secondary)
-        case .succeeded(.merge): Text("Merged · ", bundle: .app).foregroundStyle(.secondary) + Text(verbatim: pr.title).foregroundStyle(.secondary)
+        case .succeeded(.merge): Text(pr.usesMergeQueue ? "Queued · " : "Merged · ", bundle: .app).foregroundStyle(.secondary) + Text(verbatim: pr.title).foregroundStyle(.secondary)
         case .succeeded: Text(verbatim: pr.title)
         case .failed(.merge, let message): Text("Merge failed: \(MergeFailure(ghMessage: message).shortDescription)", bundle: .app).foregroundStyle(.red)
         case .failed(.refresh, let message): Text("Refresh failed: \(message)", bundle: .app).foregroundStyle(.red)
@@ -264,6 +264,7 @@ struct PillView: View {
         case .changesRequested: String(localized: "Changes requested", bundle: .app)
         case .approved: String(localized: "Approved", bundle: .app)
         case .readyToMerge: String(localized: "Ready to merge", bundle: .app)
+        case .inMergeQueue(let position): String(localized: "In queue · \(position)", bundle: .app)
         case .awaitingReview: String(localized: "Awaiting review", bundle: .app)
         case .conflicts: String(localized: "Conflicts", bundle: .app)
         case .behindBase: String(localized: "Behind base", bundle: .app)
@@ -276,6 +277,7 @@ struct PillView: View {
         case .ciFailed, .changesRequested, .conflicts: .red
         case .ciRunning: .yellow
         case .approved, .readyToMerge: .green
+        case .inMergeQueue: .purple
         case .awaitingReview: .orange
         case .behindBase, .openThreads: .gray
         }
