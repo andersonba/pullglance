@@ -30,7 +30,11 @@ final class ReviewSession {
     @ObservationIgnored private let scripting: ReviewScripting
     @ObservationIgnored private let settingsStore: ReviewSettingsStore
     @ObservationIgnored private let defaults: UserDefaults
-    @ObservationIgnored private var settingsPushed = false
+    /// Bumped whenever the page needs `setSettings` again (new document, edited settings). A push records the
+    /// epoch it started in only if no reset happened while it was awaiting, so a late push can't hide a newer reset.
+    @ObservationIgnored private var settingsEpoch = 0
+    @ObservationIgnored private var pushedEpoch = -1
+    private var needsSettingsPush: Bool { pushedEpoch != settingsEpoch }
     @ObservationIgnored private var inFlight: Task<Void, Never>?
     @ObservationIgnored private var pendingSettingsPush: Task<Void, Never>?
     /// Bumped whenever the pull request under the bar may change; a GraphQL answer for an older value is dropped.
@@ -72,7 +76,7 @@ final class ReviewSession {
         if !samePR { notice = nil; fileCounts = nil; pageCounts = nil }
         pullRequest = storedPullRequest(for: newPage)
         // A full load restarts the script, which needs setSettings before anything else; it is idempotent.
-        settingsPushed = false
+        settingsEpoch += 1
         generation += 1
         guard newPage.showsBar else { inFlight?.cancel(); inFlight = nil; return }
         let gen = generation
@@ -122,7 +126,7 @@ final class ReviewSession {
     // MARK: counts
 
     private func scheduleSettingsPush() {
-        settingsPushed = false
+        settingsEpoch += 1
         pendingSettingsPush?.cancel()
         pendingSettingsPush = Task { [weak self] in
             try? await Task.sleep(for: Self.settingsPushDelay)
@@ -133,18 +137,25 @@ final class ReviewSession {
 
     private func pushSettingsAndCount() async {
         guard page.showsBar else { return }
-        if !settingsPushed {
-            _ = try? await scripting.call("setSettings", ["args": [settingsStore.settings.scriptPayload]])
-            settingsPushed = true
-        }
+        try? await ensureSettingsPushed()
         await recount()
+    }
+
+    /// The page script ignores everything until `setSettings`; every script call goes through here first.
+    /// Pushes again if a reset happened while a push was awaiting.
+    private func ensureSettingsPushed() async throws {
+        while needsSettingsPush {
+            let epoch = settingsEpoch
+            _ = try await scripting.call("setSettings", ["args": [settingsStore.settings.scriptPayload]])
+            if epoch == settingsEpoch { pushedEpoch = epoch }
+        }
     }
 
     /// The script takes `null` for "the rules as configured".
     private func ruleArgument(_ ids: [String]?) -> Any { ids.map { $0 as Any } ?? NSNull() }
 
     private func recount() async {
-        guard page.showsBar, settingsPushed else { return }
+        guard page.showsBar, !needsSettingsPush else { return }
         let ids = ruleIDs(for: presetChoice, settings: settingsStore.settings)
         guard let raw = try? await scripting.call("counts", ["args": [ruleArgument(ids)]]) as? [String: Any] else { return }
         pageCounts = PageCounts(total: raw["total"] as? Int ?? 0, viewed: raw["viewed"] as? Int ?? 0, matching: raw["matching"] as? Int ?? 0,
@@ -209,6 +220,7 @@ final class ReviewSession {
     }
 
     func scroll(_ direction: ScrollDirection) async {
+        guard (try? await ensureSettingsPushed()) != nil else { return }
         _ = try? await scripting.call("scrollToUnviewed", ["args": [direction.rawValue]])
     }
 
@@ -218,6 +230,7 @@ final class ReviewSession {
         notice = .loading
         // A context change clears the notice; a result for the old diff then stays unshown.
         do {
+            try await ensureSettingsPushed()
             let result = try await action()
             if notice == .loading { notice = result }
         } catch {

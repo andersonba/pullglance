@@ -8,8 +8,13 @@ final class FakeScripting: ReviewScripting {
     var results: [String: Result<Any?, Error>] = [:]
     private(set) var calls: [(function: String, args: [Any])] = []
     struct Boom: Error {}
+    /// Functions whose next call suspends until `release()`; each hold applies once.
+    var holds: Set<String> = []
+    private var held: [CheckedContinuation<Void, Never>] = []
+    func release() { let waiting = held; held = []; waiting.forEach { $0.resume() } }
     func call(_ function: String, _ arguments: [String: Any]) async throws -> Any? {
         calls.append((function, arguments["args"] as? [Any] ?? []))
+        if holds.remove(function) != nil { await withCheckedContinuation { held.append($0) } }
         guard let result = results[function] else { return nil }
         return try result.get()
     }
@@ -133,6 +138,36 @@ final class FakeScripting: ReviewScripting {
         try await Task.sleep(for: ReviewSession.settingsPushDelay * 3)
         await s.settle()
         #expect(scripting.calls.map(\.function) == ["setSettings", "counts", "setSettings", "counts"])
+    }
+
+    @Test func aPageChangeDuringASettingsPushPushesAgainBeforeCounting() async {
+        let (s, _, scripting, _) = await make(mine: [pr7])
+        scripting.holds = ["setSettings"]
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        while scripting.calls.isEmpty { await Task.yield() }   // first push is suspended in the page
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7"))   // new document: needs settings again
+        scripting.release()
+        await s.settle()
+        let functions = scripting.calls.map(\.function)
+        let pushes = functions.indices.filter { functions[$0] == "setSettings" }
+        #expect(pushes.count >= 2, "calls: \(functions)")
+        if pushes.count >= 2, let firstCount = functions.firstIndex(of: "counts") {
+            #expect(firstCount > pushes[1], "counts ran before the second setSettings: \(functions)")
+        }
+    }
+
+    @Test func markRightAfterAPageChangePushesSettingsFirst() async {
+        let (s, _, scripting, _) = await make(mine: [pr7])
+        scripting.results["mark"] = .success(["marked": 1, "failed": 0, "skipped": 0, "unknown": 0, "canUndo": true])
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        let before = scripting.calls.count
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7"))
+        #expect(s.pageCounts != nil)   // kept across a tab change, so Mark stays enabled
+        await s.mark()
+        let tail = Array(scripting.calls.map(\.function).dropFirst(before))
+        #expect(tail.first == "setSettings", "calls after the page change: \(tail)")
+        #expect(tail.contains("mark"))
     }
 
     @Test func hidingTheBarPersists() async {
