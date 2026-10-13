@@ -6,6 +6,7 @@ enum SettingsTab: String, Hashable, CaseIterable {
     case general
     case sections
     case filters
+    case review
     case diagnostics
 }
 
@@ -55,6 +56,9 @@ struct SettingsView: View {
             FiltersSettingsView(store: store)
                 .tabItem { Label { Text("Filters", bundle: .app) } icon: { Image(systemName: "line.3.horizontal.decrease.circle") } }
                 .tag(SettingsTab.filters)
+            ReviewSettingsView()
+                .tabItem { Label { Text("Review", bundle: .app) } icon: { Image(systemName: "checklist") } }
+                .tag(SettingsTab.review)
             DiagnosticsSettingsView(store: store)
                 .tabItem { Label { Text("Diagnostics", bundle: .app) } icon: { Image(systemName: "stethoscope") } }
                 .tag(SettingsTab.diagnostics)

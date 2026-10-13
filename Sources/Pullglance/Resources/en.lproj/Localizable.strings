@@ -224,3 +224,15 @@
 "⌘↩ to approve" = "⌘↩ to approve";
 "Approve" = "Approve";
 "Approve…" = "Approve…";
+
+/* Settings › Review */
+"Review" = "Review";
+"Files counted as tests" = "Files counted as tests";
+"Custom globs" = "Custom globs";
+"One glob per line. Lines starting with # are ignored." = "One glob per line. Lines starting with # are ignored.";
+"Mark automatically when opening a pull request" = "Mark automatically when opening a pull request";
+"Load the whole file list before marking" = "Load the whole file list before marking";
+"Verify on the server after marking" = "Verify on the server after marking";
+"Remember viewed files on compare pages" = "Remember viewed files on compare pages";
+"Clear compare memory" = "Clear compare memory";
+"Behavior" = "Behavior";
