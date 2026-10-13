@@ -251,6 +251,17 @@ final class FakeScripting: ReviewScripting {
         #expect(!s.isEditingInPage)
     }
 
+    @Test func reloadingTheSamePageClearsTheEditingFlag() async {
+        let (s, _, _, _) = await make(mine: [pr7])
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        s.scriptEvent("editing", ["active": true])
+        // ⌘R while typing: the new document starts with no focused field and never posts {active: false}.
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        #expect(!s.isEditingInPage)
+    }
+
     @Test func reviewShortcutsNeedPageFocusAndNoModal() {
         #expect(ReviewWindowController.handlesReviewShortcut(focusInWebView: true, modalPresented: false, editingInPage: false))
         #expect(!ReviewWindowController.handlesReviewShortcut(focusInWebView: false, modalPresented: false, editingInPage: false))

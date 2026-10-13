@@ -84,7 +84,10 @@ final class ReviewSession {
         page = newPage
         if let repo = newPage.repo { presetChoice = ReviewPresetChoice.load(defaults, repo: repo) }
         // Another page: the old document's focused field is gone with it (its focusout may never arrive).
-        if !samePR { notice = nil; fileCounts = nil; pageCounts = nil; countsEpoch += 1; isEditingInPage = false }
+        if !samePR { notice = nil; fileCounts = nil; pageCounts = nil; countsEpoch += 1 }
+        // Every load reinstalls the script, and a fresh document only posts `editing` on a change: a reload
+        // while typing would otherwise leave the flag stuck and the review shortcuts dead.
+        isEditingInPage = false
         // A full load restarts the script, which needs setSettings before anything else; it is idempotent.
         settingsEpoch += 1
         generation += 1
