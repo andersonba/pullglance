@@ -11,6 +11,8 @@ query($q: String!, $withMerge: Boolean!, $first: Int!) {
         isMergeQueueEnabled @include(if: $withMerge)
         mergeQueueEntry @include(if: $withMerge) { position }
         mergeQueue @include(if: $withMerge) { configuration { mergeMethod } }
+        viewerCanEnableAutoMerge @include(if: $withMerge)
+        autoMergeRequest @include(if: $withMerge) { mergeMethod }
         repository {
           nameWithOwner
           ... on Repository @include(if: $withMerge) {

@@ -40,6 +40,8 @@ struct GHClient: GHRunning {
     static let repoSearchQuery = document("repo-search")
     static let pullRequestQuery = document("pull-request")
     static let enqueueMutation = document("enqueue")
+    static let enableAutoMergeMutation = document("enable-auto-merge")
+    static let disableAutoMergeMutation = document("disable-auto-merge")
 
     private static func document(_ name: String) -> String {
         guard let url = Bundle.app.url(forResource: name, withExtension: "graphql"),
@@ -111,6 +113,14 @@ struct GHClient: GHRunning {
         ["api", "graphql", "-f", "query=\(enqueueMutation)", "-f", "id=\(pullRequestID)", "-f", "oid=\(expectedHeadOid)"]
     }
 
+    static func enableAutoMergeArguments(pullRequestID: String, method: MergeMethod, expectedHeadOid: String) -> [String] {
+        ["api", "graphql", "-f", "query=\(enableAutoMergeMutation)", "-f", "id=\(pullRequestID)", "-f", "method=\(method.apiValue)", "-f", "oid=\(expectedHeadOid)"]
+    }
+
+    static func disableAutoMergeArguments(pullRequestID: String) -> [String] {
+        ["api", "graphql", "-f", "query=\(disableAutoMergeMutation)", "-f", "id=\(pullRequestID)"]
+    }
+
     static func commentArguments(url: URL, body: String) -> [String] {
         ["pr", "comment", url.absoluteString, "--body", body]
     }
@@ -138,6 +148,14 @@ struct GHClient: GHRunning {
 
     func enqueue(pullRequestID: String, expectedHeadOid: String) async -> GHOutcome {
         await run(Self.enqueueArguments(pullRequestID: pullRequestID, expectedHeadOid: expectedHeadOid))
+    }
+
+    func enableAutoMerge(pullRequestID: String, method: MergeMethod, expectedHeadOid: String) async -> GHOutcome {
+        await run(Self.enableAutoMergeArguments(pullRequestID: pullRequestID, method: method, expectedHeadOid: expectedHeadOid))
+    }
+
+    func disableAutoMerge(pullRequestID: String) async -> GHOutcome {
+        await run(Self.disableAutoMergeArguments(pullRequestID: pullRequestID))
     }
 
     func comment(url: URL, body: String) async -> GHOutcome {

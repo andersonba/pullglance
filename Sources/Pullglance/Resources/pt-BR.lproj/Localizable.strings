@@ -186,6 +186,17 @@
 "Already in the merge queue. GitHub merges it when its turn comes." = "Já está na fila de merge. O GitHub mergeia quando chegar a vez.";
 "The merge queue merges it with the strategy set for %@." = "A fila de merge mergeia com a estratégia configurada para %@.";
 "Add to merge queue" = "Adicionar à fila de merge";
+"Merge when checks pass…" = "Mergear quando os checks passarem…";
+"Disable auto-merge" = "Desligar auto-merge";
+"Disabling auto-merge… " = "Desligando auto-merge… ";
+"Enabling auto-merge… " = "Ligando auto-merge… ";
+"Auto-merge on · " = "Auto-merge ligado · ";
+"Auto-merge" = "Auto-merge";
+"auto-merge on" = "auto-merge ligado";
+"Auto-merge on: GitHub merges it when the requirements pass" = "Auto-merge ligado: o GitHub mergeia quando as exigências passarem";
+"GitHub merges it when the required checks and reviews pass." = "O GitHub mergeia quando os checks e reviews obrigatórios passarem.";
+"Merge when checks pass" = "Mergear quando os checks passarem";
+"Auto-merge is on. GitHub merges it when the requirements pass." = "O auto-merge está ligado. O GitHub mergeia quando as exigências passarem.";
 "The merge queue creates a merge commit when its turn comes." = "A fila de merge cria um merge commit quando chegar a vez.";
 "The merge queue squashes and merges when its turn comes." = "A fila de merge faz squash e merge quando chegar a vez.";
 "The merge queue rebases and merges when its turn comes." = "A fila de merge faz rebase e merge quando chegar a vez.";

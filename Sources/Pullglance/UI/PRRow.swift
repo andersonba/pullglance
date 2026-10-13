@@ -79,7 +79,7 @@ struct PRRow: View {
                 PopoverDismissal.open(pr.url)
             }
         }
-        .contextMenu { PRRowMenu(section: section, isDormant: isDormant, actionState: actionState, onAction: onAction) }
+        .contextMenu { PRRowMenu(section: section, isDormant: isDormant, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, onAction: onAction) }
     }
 
     /// Left column: CI dot normally; spinner, merged check or failure mark while an action is in play;
@@ -101,13 +101,27 @@ struct PRRow: View {
         }
     }
 
+    /// Merge means three things, by configuration: a merge, a place in the queue, or a request for later.
+    private var mergeProgress: Text {
+        if pr.usesMergeQueue { return Text("Adding to the queue… ", bundle: .app) }
+        if pr.offersAutoMerge { return Text("Enabling auto-merge… ", bundle: .app) }
+        return Text("Merging… ", bundle: .app)
+    }
+
+    private var mergeDone: Text {
+        if pr.usesMergeQueue { return Text("Queued · ", bundle: .app) }
+        if pr.offersAutoMerge { return Text("Auto-merge on · ", bundle: .app) }
+        return Text("Merged · ", bundle: .app)
+    }
+
     /// The title carries the action's status so the row needs no extra line.
     private var title: Text {
         switch actionState {
-        case .running(.merge): Text(pr.usesMergeQueue ? "Adding to the queue… " : "Merging… ", bundle: .app).foregroundStyle(.secondary) + Text(verbatim: pr.title).foregroundStyle(.secondary)
+        case .running(.merge): mergeProgress.foregroundStyle(.secondary) + Text(verbatim: pr.title).foregroundStyle(.secondary)
+        case .running(.disableAutoMerge): Text("Disabling auto-merge… ", bundle: .app).foregroundStyle(.secondary) + Text(verbatim: pr.title).foregroundStyle(.secondary)
         case .running(.comment): Text("Posting comment… ", bundle: .app).foregroundStyle(.secondary) + Text(verbatim: pr.title).foregroundStyle(.secondary)
         case .running: Text(verbatim: pr.title).foregroundStyle(.secondary)
-        case .succeeded(.merge): Text(pr.usesMergeQueue ? "Queued · " : "Merged · ", bundle: .app).foregroundStyle(.secondary) + Text(verbatim: pr.title).foregroundStyle(.secondary)
+        case .succeeded(.merge): mergeDone.foregroundStyle(.secondary) + Text(verbatim: pr.title).foregroundStyle(.secondary)
         case .succeeded: Text(verbatim: pr.title)
         case .failed(.merge, let message): Text("Merge failed: \(MergeFailure(ghMessage: message).shortDescription)", bundle: .app).foregroundStyle(.red)
         case .failed(.refresh, let message): Text("Refresh failed: \(message)", bundle: .app).foregroundStyle(.red)
@@ -122,16 +136,20 @@ struct PRRow: View {
 struct PRRowMenu: View {
     let section: Section
     var isDormant = false
+    /// "Merge when checks pass" outside Ready to merge (see `PullRequest.offersAutoMerge`).
+    var offersMerge = false
+    var autoMergeOn = false
     var actionState: ActionState? = nil
     var onAction: (PRAction) -> Void = { _ in }
 
     private var isRunning: Bool { if case .running = actionState { return true }; return false }
 
     var body: some View {
-        ForEach(allActions(for: section, dormant: isDormant), id: \.self) { action in
+        ForEach(allActions(for: section, dormant: isDormant, offersMerge: offersMerge, autoMergeOn: autoMergeOn), id: \.self) { action in
             Button { onAction(action) } label: {
                 switch action {
-                case .merge: Label { Text("Merge…", bundle: .app) } icon: { Image(systemName: "arrow.triangle.merge") }
+                case .merge: Label { Text(offersMerge ? "Merge when checks pass…" : "Merge…", bundle: .app) } icon: { Image(systemName: "arrow.triangle.merge") }
+                case .disableAutoMerge: Label { Text("Disable auto-merge", bundle: .app) } icon: { Image(systemName: "arrow.triangle.merge") }
                 case .comment: Label { Text("Comment…", bundle: .app) } icon: { Image(systemName: "text.bubble") }
                 case .approve: Label { Text("Approve…", bundle: .app) } icon: { Image(systemName: "checkmark.circle") }
                 case .snooze: Label { Text(isDormant ? "Wake" : "Snooze", bundle: .app) } icon: { Image(systemName: isDormant ? "sun.max" : "moon.zzz") }
@@ -140,7 +158,7 @@ struct PRRowMenu: View {
                 case .refresh: Label { Text("Refresh", bundle: .app) } icon: { Image(systemName: "arrow.clockwise") }
                 }
             }
-            .disabled(isRunning && (action == .merge || action == .comment || action == .refresh))
+            .disabled(isRunning && (action == .merge || action == .comment || action == .refresh || action == .disableAutoMerge))
         }
     }
 }
@@ -265,6 +283,7 @@ struct PillView: View {
         case .approved: String(localized: "Approved", bundle: .app)
         case .readyToMerge: String(localized: "Ready to merge", bundle: .app)
         case .inMergeQueue(let position): String(localized: "In queue · \(position)", bundle: .app)
+        case .autoMerge: String(localized: "Auto-merge", bundle: .app)
         case .awaitingReview: String(localized: "Awaiting review", bundle: .app)
         case .conflicts: String(localized: "Conflicts", bundle: .app)
         case .behindBase: String(localized: "Behind base", bundle: .app)
@@ -277,7 +296,7 @@ struct PillView: View {
         case .ciFailed, .changesRequested, .conflicts: .red
         case .ciRunning: .yellow
         case .approved, .readyToMerge: .green
-        case .inMergeQueue: .purple
+        case .inMergeQueue, .autoMerge: .purple
         case .awaitingReview: .orange
         case .behindBase, .openThreads: .gray
         }

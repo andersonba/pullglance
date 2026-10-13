@@ -13,6 +13,8 @@ fragment PullRequestFields on PullRequest {
   isMergeQueueEnabled @include(if: $withMerge)
   mergeQueueEntry @include(if: $withMerge) { position }
   mergeQueue @include(if: $withMerge) { configuration { mergeMethod } }
+  viewerCanEnableAutoMerge @include(if: $withMerge)
+  autoMergeRequest @include(if: $withMerge) { mergeMethod }
   repository {
     nameWithOwner
     mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed deleteBranchOnMerge viewerDefaultMergeMethod

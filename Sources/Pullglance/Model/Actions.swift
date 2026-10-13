@@ -21,6 +21,9 @@ enum MergeMethod: String, CaseIterable, Sendable, Equatable, Codable {
         default: return nil
         }
     }
+
+    /// GraphQL `PullRequestMergeMethod`.
+    var apiValue: String { rawValue.uppercased() }
 }
 
 /// What the repository allows, and what GitHub would pick for this user.
@@ -48,6 +51,8 @@ enum PRAction: Equatable, Sendable {
     case copyLink
     /// Only offered on a row whose last action failed: clears the failure and fetches again.
     case refresh
+    /// Only on a row with auto-merge on: GitHub's "Disable auto-merge".
+    case disableAutoMerge
 }
 
 /// The two buttons revealed by a swipe, per section. Merge only where merging is the point.
@@ -56,9 +61,10 @@ func quickActions(for section: Section, dormant: Bool = false) -> [PRAction] {
     return section == .readyToMerge ? [.merge, .comment] : [.open, .comment]
 }
 
-/// The full context menu, per section.
-func allActions(for section: Section, dormant: Bool = false) -> [PRAction] {
-    let merge: [PRAction] = section == .readyToMerge ? [.merge] : []
+/// The full context menu, per section. `offersMerge` is "Merge when checks pass" outside Ready to merge;
+/// `autoMergeOn` replaces Merge with the way to call it off.
+func allActions(for section: Section, dormant: Bool = false, offersMerge: Bool = false, autoMergeOn: Bool = false) -> [PRAction] {
+    let merge: [PRAction] = autoMergeOn ? [.disableAutoMerge] : (section == .readyToMerge || offersMerge) ? [.merge] : []
     return (dormant ? [.snooze] + merge + [.comment, .open, .copyLink] : merge + [.comment, .snooze, .open, .copyLink]) + [.refresh]
 }
 
@@ -72,6 +78,7 @@ enum MergeFailure: Equatable, Sendable {
     case temporarilyUnavailable
     case alreadyMerged
     case alreadyQueued
+    case autoMergeOn
     case closed
     case notAllowed
     case other(String)
@@ -103,6 +110,7 @@ extension MergeFailure {
         case .temporarilyUnavailable: String(localized: "try again", bundle: .app)
         case .alreadyMerged: String(localized: "already merged", bundle: .app)
         case .alreadyQueued: String(localized: "already queued", bundle: .app)
+        case .autoMergeOn: String(localized: "auto-merge on", bundle: .app)
         case .closed: String(localized: "closed", bundle: .app)
         case .notAllowed: String(localized: "not allowed", bundle: .app)
         case .other(let message): message
@@ -118,6 +126,7 @@ func mergePreflight(_ pr: PullRequest) -> MergeFailure? {
     if pr.ciState == .failure { return .checksNotPassing }
     if pr.reviewDecision == .changesRequested { return .reviewRequired }
     if pr.mergeQueuePosition != nil { return .alreadyQueued }
+    if pr.autoMergeMethod != nil { return .autoMergeOn }
     return nil
 }
 

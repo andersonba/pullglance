@@ -167,6 +167,8 @@ private struct PRNode: Decodable {
     let isMergeQueueEnabled: Bool?
     let mergeQueueEntry: QueueEntry?
     let mergeQueue: Queue?
+    let viewerCanEnableAutoMerge: Bool?
+    let autoMergeRequest: AutoMerge?
     let baseRefName: String?
     let headRefName: String?
     let headRefOid: String?
@@ -204,6 +206,7 @@ private struct PRNode: Decodable {
         let avatarUrl: URL?
     }
     struct QueueEntry: Decodable { let position: Int? }
+    struct AutoMerge: Decodable { let mergeMethod: String? }
     struct Queue: Decodable {
         let configuration: Configuration?
         struct Configuration: Decodable { let mergeMethod: String? }
@@ -263,7 +266,10 @@ private struct PRNode: Decodable {
             hasMergeState: mergeable != nil,
             usesMergeQueue: isMergeQueueEnabled ?? false,
             mergeQueuePosition: mergeQueueEntry?.position,
-            queueMergeMethod: mergeQueue?.configuration?.mergeMethod.flatMap(MergeMethod.init(apiValue:))
+            queueMergeMethod: mergeQueue?.configuration?.mergeMethod.flatMap(MergeMethod.init(apiValue:)),
+            isBlocked: mergeStateStatus == "BLOCKED",
+            canEnableAutoMerge: viewerCanEnableAutoMerge ?? false,
+            autoMergeMethod: autoMergeRequest?.mergeMethod.flatMap(MergeMethod.init(apiValue:))
         )
     }
 }
@@ -337,4 +343,14 @@ func parseEnqueueResponse(_ data: Data) throws -> Int? {
         return nil
     }
     return entry.position
+}
+
+/// A mutation that only acknowledges: `data.<field>` must be there, and no `errors` next to it.
+func parseMutationAck(_ data: Data, field: String) throws {
+    guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        throw DecodingFailure.malformed("not a JSON object")
+    }
+    let errors = (object["errors"] as? [[String: Any]])?.compactMap { $0["message"] as? String } ?? []
+    let payload = (object["data"] as? [String: Any])?[field]
+    guard payload != nil, !(payload is NSNull), errors.isEmpty else { throw DecodingFailure.noData(errors: errors) }
 }

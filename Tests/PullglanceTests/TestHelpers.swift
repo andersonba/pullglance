@@ -28,7 +28,10 @@ func makePR(
     hasMergeState: Bool = true,
     usesMergeQueue: Bool = false,
     mergeQueuePosition: Int? = nil,
-    queueMergeMethod: MergeMethod? = nil
+    queueMergeMethod: MergeMethod? = nil,
+    isBlocked: Bool = false,
+    canEnableAutoMerge: Bool = false,
+    autoMergeMethod: MergeMethod? = nil
 ) -> PullRequest {
     PullRequest(
         repo: repo, number: number, title: title,
@@ -41,7 +44,8 @@ func makePR(
         baseRefName: "main", headRefName: "feature", headRefOid: headRefOid,
         mergeOptions: mergeOptions,
         nodeID: nodeID, hasMergeState: hasMergeState, usesMergeQueue: usesMergeQueue,
-        mergeQueuePosition: mergeQueuePosition, queueMergeMethod: queueMergeMethod
+        mergeQueuePosition: mergeQueuePosition, queueMergeMethod: queueMergeMethod,
+        isBlocked: isBlocked, canEnableAutoMerge: canEnableAutoMerge, autoMergeMethod: autoMergeMethod
     )
 }
 
@@ -84,6 +88,18 @@ actor FakeGH: GHRunning {
     private(set) var comments: [(url: URL, body: String)] = []
     private var approveOutcome: GHOutcome = .success(Data())
     private(set) var approvals: [(url: URL, body: String?)] = []
+    private var autoMergeOutcome: GHOutcome = .success(Data("{\"data\":{\"enablePullRequestAutoMerge\":{\"clientMutationId\":null}}}".utf8))
+    private(set) var autoMergeEnables: [(id: String, method: MergeMethod, oid: String)] = []
+    private(set) var autoMergeDisables: [String] = []
+    func setAutoMergeOutcome(_ outcome: GHOutcome) { autoMergeOutcome = outcome }
+    func enableAutoMerge(pullRequestID: String, method: MergeMethod, expectedHeadOid: String) async -> GHOutcome {
+        autoMergeEnables.append((pullRequestID, method, expectedHeadOid))
+        return autoMergeOutcome
+    }
+    func disableAutoMerge(pullRequestID: String) async -> GHOutcome {
+        autoMergeDisables.append(pullRequestID)
+        return .success(Data("{\"data\":{\"disablePullRequestAutoMerge\":{\"clientMutationId\":null}}}".utf8))
+    }
     private var enqueueOutcome: GHOutcome = .success(Data("{\"data\":{\"enqueuePullRequest\":{\"mergeQueueEntry\":null}}}".utf8))
     private(set) var enqueues: [(id: String, oid: String)] = []
     func setEnqueueOutcome(_ outcome: GHOutcome) { enqueueOutcome = outcome }

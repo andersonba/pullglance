@@ -15,6 +15,7 @@ import Testing
         #expect(pills(for: makePR(reviewDecision: .approved, ciState: .success, usesMergeQueue: true, mergeQueuePosition: 3)) == [.approved, .inMergeQueue(3)])
         // Queue enabled but not queued yet: still "ready", the modal explains the queue.
         #expect(pills(for: makePR(reviewDecision: .approved, ciState: .success, usesMergeQueue: true)) == [.approved, .readyToMerge])
+        #expect(pills(for: makePR(reviewDecision: .approved, ciState: .pending, isBlocked: true, autoMergeMethod: .squash)) == [.ciRunning, .approved, .autoMerge])
         // Queue membership does not depend on a review: repositories without required reviews queue too.
         #expect(pills(for: makePR(reviewDecision: nil, ciState: .success, usesMergeQueue: true, mergeQueuePosition: 2)) == [.awaitingReview, .inMergeQueue(2)])
     }

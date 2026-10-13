@@ -30,6 +30,41 @@ import Testing
         #expect(page.pullRequests.map(\.hasMergeState) == [true, true, true, false])
     }
 
+    @Test func decodesAutoMergeFields() throws {
+        let blocked = node(number: 1, ci: "PENDING", mergeState: "BLOCKED", prExtra: "\"viewerCanEnableAutoMerge\":true,\"autoMergeRequest\":null")
+        let scheduled = node(number: 2, ci: "PENDING", mergeState: "BLOCKED", prExtra: "\"viewerCanEnableAutoMerge\":false,\"autoMergeRequest\":{\"mergeMethod\":\"SQUASH\"}")
+        let page = try parseSearchResponse(envelope(nodes: [blocked, scheduled, node(number: 3, ci: "SUCCESS")]))
+        #expect(page.pullRequests.map(\.isBlocked) == [true, true, false])
+        #expect(page.pullRequests.map(\.canEnableAutoMerge) == [true, false, false])
+        #expect(page.pullRequests.map(\.autoMergeMethod) == [nil, .squash, nil])
+    }
+
+    /// GitHub's own rule for showing "Enable auto-merge": the viewer may, and the PR cannot merge right now.
+    @Test func autoMergeIsOfferedOnlyWhereGitHubWouldOfferIt() {
+        #expect(makePR(isBlocked: true, canEnableAutoMerge: true).offersAutoMerge == true)
+        #expect(makePR(isBlocked: false, canEnableAutoMerge: true).offersAutoMerge == false, "mergeable now: merge now")
+        #expect(makePR(isBlocked: true, canEnableAutoMerge: false).offersAutoMerge == false)
+        #expect(makePR(usesMergeQueue: true, isBlocked: true, canEnableAutoMerge: true).offersAutoMerge == false, "the queue is the way there")
+        #expect(makePR(isBlocked: true, canEnableAutoMerge: true, autoMergeMethod: .squash).offersAutoMerge == false, "already on")
+        #expect(makePR(hasMergeState: false, isBlocked: true, canEnableAutoMerge: true).offersAutoMerge == false, "unknown is not yes")
+    }
+
+    @Test func autoMergeArgumentsMatchTheGhCLI() {
+        let enable = GHClient.enableAutoMergeArguments(pullRequestID: "PR_1", method: .squash, expectedHeadOid: "abc")
+        #expect(Array(enable.prefix(3)) == ["api", "graphql", "-f"])
+        #expect(enable[3].contains("enablePullRequestAutoMerge"))
+        #expect(Array(enable.suffix(6)) == ["-f", "id=PR_1", "-f", "method=SQUASH", "-f", "oid=abc"])
+        let disable = GHClient.disableAutoMergeArguments(pullRequestID: "PR_1")
+        #expect(disable[3].contains("disablePullRequestAutoMerge"))
+        #expect(Array(disable.suffix(2)) == ["-f", "id=PR_1"])
+    }
+
+    @Test func mutationAcknowledgementsRejectErrors() throws {
+        try parseMutationAck(Data(#"{"data":{"enablePullRequestAutoMerge":{"clientMutationId":null}}}"#.utf8), field: "enablePullRequestAutoMerge")
+        let refused = Data(#"{"data":{"enablePullRequestAutoMerge":null},"errors":[{"message":"Pull request is in clean status"}]}"#.utf8)
+        #expect(throws: DecodingFailure.noData(errors: ["Pull request is in clean status"])) { try parseMutationAck(refused, field: "enablePullRequestAutoMerge") }
+    }
+
     @Test func enqueueArgumentsMatchTheGhCLI() {
         let args = GHClient.enqueueArguments(pullRequestID: "PR_1", expectedHeadOid: "abc")
         #expect(Array(args.prefix(3)) == ["api", "graphql", "-f"])
@@ -87,6 +122,12 @@ import Testing
     @Test func commentArgumentsMatchTheGhCLI() {
         let url = URL(string: "https://github.com/acme/web/pull/7")!
         #expect(GHClient.commentArguments(url: url, body: "LGTM\nthanks") == ["pr", "comment", "https://github.com/acme/web/pull/7", "--body", "LGTM\nthanks"])
+    }
+
+    @Test func mergeWhenChecksPassReachesTheMenuOutsideReadyToMerge() {
+        #expect(allActions(for: .waitingForReview, offersMerge: true) == [.merge, .comment, .snooze, .open, .copyLink, .refresh])
+        #expect(allActions(for: .waitingForReview, autoMergeOn: true) == [.disableAutoMerge, .comment, .snooze, .open, .copyLink, .refresh])
+        #expect(quickActions(for: .waitingForReview) == [.open, .comment], "swipe tiles do not change")
     }
 
     @Test func actionsPerSection() {
@@ -261,6 +302,48 @@ import Testing
         #expect(store.directList.first { $0.number == 7 }?.headRefOid == "newer")
     }
 
+    /// Blocked on requirements, auto-merge allowed: GitHub merges later, by itself. The app only asks.
+    @Test func mergeWhenChecksPassEnablesAutoMergeAndKeepsTheRow() async throws {
+        let gh = FakeGH()
+        let blocked = node(number: 104, ci: "PENDING", decision: "APPROVED", mergeState: "BLOCKED", headRefOid: "cafe", prExtra: "\"id\":\"PR_b\",\"viewerCanEnableAutoMerge\":true,\"autoMergeRequest\":null")
+        await gh.set(.success(envelope(nodes: [blocked])), for: SearchQuery.mine)
+        await gh.set(.success(try fixture("search-direct.json")), for: SearchQuery.direct)
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() }, successLinger: .milliseconds(100))
+        await store.refresh()
+        let pr = try #require(store.mine.value.first { $0.number == 104 })
+        #expect(pr.offersAutoMerge)
+        let result = await store.merge(pr, method: .rebase, deleteBranch: true)
+        guard case .success(let note?) = result else { Issue.record("expected a note, got \(result)"); return }
+        #expect(note.isEmpty == false)
+        let call = try #require(await gh.autoMergeEnables.first)
+        #expect(call.id == "PR_b")
+        #expect(call.method == .rebase)
+        #expect(call.oid == "cafe")
+        #expect(await gh.merges.isEmpty)
+        #expect(await gh.dependentQueries.isEmpty, "the branch is GitHub's to delete, later")
+        let scheduled = node(number: 104, ci: "PENDING", decision: "APPROVED", mergeState: "BLOCKED", headRefOid: "cafe", prExtra: "\"id\":\"PR_b\",\"viewerCanEnableAutoMerge\":false,\"autoMergeRequest\":{\"mergeMethod\":\"REBASE\"}")
+        await gh.setPullRequest(.success(pullRequestEnvelope(scheduled)), number: 104)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(store.actionState(for: pr) == nil)
+        #expect(store.mine.value.first { $0.number == 104 }?.autoMergeMethod == .rebase)
+    }
+
+    @Test func disablingAutoMergeCallsGitHubAndRefreshesTheRow() async throws {
+        let gh = FakeGH()
+        let scheduled = node(number: 104, ci: "PENDING", decision: "APPROVED", mergeState: "BLOCKED", prExtra: "\"id\":\"PR_b\",\"viewerCanEnableAutoMerge\":false,\"autoMergeRequest\":{\"mergeMethod\":\"SQUASH\"}")
+        await gh.set(.success(envelope(nodes: [scheduled])), for: SearchQuery.mine)
+        await gh.set(.success(try fixture("search-direct.json")), for: SearchQuery.direct)
+        let off = node(number: 104, ci: "PENDING", decision: "APPROVED", mergeState: "BLOCKED", prExtra: "\"id\":\"PR_b\",\"viewerCanEnableAutoMerge\":true,\"autoMergeRequest\":null")
+        await gh.setPullRequest(.success(pullRequestEnvelope(off)), number: 104)
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() })
+        await store.refresh()
+        let pr = try #require(store.mine.value.first { $0.number == 104 })
+        #expect(await store.disableAutoMerge(pr) == .success())
+        #expect(await gh.autoMergeDisables == ["PR_b"])
+        #expect(store.mine.value.first { $0.number == 104 }?.autoMergeMethod == nil)
+        #expect(store.actionState(for: pr) == nil)
+    }
+
     @Test func keepsTheBranchWhenOpenPullRequestsAreBasedOnIt() async throws {
         let gh = try await gh()
         await gh.setOpenPullRequests(.success(Data("[{\"number\":8},{\"number\":9}]".utf8)))
@@ -386,8 +469,9 @@ private extension Data {
         #expect(mergePreflight(makePR(reviewDecision: .changesRequested, ciState: .success)) == .reviewRequired)
         // Pending checks and a missing review are warnings for the modal, not blocks: branch protection decides.
         #expect(mergePreflight(makePR(reviewDecision: .reviewRequired, ciState: .pending)) == nil)
-        // Already in the queue: nothing left to ask for.
+        // Already in the queue, or already scheduled: nothing left to ask for.
         #expect(mergePreflight(makePR(reviewDecision: .approved, ciState: .success, usesMergeQueue: true, mergeQueuePosition: 1)) == .alreadyQueued)
+        #expect(mergePreflight(makePR(reviewDecision: .approved, ciState: .pending, isBlocked: true, autoMergeMethod: .squash)) == .autoMergeOn)
         #expect(mergePreflight(makePR(reviewDecision: .approved, ciState: .success, usesMergeQueue: true)) == nil)
     }
 }

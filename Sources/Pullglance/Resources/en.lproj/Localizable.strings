@@ -186,6 +186,17 @@
 "Already in the merge queue. GitHub merges it when its turn comes." = "Already in the merge queue. GitHub merges it when its turn comes.";
 "The merge queue merges it with the strategy set for %@." = "The merge queue merges it with the strategy set for %@.";
 "Add to merge queue" = "Add to merge queue";
+"Merge when checks pass…" = "Merge when checks pass…";
+"Disable auto-merge" = "Disable auto-merge";
+"Disabling auto-merge… " = "Disabling auto-merge… ";
+"Enabling auto-merge… " = "Enabling auto-merge… ";
+"Auto-merge on · " = "Auto-merge on · ";
+"Auto-merge" = "Auto-merge";
+"auto-merge on" = "auto-merge on";
+"Auto-merge on: GitHub merges it when the requirements pass" = "Auto-merge on: GitHub merges it when the requirements pass";
+"GitHub merges it when the required checks and reviews pass." = "GitHub merges it when the required checks and reviews pass.";
+"Merge when checks pass" = "Merge when checks pass";
+"Auto-merge is on. GitHub merges it when the requirements pass." = "Auto-merge is on. GitHub merges it when the requirements pass.";
 "The merge queue creates a merge commit when its turn comes." = "The merge queue creates a merge commit when its turn comes.";
 "The merge queue squashes and merges when its turn comes." = "The merge queue squashes and merges when its turn comes.";
 "The merge queue rebases and merges when its turn comes." = "The merge queue rebases and merges when its turn comes.";

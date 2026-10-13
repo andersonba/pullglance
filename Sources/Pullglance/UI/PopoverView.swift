@@ -268,6 +268,8 @@ struct PopoverView: View {
             show(toast: String(localized: "Link copied", bundle: .app))
         case .refresh:
             Task { _ = await store.refreshOne(pr) }
+        case .disableAutoMerge:
+            Task { _ = await store.disableAutoMerge(pr) }
         }
     }
 
@@ -367,7 +369,7 @@ struct PopoverView: View {
             isRunning: running,
             isLocked: reordering,
             onAction: { handle($0, for: pr) },
-            menu: { PRRowMenu(section: actionSection, isDormant: dormant, actionState: actionState, onAction: { handle($0, for: pr) }) }
+            menu: { PRRowMenu(section: actionSection, isDormant: dormant, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, onAction: { handle($0, for: pr) }) }
         ) {
             PRRow(
                 pr: pr,

@@ -49,6 +49,18 @@ struct PullRequest: Sendable, Equatable, Identifiable {
     let mergeQueuePosition: Int?
     /// The strategy the queue is configured with, when there is one.
     let queueMergeMethod: MergeMethod?
+    /// `mergeStateStatus == BLOCKED`: requirements (checks, reviews) still unmet, so no merge right now.
+    let isBlocked: Bool
+    /// GitHub's `viewerCanEnableAutoMerge`: the repository allows it and this user may ask for it.
+    let canEnableAutoMerge: Bool
+    /// Auto-merge is already on, with this strategy; nil otherwise.
+    let autoMergeMethod: MergeMethod?
+
+    /// Where GitHub itself shows "Enable auto-merge": the viewer may, nothing is scheduled yet, and the PR
+    /// cannot merge right now. A queue base takes the queue path instead; unknown merge state is not a yes.
+    var offersAutoMerge: Bool {
+        hasMergeState && !usesMergeQueue && canEnableAutoMerge && isBlocked && autoMergeMethod == nil
+    }
 
     var id: String { "\(repo)#\(number)" }
     var checksURL: URL { url.appendingPathComponent("checks") }

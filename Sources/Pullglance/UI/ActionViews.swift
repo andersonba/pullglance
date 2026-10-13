@@ -50,7 +50,15 @@ struct MergeConfirmView: View {
                 .disabled(running)
             }
 
-            if pr.usesMergeQueue, !pr.mergeOptions.deleteBranchOnMerge {
+            if pr.offersAutoMerge {
+                // GitHub's "Enable auto-merge": the strategy is chosen now, the merge happens when the requirements pass.
+                Label { Text("GitHub merges it when the required checks and reviews pass.", bundle: .app) } icon: { Image(systemName: "clock.arrow.circlepath") }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if (pr.usesMergeQueue || pr.offersAutoMerge), !pr.mergeOptions.deleteBranchOnMerge {
                 // The merge happens later, out of our hands; only the repository setting could delete the branch.
                 Label { Text("The branch stays after the merge.", bundle: .app) } icon: { Image(systemName: "arrow.triangle.branch") }
                     .font(.caption)
@@ -107,6 +115,7 @@ struct MergeConfirmView: View {
     private var confirmLabel: String {
         if failure != nil, isRetryable, mergePreflight(pr) == nil { return String(localized: "Retry", bundle: .app) }
         if pr.usesMergeQueue { return String(localized: "Add to merge queue", bundle: .app) }
+        if pr.offersAutoMerge { return String(localized: "Merge when checks pass", bundle: .app) }
         switch method {
         case .merge: return String(localized: "Merge", bundle: .app)
         case .squash: return String(localized: "Squash and merge", bundle: .app)
@@ -143,6 +152,7 @@ struct MergeConfirmView: View {
         case .temporarilyUnavailable: String(localized: "GitHub could not merge right now. Try again in a few seconds.", bundle: .app)
         case .alreadyMerged: String(localized: "Already merged.", bundle: .app)
         case .alreadyQueued: String(localized: "Already in the merge queue. GitHub merges it when its turn comes.", bundle: .app)
+        case .autoMergeOn: String(localized: "Auto-merge is on. GitHub merges it when the requirements pass.", bundle: .app)
         case .closed: String(localized: "This PR is closed.", bundle: .app)
         case .notAllowed: String(localized: "You do not have permission to merge here.", bundle: .app)
         case .other(let message): message

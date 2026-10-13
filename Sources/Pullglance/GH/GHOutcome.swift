@@ -19,6 +19,10 @@ protocol GHRunning: Sendable {
     /// `enqueue.graphql`: adds the pull request to its base branch's merge queue. The queue merges with the
     /// strategy it is configured with; `expectedHeadOid` plays the part of `--match-head-commit`.
     func enqueue(pullRequestID: String, expectedHeadOid: String) async -> GHOutcome
+    /// `enable-auto-merge.graphql`: GitHub merges with `method` once the requirements pass, by itself.
+    func enableAutoMerge(pullRequestID: String, method: MergeMethod, expectedHeadOid: String) async -> GHOutcome
+    /// `disable-auto-merge.graphql`.
+    func disableAutoMerge(pullRequestID: String) async -> GHOutcome
     /// `gh pr comment`.
     func comment(url: URL, body: String) async -> GHOutcome
     /// `gh pr review --approve`, with an optional comment.

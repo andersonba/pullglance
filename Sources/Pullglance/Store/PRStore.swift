@@ -551,6 +551,8 @@ final class PRStore {
     /// Failures stay on the row until dismissed. They are not logged: they belong to the row, not to the Logs tab.
     func merge(_ listed: PullRequest, method: MergeMethod, deleteBranch: Bool) async -> ActionResult {
         setActionState(.running(.merge), for: listed)
+        // Decided on what the modal showed: "merge now" never quietly becomes "merge later".
+        let whenReady = listed.offersAutoMerge
         // Listed without merge fields (a review request): whether the base has a queue is unknown, and
         // guessing "no" is how the wrong mechanism gets used. One lookup settles it.
         var pr = listed
@@ -577,6 +579,12 @@ final class PRStore {
             result = enqueueResult(await client.enqueue(pullRequestID: pr.nodeID, expectedHeadOid: pr.headRefOid))
             if case .success(let queueNote) = result { note = queueNote }
             appLog.info("enqueue \(pr.id): \(result.logDescription)")
+        } else if whenReady {
+            // GitHub merges by itself once the requirements pass; the branch, if deleted, is deleted by the
+            // repository setting then. Nothing to check or delete here.
+            result = ackResult(await client.enableAutoMerge(pullRequestID: pr.nodeID, method: method, expectedHeadOid: pr.headRefOid), field: "enablePullRequestAutoMerge")
+            if case .success = result { note = String(localized: "Auto-merge on: GitHub merges it when the requirements pass", bundle: .app) }
+            appLog.info("auto-merge on \(pr.id) \(method.ghFlag): \(result.logDescription)")
         } else {
             // Deleting a branch that other open pull requests are based on closes them (GitHub does not retarget
             // when the deletion comes right after the merge). Keep the branch in that case, or when unsure.
@@ -604,8 +612,8 @@ final class PRStore {
             recomputeBadge()
             Task { [successLinger] in
                 try? await Task.sleep(for: successLinger)
-                if pr.usesMergeQueue {
-                    // Queued is not merged: the row stays, and the lookup brings the queue entry in for the pill.
+                if pr.usesMergeQueue || whenReady {
+                    // Queued or scheduled is not merged: the row stays, and the lookup brings the state in for the pill.
                     clearActionState(for: pr)
                     _ = await refreshOne(pr, quiet: true)
                 } else {
@@ -640,6 +648,34 @@ final class PRStore {
         appLog.info("approve \(pr.id): \(result.logDescription)")
         setActionState(nil, for: pr)
         return result
+    }
+
+    /// GitHub's "Disable auto-merge". The row is read again so the pill and the menu follow.
+    func disableAutoMerge(_ pr: PullRequest) async -> ActionResult {
+        setActionState(.running(.disableAutoMerge), for: pr)
+        let result = ackResult(await client.disableAutoMerge(pullRequestID: pr.nodeID), field: "disablePullRequestAutoMerge")
+        appLog.info("auto-merge off \(pr.id): \(result.logDescription)")
+        switch result {
+        case .success:
+            clearActionState(for: pr)
+            _ = await refreshOne(pr, quiet: true)
+        case .failure(let message):
+            setActionState(.failed(.disableAutoMerge, message), for: pr)
+        }
+        return result
+    }
+
+    /// A mutation that only acknowledges, through the same envelope rules as `enqueueResult`.
+    private func ackResult(_ outcome: GHOutcome, field: String) -> ActionResult {
+        guard case .success(let data) = outcome else { return outcomeResult(outcome) }
+        do {
+            try parseMutationAck(data, field: field)
+            return .success()
+        } catch DecodingFailure.noData(let errors) where !errors.isEmpty {
+            return .failure(errors.joined(separator: "; "))
+        } catch {
+            return .failure(String(localized: "GitHub returned an unexpected answer", bundle: .app))
+        }
     }
 
     /// `gh api graphql` exits non-zero on GraphQL errors but still prints the envelope, so the note or the

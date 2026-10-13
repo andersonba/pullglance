@@ -6,6 +6,8 @@ enum Pill: Hashable, Sendable {
     case readyToMerge
     /// Added to the base branch's merge queue, at this 1-based position; replaces "ready".
     case inMergeQueue(Int)
+    /// Auto-merge is on: GitHub merges when the requirements pass.
+    case autoMerge
     case awaitingReview
     case conflicts
     case behindBase
@@ -31,6 +33,7 @@ func pills(for pr: PullRequest) -> [Pill] {
     }
     // Independent of the review: repositories without required reviews queue too.
     if let position = pr.mergeQueuePosition { result.append(.inMergeQueue(position)) }
+    if pr.autoMergeMethod != nil { result.append(.autoMerge) }
     if pr.hasConflicts { result.append(.conflicts) }
     if pr.isBehindBase { result.append(.behindBase) }
     if pr.unresolvedThreads > 0 {
