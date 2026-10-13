@@ -25,6 +25,7 @@ struct PullglanceApp: App {
             }
         } else {
             store.start()
+            ReviewWindowController.configure(store: store)
         }
         Task { await AvatarCache.shared.pruneDisk() }
     }
@@ -39,8 +40,31 @@ struct PullglanceApp: App {
         }
         .menuBarExtraStyle(.window)
 
+        .commands { ReviewCommands() }
+
         Settings {
             SettingsView(store: store)
+        }
+    }
+}
+
+/// Menu items for the review window. The window also handles these keys itself while it is key (a focused
+/// web view would swallow them otherwise); the menu makes them discoverable.
+struct ReviewCommands: Commands {
+    var body: some Commands {
+        CommandMenu(Text("Review", bundle: .app)) {
+            Button { ReviewWindowController.shared?.goBack() } label: { Text("Back", bundle: .app) }.keyboardShortcut("[")
+            Button { ReviewWindowController.shared?.goForward() } label: { Text("Forward", bundle: .app) }.keyboardShortcut("]")
+            Button { ReviewWindowController.shared?.reload() } label: { Text("Reload Page", bundle: .app) }.keyboardShortcut("r")
+            Button { ReviewWindowController.shared?.stop() } label: { Text("Stop", bundle: .app) }.keyboardShortcut(".")
+            Divider()
+            Button { ReviewWindowController.shared?.focusAddress() } label: { Text("Open Location", bundle: .app) }.keyboardShortcut("l")
+            Button { ReviewWindowController.shared?.openInBrowser() } label: { Text("Open Page in Browser", bundle: .app) }.keyboardShortcut("o", modifiers: [.command, .shift])
+            Button { ReviewWindowController.shared?.showFind() } label: { Text("Find…", bundle: .app) }.keyboardShortcut("f")
+            Divider()
+            Button { ReviewWindowController.shared?.zoomIn() } label: { Text("Zoom In", bundle: .app) }.keyboardShortcut("+")
+            Button { ReviewWindowController.shared?.zoomOut() } label: { Text("Zoom Out", bundle: .app) }.keyboardShortcut("-")
+            Button { ReviewWindowController.shared?.zoomReset() } label: { Text("Actual Size", bundle: .app) }.keyboardShortcut("0")
         }
     }
 }
