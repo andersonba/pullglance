@@ -90,11 +90,13 @@ private final class Clock: @unchecked Sendable {
         let (store, gh) = try await make(interval: .milliseconds(30))
         await gh.setPullRequest(.success(pullRequestEnvelope(node(number: 104, ci: "PENDING"))), number: 104)
         store.startCIPolling()
-        try await Task.sleep(for: .milliseconds(200))
-        let during = await gh.lookups.count
-        #expect(during >= 2)
+        let polled = await waitUntil { await gh.lookups.count >= 2 }
+        #expect(polled)
         store.stopCIPolling()
+        // A lookup already in flight when stopping still lands; after that, nothing more.
+        try await Task.sleep(for: .milliseconds(80))
+        let after = await gh.lookups.count
         try await Task.sleep(for: .milliseconds(120))
-        #expect(await gh.lookups.count == during)
+        #expect(await gh.lookups.count == after)
     }
 }

@@ -58,8 +58,8 @@ import Testing
         #expect(store.badgeCount == 6)
 
         store.hiddenOwners = ["acme"]
-        try await Task.sleep(for: .milliseconds(150))
-        #expect(await gh.callCount(for: SearchQuery.mine(hiding: ["acme"])) == 1)
+        let refreshed = await waitUntil { await gh.callCount(for: SearchQuery.mine(hiding: ["acme"])) == 1 && store.mine.total == 0 }
+        #expect(refreshed)
         #expect(store.badgeCount == 0)
         #expect(store.mine.total == 0)
         #expect(defaults.stringArray(forKey: PRStore.hiddenOwnersKey) == ["acme"])

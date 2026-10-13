@@ -26,8 +26,8 @@ import Testing
         let store = PRStore(client: gh, defaults: defaults, now: { Date() })
         await store.refresh()
         store.setRule(RepoRule(mode: .allExcept, repos: ["acme/web"]), for: "acme")
-        try await Task.sleep(for: .milliseconds(150))
-        #expect(await gh.callCount(for: SearchQuery.mine(hiding: [], repos: ["acme/web"])) == 1)
+        let refreshed = await waitUntil { await gh.callCount(for: SearchQuery.mine(hiding: [], repos: ["acme/web"])) == 1 }
+        #expect(refreshed)
         let reloaded = PRStore(client: gh, defaults: defaults, now: { Date() })
         #expect(reloaded.repoRule(for: "acme") == RepoRule(mode: .allExcept, repos: ["acme/web"]))
     }

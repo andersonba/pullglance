@@ -217,8 +217,8 @@ import Testing
         #expect(store.actionState(for: pr) == .succeeded(.merge))
         #expect(store.mine.value.contains(pr))
         #expect(store.badgeCount == 5)
-        try await Task.sleep(for: .milliseconds(300))
-        #expect(store.mine.value.contains(pr) == false)
+        let left = await waitUntil { !store.mine.value.contains(pr) }
+        #expect(left)
         #expect(store.actionState(for: pr) == nil)
     }
 
@@ -245,10 +245,9 @@ import Testing
         // Queued is not merged: the row stays, and a lookup brings the queue entry in for the pill.
         let inQueue = node(number: 102, ci: "SUCCESS", decision: "APPROVED", headRefOid: "feedface", prExtra: "\"id\":\"PR_q\",\"isMergeQueueEnabled\":true,\"mergeQueueEntry\":{\"position\":2,\"state\":\"AWAITING_CHECKS\"}")
         await gh.setPullRequest(.success(pullRequestEnvelope(inQueue)), number: 102)
-        try await Task.sleep(for: .milliseconds(400))
+        let queuedShown = await waitUntil { store.mine.value.first { $0.id == pr.id }?.mergeQueuePosition == 2 }
+        #expect(queuedShown)
         #expect(store.actionState(for: pr) == nil)
-        let kept = try #require(store.mine.value.first { $0.id == pr.id })
-        #expect(kept.mergeQueuePosition == 2)
         #expect(await gh.lookups.map(\.includeMergeState) == [true])
     }
 
@@ -323,9 +322,9 @@ import Testing
         #expect(await gh.dependentQueries.isEmpty, "the branch is GitHub's to delete, later")
         let scheduled = node(number: 104, ci: "PENDING", decision: "APPROVED", mergeState: "BLOCKED", headRefOid: "cafe", prExtra: "\"id\":\"PR_b\",\"viewerCanEnableAutoMerge\":false,\"autoMergeRequest\":{\"mergeMethod\":\"REBASE\"}")
         await gh.setPullRequest(.success(pullRequestEnvelope(scheduled)), number: 104)
-        try await Task.sleep(for: .milliseconds(300))
+        let scheduledShown = await waitUntil { store.mine.value.first { $0.number == 104 }?.autoMergeMethod == .rebase }
+        #expect(scheduledShown)
         #expect(store.actionState(for: pr) == nil)
-        #expect(store.mine.value.first { $0.number == 104 }?.autoMergeMethod == .rebase)
     }
 
     @Test func disablingAutoMergeCallsGitHubAndRefreshesTheRow() async throws {

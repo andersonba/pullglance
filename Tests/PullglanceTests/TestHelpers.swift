@@ -188,6 +188,19 @@ actor FakeGH: GHRunning {
     }
 }
 
+/// Polls `condition` until it holds or `timeout` passes; returns whether it held. For work the store starts
+/// on its own (a refresh after a setting changed, a lazy load, a timer): a fixed sleep is either too long or,
+/// under a loaded machine, too short.
+@MainActor
+func waitUntil(timeout: Duration = .seconds(3), _ condition: @MainActor () async -> Bool) async -> Bool {
+    let deadline = ContinuousClock.now + timeout
+    while ContinuousClock.now < deadline {
+        if await condition() { return true }
+        try? await Task.sleep(for: .milliseconds(5))
+    }
+    return await condition()
+}
+
 func testDefaults() -> UserDefaults {
     let suite = "PullglanceTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suite)!

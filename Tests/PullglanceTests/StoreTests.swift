@@ -164,7 +164,8 @@ import Testing
         await store.refresh()
         #expect(store.viaTeam == nil)
         store.isViaTeamExpanded = true
-        try await Task.sleep(for: .milliseconds(100))
+        let loaded = await waitUntil { store.viaTeam != nil }
+        #expect(loaded)
         #expect(store.viaTeam?.total == 154)
         #expect(store.viaTeamList.map(\.number) == [301, 302])
         await store.refresh()
@@ -177,7 +178,8 @@ import Testing
         let store = makeStore(gh)
         await store.refresh()
         store.isViaTeamExpanded = true
-        try await Task.sleep(for: .milliseconds(100))
+        let failed = await waitUntil { store.viaTeamError != nil }
+        #expect(failed)
         #expect(store.isLoadingViaTeam == false)
         #expect(store.viaTeam == nil)
         #expect(store.viaTeamError == .other("boom"))
@@ -329,8 +331,8 @@ import Testing
         try await Task.sleep(for: .milliseconds(150))
         #expect(await gh.callCount(for: SearchQuery.mine) == 0)
         store.holdsAutoRefresh = false
-        try await Task.sleep(for: .milliseconds(150))
-        #expect(await gh.callCount(for: SearchQuery.mine) > 0)
+        let resumed = await waitUntil { await gh.callCount(for: SearchQuery.mine) > 0 }
+        #expect(resumed)
     }
 
     @Test func refreshIntervalDefaultsTo120sAndPersists() async throws {
