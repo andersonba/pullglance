@@ -1,0 +1,147 @@
+import Foundation
+import Testing
+@testable import Pullglance
+
+/// Scripted page script: returns what it is told and records every call.
+@MainActor
+final class FakeScripting: ReviewScripting {
+    var results: [String: Result<Any?, Error>] = [:]
+    private(set) var calls: [(function: String, args: [Any])] = []
+    struct Boom: Error {}
+    func call(_ function: String, _ arguments: [String: Any]) async throws -> Any? {
+        calls.append((function, arguments["args"] as? [Any] ?? []))
+        guard let result = results[function] else { return nil }
+        return try result.get()
+    }
+}
+
+@MainActor
+@Suite struct ReviewSessionTests {
+    private let pr7 = makePR(repo: "acme/web", number: 7)
+
+    private func make(mine: [PullRequest] = []) async -> (ReviewSession, FakeGH, FakeScripting, PRStore) {
+        let gh = FakeGH()
+        await gh.set(.success(envelope(nodes: mine.map { node(number: $0.number, ci: "SUCCESS", decision: "APPROVED") })), for: SearchQuery.mine)
+        await gh.set(.success(envelope(nodes: [])), for: SearchQuery.direct)
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() })
+        await store.refresh()
+        let scripting = FakeScripting()
+        scripting.results["counts"] = .success(["total": 3, "viewed": 1, "matching": 2, "partial": false, "perRule": ["js-unit": 2]])
+        let session = ReviewSession(store: store, client: gh, scripting: scripting, settings: ReviewSettingsStore(defaults: testDefaults()), defaults: testDefaults())
+        return (session, gh, scripting, store)
+    }
+
+    @Test func enteringAPullRequestPicksTheStoresPRAndFetchesCounts() async {
+        let (s, gh, scripting, _) = await make(mine: [pr7])
+        await gh.setPullRequestFiles([.success(filesEnvelope(total: 3, viewed: [true, false, false], next: nil))])
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        #expect(s.page == .pullRequest(repo: "acme/web", number: 7, tab: .files))
+        #expect(s.pullRequest?.number == 7)
+        #expect(s.fileCounts == FileCounts(total: 3, viewed: 1))
+        #expect(s.pageCounts?.matching == 2)
+        #expect(scripting.calls.map(\.function) == ["setSettings", "counts"])
+        #expect(s.showsBar)
+    }
+
+    @Test func otherPagesHideTheBarAndFetchNothing() async {
+        let (s, gh, _, _) = await make()
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pulls"))
+        await s.settle()
+        #expect(s.showsBar == false)
+        #expect(await gh.fileLookups.isEmpty)
+    }
+
+    @Test func markShowsTheResultAndRefreshesCounts() async {
+        let (s, gh, scripting, _) = await make(mine: [pr7])
+        await gh.setPullRequestFiles([.success(filesEnvelope(total: 3, viewed: [true, false, false], next: nil)), .success(filesEnvelope(total: 3, viewed: [true, true, true], next: nil))])
+        scripting.results["mark"] = .success(["marked": 2, "failed": 0, "skipped": 0, "unknown": 0, "canUndo": true])
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        await s.mark()
+        #expect(s.notice == .marked(count: 2, failed: 0, canUndo: true))
+        #expect(s.busy == false)
+        #expect(s.fileCounts == FileCounts(total: 3, viewed: 3))
+        #expect(scripting.calls.last { $0.function == "mark" }?.args.first is NSNull)   // auto → null rule ids
+    }
+
+    @Test func chosenPresetIsPassedAndRemembered() async {
+        let (s, _, scripting, _) = await make(mine: [pr7])
+        scripting.results["mark"] = .success(["marked": 1, "failed": 0, "skipped": 0, "unknown": 0, "canUndo": true])
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        s.choose(.preset("python"))
+        await s.mark()
+        #expect(scripting.calls.last { $0.function == "mark" }?.args.first as? [String] == ["python"])
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7"))
+        await s.settle()
+        #expect(s.presetChoice == .preset("python"))
+    }
+
+    @Test func scriptFailureEndsBusyWithAnErrorNotice() async {
+        let (s, _, scripting, _) = await make(mine: [pr7])
+        scripting.results["mark"] = .failure(FakeScripting.Boom())
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        await s.mark()
+        #expect(s.busy == false)
+        if case .error = s.notice {} else { Issue.record("expected an error notice, got \(String(describing: s.notice))") }
+    }
+
+    @Test func contextChangeSwitchesPullRequestAndDropsUndo() async {
+        let pr8 = makePR(repo: "acme/web", number: 8)
+        let (s, gh, scripting, _) = await make(mine: [pr7, pr8])
+        // Three pages: PR 7 on entry, PR 7 again after mark (perform refreshes counts), then PR 8.
+        await gh.setPullRequestFiles([
+            .success(filesEnvelope(total: 3, viewed: [true, false, false], next: nil)),
+            .success(filesEnvelope(total: 3, viewed: [true, true, true], next: nil)),
+            .success(filesEnvelope(total: 5, viewed: [false, false, false, false, false], next: nil)),
+        ])
+        scripting.results["mark"] = .success(["marked": 2, "failed": 0, "skipped": 0, "unknown": 0, "canUndo": true])
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        await s.mark()
+        #expect(s.notice == .marked(count: 2, failed: 0, canUndo: true))
+        // Turbo navigation inside GitHub: the script reports a new context before any didFinish.
+        s.scriptEvent("context", ["kind": "pull", "basePath": "/acme/web/pull/8", "key": "k8"])
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/8/files"))
+        await s.settle()
+        #expect(s.pullRequest?.number == 8)
+        #expect(s.notice == nil)
+        #expect(s.fileCounts == FileCounts(total: 5, viewed: 0))
+    }
+
+    @Test func compareHasPageCountsButNoGraphQL() async {
+        let (s, gh, _, _) = await make()
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/compare/main...feat%2Fx"))
+        await s.settle()
+        #expect(s.page.compareTitle == "main…feat/x")
+        #expect(s.fileCounts == nil)
+        #expect(s.pageCounts?.total == 3)
+        #expect(await gh.fileLookups.isEmpty)
+    }
+
+    @Test func settingsEditsAreCoalescedIntoOnePush() async throws {
+        let gh = FakeGH()
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() })
+        let scripting = FakeScripting()
+        let settings = ReviewSettingsStore(defaults: testDefaults())
+        let s = ReviewSession(store: store, client: gh, scripting: scripting, settings: settings, defaults: testDefaults())
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/compare/main...feat"))
+        await s.settle()
+        for text in ["*", "*.", "*.md"] { settings.settings.customGlobsText = text }   // one per keystroke
+        try await Task.sleep(for: ReviewSession.settingsPushDelay * 3)
+        await s.settle()
+        #expect(scripting.calls.map(\.function) == ["setSettings", "counts", "setSettings", "counts"])
+    }
+
+    @Test func hidingTheBarPersists() async {
+        let defaults = testDefaults()
+        let gh = FakeGH()
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() })
+        let s = ReviewSession(store: store, client: gh, scripting: FakeScripting(), settings: ReviewSettingsStore(defaults: testDefaults()), defaults: defaults)
+        s.isBarHidden = true
+        let again = ReviewSession(store: store, client: gh, scripting: FakeScripting(), settings: ReviewSettingsStore(defaults: testDefaults()), defaults: defaults)
+        #expect(again.isBarHidden)
+    }
+}

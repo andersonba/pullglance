@@ -1,0 +1,231 @@
+import Foundation
+import Observation
+
+enum ScrollDirection: String { case next, previous }
+
+/// What the review bar shows and does for the page in the window. Page data comes from the URL and the
+/// script; pull request data from the store; viewed/total from GraphQL; actions from the script and the store.
+@Observable
+@MainActor
+final class ReviewSession {
+    enum Notice: Equatable {
+        case loading
+        case marked(count: Int, failed: Int, canUndo: Bool)
+        case undone(count: Int)
+        case error(String)
+    }
+    struct PageCounts: Equatable {
+        var total: Int
+        var viewed: Int
+        var matching: Int
+        var partial: Bool
+        var perRule: [String: Int]
+    }
+
+    /// Settings edits arrive per keystroke; one push after this pause.
+    static let settingsPushDelay: Duration = .milliseconds(300)
+
+    let store: PRStore
+    @ObservationIgnored private let client: GHRunning
+    @ObservationIgnored private let scripting: ReviewScripting
+    @ObservationIgnored private let settingsStore: ReviewSettingsStore
+    @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private var settingsPushed = false
+    @ObservationIgnored private var inFlight: Task<Void, Never>?
+    @ObservationIgnored private var pendingSettingsPush: Task<Void, Never>?
+    /// Bumped whenever the pull request under the bar may change; a GraphQL answer for an older value is dropped.
+    @ObservationIgnored private var generation = 0
+
+    private(set) var page: ReviewPage = .other
+    private(set) var pullRequest: PullRequest?
+    private(set) var fileCounts: FileCounts?
+    private(set) var pageCounts: PageCounts?
+    private(set) var busy = false
+    private(set) var notice: Notice?
+    private(set) var presetChoice: ReviewPresetChoice = .auto
+    var isBarHidden: Bool { didSet { defaults.set(isBarHidden, forKey: "reviewBarHidden") } }
+
+    var showsBar: Bool { page.showsBar && !isBarHidden }
+    /// Files matching the current choice, from the page; what the Mark button shows.
+    var matchCount: Int { pageCounts?.matching ?? 0 }
+
+    init(store: PRStore, client: GHRunning, scripting: ReviewScripting, settings: ReviewSettingsStore, defaults: UserDefaults) {
+        self.store = store
+        self.client = client
+        self.scripting = scripting
+        self.settingsStore = settings
+        self.defaults = defaults
+        isBarHidden = defaults.bool(forKey: "reviewBarHidden")
+        settings.onChange = { [weak self] _ in self?.scheduleSettingsPush() }
+    }
+
+    // MARK: page
+
+    func pageChanged(to url: URL?) {
+        let newPage = ReviewPage.classify(url)
+        let samePR: Bool = {
+            if case .pullRequest(let r1, let n1, _) = newPage, case .pullRequest(let r2, let n2, _) = page { return r1 == r2 && n1 == n2 }
+            return newPage == page
+        }()
+        page = newPage
+        if let repo = newPage.repo { presetChoice = ReviewPresetChoice.load(defaults, repo: repo) }
+        if !samePR { notice = nil; fileCounts = nil; pageCounts = nil }
+        pullRequest = storedPullRequest(for: newPage)
+        // A full load restarts the script, which needs setSettings before anything else; it is idempotent.
+        settingsPushed = false
+        generation += 1
+        guard newPage.showsBar else { inFlight?.cancel(); inFlight = nil; return }
+        let gen = generation
+        let previous = inFlight
+        inFlight = Task { [weak self] in
+            await previous?.value
+            guard let self, gen == self.generation else { return }
+            await self.pushSettingsAndCount()
+            if case .pullRequest = newPage, !samePR || self.fileCounts == nil { await self.refreshFileCounts(generation: gen) }
+        }
+    }
+
+    func scriptEvent(_ name: String, _ payload: Any?) {
+        switch name {
+        case "context":
+            // The page moved under us (Turbo). A new diff means undo no longer applies.
+            if let dict = payload as? [String: Any], let base = dict["basePath"] as? String, base != currentBasePath { notice = nil }
+        case "listing":
+            track { await $0.recount() }
+        default: break
+        }
+    }
+
+    private var currentBasePath: String? {
+        switch page {
+        case .pullRequest(let repo, let number, _): "/\(repo)/pull/\(number)"
+        case .compare(let repo, let range): "/\(repo)/compare/\(range)"
+        case .other: nil
+        }
+    }
+
+    private func storedPullRequest(for page: ReviewPage) -> PullRequest? {
+        guard case .pullRequest(let repo, let number, _) = page else { return nil }
+        return (store.mine.value + store.direct.value + (store.viaTeam?.value ?? [])).first { $0.repo == repo && $0.number == number }
+    }
+
+    /// Runs `work` after whatever is in flight, and makes it what `settle()` waits for.
+    private func track(_ work: @escaping @MainActor (ReviewSession) async -> Void) {
+        let previous = inFlight
+        inFlight = Task { [weak self] in
+            await previous?.value
+            guard let self else { return }
+            await work(self)
+        }
+    }
+
+    // MARK: counts
+
+    private func scheduleSettingsPush() {
+        settingsPushed = false
+        pendingSettingsPush?.cancel()
+        pendingSettingsPush = Task { [weak self] in
+            try? await Task.sleep(for: Self.settingsPushDelay)
+            guard !Task.isCancelled, let self else { return }
+            self.track { await $0.pushSettingsAndCount() }
+        }
+    }
+
+    private func pushSettingsAndCount() async {
+        guard page.showsBar else { return }
+        if !settingsPushed {
+            _ = try? await scripting.call("setSettings", ["args": [settingsStore.settings.scriptPayload]])
+            settingsPushed = true
+        }
+        await recount()
+    }
+
+    /// The script takes `null` for "the rules as configured".
+    private func ruleArgument(_ ids: [String]?) -> Any { ids.map { $0 as Any } ?? NSNull() }
+
+    private func recount() async {
+        guard page.showsBar, settingsPushed else { return }
+        let ids = ruleIDs(for: presetChoice, settings: settingsStore.settings)
+        guard let raw = try? await scripting.call("counts", ["args": [ruleArgument(ids)]]) as? [String: Any] else { return }
+        pageCounts = PageCounts(total: raw["total"] as? Int ?? 0, viewed: raw["viewed"] as? Int ?? 0, matching: raw["matching"] as? Int ?? 0,
+                                partial: raw["partial"] as? Bool ?? false, perRule: raw["perRule"] as? [String: Int] ?? [:])
+    }
+
+    private func refreshFileCounts(generation gen: Int) async {
+        guard case .pullRequest(let repo, let number, _) = page, let ref = PullRequestRef(repo: repo, number: number) else { return }
+        let counts = await fetchFileCounts(client, ref: ref)
+        guard gen == generation else { return }
+        fileCounts = counts
+    }
+
+    func refresh() async {
+        let gen = generation
+        await pushSettingsAndCount()
+        if case .pullRequest = page {
+            await refreshFileCounts(generation: gen)
+            if let pullRequest, gen == generation {
+                _ = await store.refreshOne(pullRequest, quiet: true)
+                if gen == generation { self.pullRequest = storedPullRequest(for: page) }
+            }
+        }
+    }
+
+    /// Test hook: wait for the work `pageChanged` (and anything chained after it) started.
+    func settle() async {
+        while let task = inFlight {
+            await task.value
+            if inFlight == task { break }
+        }
+    }
+
+    // MARK: actions
+
+    func choose(_ choice: ReviewPresetChoice) {
+        presetChoice = choice
+        if let repo = page.repo { choice.save(defaults, repo: repo) }
+        track { await $0.recount() }
+    }
+
+    func mark() async {
+        await perform { [self] in
+            let ids = ruleIDs(for: presetChoice, settings: settingsStore.settings)
+            let raw = try await scripting.call("mark", ["args": [ruleArgument(ids)]]) as? [String: Any] ?? [:]
+            return .marked(count: raw["marked"] as? Int ?? 0, failed: raw["failed"] as? Int ?? 0, canUndo: raw["canUndo"] as? Bool ?? false)
+        }
+    }
+
+    func undo() async {
+        await perform { [self] in
+            let raw = try await scripting.call("undo", ["args": []]) as? [String: Any] ?? [:]
+            return .undone(count: raw["marked"] as? Int ?? 0)
+        }
+    }
+
+    func unmarkAll() async {
+        await perform { [self] in
+            let raw = try await scripting.call("unmarkAll", ["args": []]) as? [String: Any] ?? [:]
+            return .undone(count: raw["marked"] as? Int ?? 0)
+        }
+    }
+
+    func scroll(_ direction: ScrollDirection) async {
+        _ = try? await scripting.call("scrollToUnviewed", ["args": [direction.rawValue]])
+    }
+
+    private func perform(_ action: @MainActor () async throws -> Notice) async {
+        guard !busy else { return }
+        busy = true
+        notice = .loading
+        // A context change clears the notice; a result for the old diff then stays unshown.
+        do {
+            let result = try await action()
+            if notice == .loading { notice = result }
+        } catch {
+            if notice == .loading { notice = .error(String(localized: "The page did not respond. Reload and try again.", bundle: .app)) }
+            AppLog.shared.info("review action failed: \(type(of: error))")
+        }
+        busy = false
+        await recount()
+        await refreshFileCounts(generation: generation)
+    }
+}

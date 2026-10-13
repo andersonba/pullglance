@@ -236,3 +236,5 @@
 "Remember viewed files on compare pages" = "Remember viewed files on compare pages";
 "Clear compare memory" = "Clear compare memory";
 "Behavior" = "Behavior";
+
+"The page did not respond. Reload and try again." = "The page did not respond. Reload and try again.";
