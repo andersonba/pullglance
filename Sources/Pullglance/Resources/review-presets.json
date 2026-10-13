@@ -1,0 +1,140 @@
+[
+ {
+  "id": "js-unit",
+  "group": "JavaScript / TypeScript",
+  "label": "Unit tests",
+  "description": "Jest, Vitest, Mocha: *.test.*, *.spec.*, __tests__/",
+  "globs": [
+   "**/*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs}",
+   "**/__tests__/**"
+  ],
+  "enabled": true
+ },
+ {
+  "id": "js-stories",
+  "group": "JavaScript / TypeScript",
+  "label": "Storybook",
+  "description": "*.stories.*",
+  "globs": [
+   "**/*.stories.{js,jsx,ts,tsx}"
+  ],
+  "enabled": false
+ },
+ {
+  "id": "snapshots-fixtures",
+  "group": "General",
+  "label": "Snapshots, fixtures and mocks",
+  "description": "__snapshots__/, *.snap, __fixtures__/, fixtures/, __mocks__/",
+  "globs": [
+   "**/__snapshots__/**",
+   "**/*.snap",
+   "**/__fixtures__/**",
+   "**/fixtures/**",
+   "**/__mocks__/**"
+  ],
+  "enabled": true
+ },
+ {
+  "id": "e2e",
+  "group": "General",
+  "label": "End-to-end",
+  "description": "Cypress, Playwright, *.e2e.*, *.cy.*",
+  "globs": [
+   "**/*.{e2e,cy}.{js,ts,tsx}",
+   "**/cypress/**",
+   "**/e2e/**",
+   "**/playwright/**"
+  ],
+  "enabled": true
+ },
+ {
+  "id": "generic-dirs",
+  "group": "General",
+  "label": "Test folders",
+  "description": "test/, tests/, spec/, testing/",
+  "globs": [
+   "**/test/**",
+   "**/tests/**",
+   "**/spec/**",
+   "**/testing/**"
+  ],
+  "enabled": true
+ },
+ {
+  "id": "go",
+  "group": "Go",
+  "label": "Go",
+  "description": "*_test.go, testdata/",
+  "globs": [
+   "**/*_test.go",
+   "**/testdata/**"
+  ],
+  "enabled": true
+ },
+ {
+  "id": "python",
+  "group": "Python",
+  "label": "pytest / unittest",
+  "description": "test_*.py, *_test.py, conftest.py",
+  "globs": [
+   "**/test_*.py",
+   "**/*_test.py",
+   "**/conftest.py"
+  ],
+  "enabled": true
+ },
+ {
+  "id": "ruby",
+  "group": "Ruby",
+  "label": "RSpec / Minitest",
+  "description": "*_spec.rb, *_test.rb",
+  "globs": [
+   "**/*_spec.rb",
+   "**/*_test.rb"
+  ],
+  "enabled": true
+ },
+ {
+  "id": "jvm",
+  "group": "Java / Kotlin",
+  "label": "JUnit",
+  "description": "src/test/, *Test.java, *Tests.kt",
+  "globs": [
+   "**/src/test/**",
+   "**/*Test.{java,kt}",
+   "**/*Tests.{java,kt}"
+  ],
+  "enabled": true
+ },
+ {
+  "id": "dotnet",
+  "group": ".NET",
+  "label": "xUnit / NUnit",
+  "description": "*.Tests/, *Tests.cs",
+  "globs": [
+   "**/*.Tests/**",
+   "**/*Tests.cs"
+  ],
+  "enabled": true
+ },
+ {
+  "id": "php",
+  "group": "PHP",
+  "label": "PHPUnit",
+  "description": "*Test.php",
+  "globs": [
+   "**/*Test.php"
+  ],
+  "enabled": true
+ },
+ {
+  "id": "elixir",
+  "group": "Elixir",
+  "label": "ExUnit",
+  "description": "*_test.exs",
+  "globs": [
+   "**/*_test.exs"
+  ],
+  "enabled": true
+ }
+]

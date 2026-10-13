@@ -1,0 +1,18 @@
+{
+  "name": "pullglance-review-script",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": { "picomatch": "^4.0.7" },
+  "devDependencies": {
+    "@types/picomatch": "^4.0.3",
+    "esbuild": "^0.28.0",
+    "happy-dom": "^20.14.6",
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.3"
+  }
+}
