@@ -18,6 +18,11 @@ struct PRRow: View {
     var handlesTap = true
     /// Reorder mode: a grip on the trailing edge, the content sliding over to make room.
     var showsGrip = false
+    /// A click on the avatar narrows the lists to this author (see `PRStore.toggleQuickAuthor`); nil keeps
+    /// the avatar inert (reorder mode).
+    var onAuthorTap: (() -> Void)? = nil
+    /// Whether the lists are already narrowed to this author, for the hint and the ring.
+    var isAuthorFiltered = false
 
     private var isRunning: Bool { if case .running = actionState { return true }; return false }
 
@@ -56,7 +61,11 @@ struct PRRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if showAuthor {
-                AuthorAvatar(login: pr.author, url: pr.authorAvatarURL)
+                if let onAuthorTap {
+                    AuthorFilterButton(login: pr.author, url: pr.authorAvatarURL, isActive: isAuthorFiltered, action: onAuthorTap)
+                } else {
+                    AuthorAvatar(login: pr.author, url: pr.authorAvatarURL)
+                }
             }
             if showsGrip {
                 Image(systemName: "line.3.horizontal")
@@ -237,6 +246,34 @@ struct CIDot: View {
 
 /// The author's GitHub picture from `AvatarCache`; a neutral initial until it arrives or when there is none
 /// (deleted account, offline). Reading the cache in `body` keeps a redrawn row from flashing the initial.
+/// The avatar as a button: a ring under the pointer, a filled ring while the lists are narrowed to this person.
+struct AuthorFilterButton: View {
+    let login: String
+    let url: URL?
+    let isActive: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            AuthorAvatar(login: login, url: url)
+                .overlay(alignment: .top) {
+                    Circle()
+                        .strokeBorder(Color.accentColor, lineWidth: 1.5)
+                        .frame(width: 20, height: 20)
+                        .offset(y: 1)
+                        .opacity(isActive || hovering ? 1 : 0)
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(.easeInOut(duration: 0.12), value: hovering)
+        .help(isActive ? Text("Show all authors", bundle: .app) : Text("Show only \(login)", bundle: .app))
+        .accessibilityLabel(isActive ? Text("Show all authors", bundle: .app) : Text("Show only \(login)", bundle: .app))
+    }
+}
+
 struct AuthorAvatar: View {
     let login: String
     let url: URL?

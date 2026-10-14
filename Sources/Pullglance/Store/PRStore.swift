@@ -218,6 +218,12 @@ final class PRStore {
     var quickAuthorFilter: Set<String> = []
     var hasQuickFilter: Bool { !quickRepoFilter.isEmpty || !quickAuthorFilter.isEmpty }
 
+    /// A click on a row's avatar: that person only, or back to everyone when it already was only them.
+    /// Several people at once are the filter panel's business.
+    func toggleQuickAuthor(_ login: String) {
+        quickAuthorFilter = quickAuthorFilter == [login] ? [] : [login]
+    }
+
     /// Sections shown in the popover. Missing from defaults means all.
     /// Persisted as the hidden set, so a section added in a later version shows up for existing users.
     var visibleSections: Set<Section> {

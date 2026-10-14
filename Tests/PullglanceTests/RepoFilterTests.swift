@@ -74,5 +74,19 @@ import Testing
         store.quickAuthorFilter = []
         #expect(store.reviewTabCount == 3)
     }
+
+    /// A click on a row's avatar: that person only; again on the same person: everyone. Another person replaces.
+    @Test func avatarClickTogglesASingleAuthor() async throws {
+        let store = PRStore(client: try await gh(), defaults: testDefaults(), now: { Date() })
+        store.toggleQuickAuthor("alice")
+        #expect(store.quickAuthorFilter == ["alice"])
+        store.toggleQuickAuthor("bob")
+        #expect(store.quickAuthorFilter == ["bob"])
+        store.quickAuthorFilter = ["alice", "bob"]
+        store.toggleQuickAuthor("bob")
+        #expect(store.quickAuthorFilter == ["bob"], "from a set, the click narrows to that person")
+        store.toggleQuickAuthor("bob")
+        #expect(store.quickAuthorFilter.isEmpty)
+    }
 }
 
