@@ -3,6 +3,8 @@ import SwiftUI
 
 struct FooterView: View {
     @Bindable var store: PRStore
+    /// Opens the shortcuts card over the popover (the card is the popover's; the menu only asks for it).
+    var showShortcuts: () -> Void = {}
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
@@ -105,6 +107,10 @@ struct FooterView: View {
             Text("Open review requests on GitHub", bundle: .app)
         }
         Divider()
+        Button(action: showShortcuts) {
+            Text("Keyboard Shortcuts…", bundle: .app)
+        }
+        .keyboardShortcut("/", modifiers: .command)
         Button { open(tab: .general) } label: {
             Text("Settings…", bundle: .app)
         }

@@ -297,7 +297,10 @@ struct ToastView: View {
             .font(.caption)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(.regularMaterial, in: Capsule())
+            // A solid capsule, not a material: a material appearing inside the popover makes the panel's own
+            // glass re-sample, and the whole background visibly changes for the toast's lifetime.
+            .background(Color(nsColor: .controlBackgroundColor), in: Capsule())
+            .overlay(Capsule().strokeBorder(.primary.opacity(0.1)))
             .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
     }
 }

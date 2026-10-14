@@ -29,6 +29,8 @@ struct PopoverView: View {
     @State private var rowFrames: [PullRequest.ID: CGRect] = [:]
     /// Keyboard triage: the focused row, if any. See `TriageFocus`.
     @State private var focus = TriageFocus()
+    /// The shortcuts card (⌘/ or the ⋯ menu).
+    @State private var showingShortcuts = false
     private static let listSpace = "list"
     static let holdToReorder: Double = 0.5
 
@@ -72,10 +74,17 @@ struct PopoverView: View {
 
             ZStack(alignment: .top) {
                 content
-                    .opacity(store.isApplyingSettingsChange || merging != nil || commenting != nil ? 0.45 : 1)
-                    .allowsHitTesting(!store.isApplyingSettingsChange && merging == nil && commenting == nil)
+                    .opacity(store.isApplyingSettingsChange || merging != nil || commenting != nil || showingShortcuts ? 0.45 : 1)
+                    .allowsHitTesting(!store.isApplyingSettingsChange && merging == nil && commenting == nil && !showingShortcuts)
                 if store.isApplyingSettingsChange {
                     ProgressView().progressViewStyle(.linear).controlSize(.mini).padding(.horizontal, 12)
+                }
+                if showingShortcuts {
+                    // A click anywhere outside the card closes it.
+                    Color.clear.contentShape(Rectangle()).onTapGesture { showingShortcuts = false }
+                    ShortcutsCard { showingShortcuts = false }
+                        .padding(.top, 24)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
                 }
                 if let pr = merging {
                     MergeConfirmView(pr: pr, store: store, previousFailure: previousFailure(of: pr)) { options in
@@ -108,6 +117,7 @@ struct PopoverView: View {
             .animation(.easeInOut(duration: 0.2), value: store.isApplyingSettingsChange)
             .animation(.easeInOut(duration: 0.18), value: merging?.id)
             .animation(.easeInOut(duration: 0.18), value: commenting?.id)
+            .animation(.easeInOut(duration: 0.18), value: showingShortcuts)
             .animation(.easeInOut(duration: 0.2), value: toast)
 
             if reordering {
@@ -115,7 +125,7 @@ struct PopoverView: View {
             } else {
                 // The regular footer always sets the height; the triage keys draw over it while a row is focused.
                 ZStack {
-                    FooterView(store: store).opacity(focusedPR == nil ? 1 : 0)
+                    FooterView(store: store, showShortcuts: { showingShortcuts = true }).opacity(focusedPR == nil ? 1 : 0)
                     if let focusedPR {
                         TriageFooter(isPinned: store.isPinned(focusedPR), isDormant: store.isDormant(focusedPR))
                     }
@@ -123,7 +133,6 @@ struct PopoverView: View {
             }
         }
         .frame(width: 380)
-        .background(KeyDownMonitor { event in handleKey(event) })
         .animation(.easeInOut(duration: 0.15), value: focus.id != nil)
         .onAppear {
             SettingsOpener.bringSettingsForwardIfOpen()
@@ -135,6 +144,7 @@ struct PopoverView: View {
             reviewFilter = nil
             openRow = nil
             focus.clear()
+            showingShortcuts = false
             setReordering(false)
         }
         .onChange(of: tab) { _, _ in
@@ -178,7 +188,9 @@ struct PopoverView: View {
             .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top <= 0.5 } action: { _, top in listAtTop = top }
             // The pull is measured from the trackpad itself (no rubber band when the list fits); the list
             // slides down with it and the ring sits in the gap it opens.
-            .background(ScrollWheelMonitor { event in handlePull(event) })
+            // The pull is measured from the trackpad itself (no rubber band when the list fits); the same AppKit
+            // view takes the triage keys. It stays here, inside the list: at the popover's root it costs the glass.
+            .background(ScrollWheelMonitor(handler: { event in handlePull(event) }, keyHandler: { event in handleKey(event) }))
             .overlay(alignment: .top) {
                 PullRing(state: pull, refreshing: store.phase == .loading && pull.stretch > 0)
                     .frame(height: max(pull.stretch, 1))
@@ -210,9 +222,13 @@ struct PopoverView: View {
     /// Plain keys while the popover is up and nothing else wants them: no field being edited, no modal,
     /// no reorder mode. ↓ starts; from then on the letters act on the focused row and Esc ends it.
     private func handleKey(_ event: NSEvent) -> Bool {
-        guard !reordering, merging == nil, commenting == nil, store.hasAnyData, store.blockingError == nil else { return false }
+        guard !reordering, merging == nil, commenting == nil else { return false }
         if event.window?.firstResponder is NSTextView { return false }
         guard let key = TriageKey(characters: event.charactersIgnoringModifiers, keyCode: event.keyCode, modifiers: event.modifierFlags.intersection(.deviceIndependentFlagsMask)) else { return false }
+        // The card answers to its own two keys and swallows the rest while it is up.
+        if key == .shortcuts { showingShortcuts.toggle(); return true }
+        if showingShortcuts { if key == .escape { showingShortcuts = false }; return true }
+        guard store.hasAnyData, store.blockingError == nil else { return false }
         let rows = triageRows
         let ids = rows.map(\.pr.id)
         switch key {
@@ -238,7 +254,9 @@ struct PopoverView: View {
             guard focus.id != nil else { return false }
             focus.clear()
             return true
-        case .pin, .snooze, .open, .review:
+        case .shortcuts:
+            return true   // handled above
+        case .pin, .snooze, .open, .review, .refresh, .comment, .merge, .copyLink:
             guard let id = focus.id, let row = rows.first(where: { $0.pr.id == id }) else { return false }
             switch key {
             case .pin, .snooze:
@@ -249,6 +267,17 @@ struct PopoverView: View {
             case .open:
                 focus.clear()
                 handle(.open, for: row.pr)
+            case .refresh:
+                handle(.refresh, for: row.pr)
+            case .comment:
+                handle(.comment, for: row.pr)
+            case .merge:
+                // Only where the row's menu offers it; elsewhere the key does nothing, as the menu would.
+                let origin = row.section.isFixed ? store.originSection(of: row.pr) : row.section
+                let offered = allActions(for: origin, dormant: store.isDormant(row.pr), offersMerge: row.pr.offersAutoMerge, autoMergeOn: row.pr.autoMergeMethod != nil)
+                if offered.contains(.merge) { handle(.merge, for: row.pr) }
+            case .copyLink:
+                handle(.copyLink, for: row.pr)
             default:
                 focus.clear()
                 openReview(row.pr, section: row.section)

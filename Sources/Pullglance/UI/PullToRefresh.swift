@@ -114,21 +114,28 @@ struct PullRing: View {
     }
 }
 
-/// Trackpad scroll events of the view's own window, phase by phase. The handler returns true to swallow
-/// the event (the pull took it) or false to let the list scroll.
+/// Trackpad scroll events (and key presses) of the view's own window. Each handler returns true to swallow
+/// the event (the pull took it, the triage took it) or false to let it through. One AppKit view for both,
+/// kept inside the list's background: an AppKit view at the popover's root costs the panel its glass.
 struct ScrollWheelMonitor: NSViewRepresentable {
     let handler: @MainActor (NSEvent) -> Bool
+    var keyHandler: (@MainActor (NSEvent) -> Bool)? = nil
 
     func makeNSView(context: Context) -> NSView {
         let view = MonitorView()
         view.handler = handler
+        view.keyHandler = keyHandler
         return view
     }
 
-    func updateNSView(_ view: NSView, context: Context) { (view as? MonitorView)?.handler = handler }
+    func updateNSView(_ view: NSView, context: Context) {
+        (view as? MonitorView)?.handler = handler
+        (view as? MonitorView)?.keyHandler = keyHandler
+    }
 
     final class MonitorView: NSView {
         var handler: (@MainActor (NSEvent) -> Bool)?
+        var keyHandler: (@MainActor (NSEvent) -> Bool)?
         private var monitor: Any?
 
         /// Installed while the view is in a window; removed when it leaves (the popover closes), which is
@@ -137,8 +144,10 @@ struct ScrollWheelMonitor: NSViewRepresentable {
             super.viewDidMoveToWindow()
             if let monitor { NSEvent.removeMonitor(monitor); self.monitor = nil }
             guard window != nil else { return }
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-                guard let self, event.window === self.window, let handler = self.handler else { return event }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .keyDown]) { [weak self] event in
+                guard let self, event.window === self.window else { return event }
+                let handler = event.type == .keyDown ? self.keyHandler : self.handler
+                guard let handler else { return event }
                 return MainActor.assumeIsolated { handler(event) } ? nil : event
             }
         }

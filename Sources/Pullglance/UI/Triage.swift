@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// Keyboard triage in the popover. ↓ starts it: a focus walks the rows on screen, in display order, and
-/// single letters act on the focused row. Pure state; `KeyDownMonitor` feeds it, `PopoverView` applies it.
+/// single letters act on the focused row. Pure state; the list's `ScrollWheelMonitor` feeds it the keys, `PopoverView` applies it.
 struct TriageFocus: Equatable {
     private(set) var id: PullRequest.ID?
 
@@ -29,12 +29,22 @@ struct TriageFocus: Equatable {
     }
 }
 
-/// The keys triage answers to. Plain keys only: anything with ⌘, ⌥ or ⌃ belongs to the menus.
+/// The keys triage answers to: plain keys, plus ⌘C (copy link) and ⌘/ (the shortcuts card), the two whose
+/// plain letters are taken. Anything else with ⌘, ⌥ or ⌃ belongs to the menus.
 enum TriageKey: Equatable {
-    case up, down, left, right, pin, snooze, open, review, escape
+    case up, down, left, right, pin, snooze, open, review, refresh, comment, merge, copyLink, shortcuts, escape
 
     init?(characters: String?, keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
-        if !modifiers.intersection([.command, .option, .control]).isEmpty { return nil }
+        let held = modifiers.intersection([.command, .option, .control])
+        if held == [.command] {
+            switch characters?.lowercased() {
+            case "c": self = .copyLink
+            case "/": self = .shortcuts
+            default: return nil
+            }
+            return
+        }
+        if !held.isEmpty { return nil }
         switch keyCode {
         case 125: self = .down; return
         case 126: self = .up; return
@@ -48,36 +58,11 @@ enum TriageKey: Equatable {
         case "p": self = .pin
         case "s": self = .snooze
         case "o": self = .open
+        case "r": self = .refresh
+        case "c": self = .comment
+        case "m": self = .merge
         case "\r": self = .review
         default: return nil
-        }
-    }
-}
-
-/// Key presses of the view's own window. The handler returns true to swallow the event.
-struct KeyDownMonitor: NSViewRepresentable {
-    let handler: @MainActor (NSEvent) -> Bool
-
-    func makeNSView(context: Context) -> NSView {
-        let view = MonitorView()
-        view.handler = handler
-        return view
-    }
-
-    func updateNSView(_ view: NSView, context: Context) { (view as? MonitorView)?.handler = handler }
-
-    final class MonitorView: NSView {
-        var handler: (@MainActor (NSEvent) -> Bool)?
-        private var monitor: Any?
-
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            if let monitor { NSEvent.removeMonitor(monitor); self.monitor = nil }
-            guard window != nil else { return }
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                guard let self, event.window === self.window, let handler = self.handler else { return event }
-                return MainActor.assumeIsolated { handler(event) } ? nil : event
-            }
         }
     }
 }
@@ -123,5 +108,76 @@ struct TriageFooter: View {
             label.foregroundStyle(.secondary)
         }
         .layoutPriority(1)
+    }
+}
+
+/// Every key the app answers to, in one card over the popover (⌘/ or the ⋯ menu). Grouped by where the
+/// hands are: the popover, a focused row, the review window.
+struct ShortcutsCard: View {
+    let close: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Keyboard shortcuts", bundle: .app).font(.headline)
+                Spacer()
+                Button(action: close) { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut(.cancelAction)
+                    .help(Text("Exit", bundle: .app))
+            }
+            group(Text("Popover", bundle: .app)) {
+                line(Text("Refresh", bundle: .app), ["⌘R"])
+                line(Text("Quick filters", bundle: .app), ["0", "–", "9"])
+                line(Text("Switch tab", bundle: .app), ["←", "→"])
+                line(Text("Settings…", bundle: .app), ["⌘,"])
+            }
+            group(Text("Focused row", bundle: .app)) {
+                line(Text("Start", bundle: .app), ["↓"])
+                line(Text("Open review", bundle: .app), ["↩"])
+                line(Text("Pin · Snooze · Refresh", bundle: .app), ["P", "S", "R"])
+                line(Text("Comment · Merge", bundle: .app), ["C", "M"])
+                line(Text("Open on GitHub · Copy link", bundle: .app), ["O", "⌘C"])
+                line(Text("Exit", bundle: .app), ["esc"])
+            }
+            group(Text("Review window", bundle: .app)) {
+                line(Text("Mark viewed · Mark tests", bundle: .app), ["⌘↩", "⇧⌘V"])
+                line(Text("Previous · Next file", bundle: .app), ["⌘↑", "⌘↓"])
+                line(Text("Approve · Comment · Merge", bundle: .app), ["⇧⌘A", "⇧⌘C", "⇧⌘M"])
+                line(Text("Review bar", bundle: .app), ["⌥⌘B"])
+                line(Text("Find · Address bar · Open in browser", bundle: .app), ["⌘F", "⌘L", "⇧⌘O"])
+            }
+        }
+        .padding(16)
+        .frame(width: 340)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.25), radius: 14, y: 6)
+    }
+
+    private func group(_ title: Text, @ViewBuilder lines: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            title.font(.caption2).textCase(.uppercase).foregroundStyle(.secondary).kerning(0.4)
+            lines()
+        }
+    }
+
+    private func line(_ label: Text, _ keys: [String]) -> some View {
+        HStack(spacing: 6) {
+            label.font(.system(size: 11)).lineLimit(1)
+            Spacer(minLength: 8)
+            HStack(spacing: 3) {
+                ForEach(keys, id: \.self) { k in
+                    if k == "–" {
+                        Text(verbatim: k).font(.system(size: 10)).foregroundStyle(.secondary)
+                    } else {
+                        Text(verbatim: k)
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+                    }
+                }
+            }
+        }
     }
 }
