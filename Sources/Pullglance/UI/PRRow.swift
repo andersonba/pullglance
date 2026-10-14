@@ -49,6 +49,11 @@ struct PRRow: View {
                     if showAuthor { Text(verbatim: "· \(pr.author)") }
                     if let teamLabel { Text(verbatim: "· \(teamLabel)").foregroundStyle(.purple) }
                     Spacer(minLength: 8)
+                    if let size = diffSizeText(additions: pr.additions, deletions: pr.deletions) {
+                        // "+24 −44": the size of the thing, at a glance, in the diff's own colors.
+                        DiffSizeText(text: size)
+                        Text(verbatim: "·").foregroundStyle(.tertiary)
+                    }
                     Text(pr.updatedAt, format: .relative(presentation: .numeric, unitsStyle: .narrow))
                         .foregroundStyle(.tertiary)
                         .fixedSize()
@@ -62,10 +67,10 @@ struct PRRow: View {
                 // Kept in place while an action runs or has failed, only dimmed: dropping them changed the
                 // row's height and shifted everything below for the duration of a refresh.
                 if !rowPills.isEmpty, !isDormant {
-                    HStack(spacing: 4) {
-                        ForEach(rowPills, id: \.self) { PillView(pill: $0) }
+                    // Wraps to a second line when they do not fit, rather than truncating each pill.
+                    PillFlow(spacing: 4, lineSpacing: 3) {
+                        ForEach(rowPills, id: \.self) { PillView(pill: $0).fixedSize() }
                     }
-                    .lineLimit(1)
                     .opacity(actionState == nil ? 1 : 0.35)
                 }
             }
@@ -339,12 +344,58 @@ struct AuthorAvatar: View {
     }
 }
 
+/// Left-to-right flow that wraps: pills keep their size and the row grows a line instead of truncating.
+struct PillFlow: Layout {
+    var spacing: CGFloat = 4
+    var lineSpacing: CGFloat = 3
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0, maxX: CGFloat = 0
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > width { x = 0; y += lineHeight + lineSpacing; lineHeight = 0 }
+            x += size.width + spacing
+            lineHeight = max(lineHeight, size.height)
+            maxX = max(maxX, x - spacing)
+        }
+        return CGSize(width: width == .infinity ? maxX : width, height: y + lineHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX, y = bounds.minY, lineHeight: CGFloat = 0
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            if x > bounds.minX, x + size.width > bounds.maxX { x = bounds.minX; y += lineHeight + lineSpacing; lineHeight = 0 }
+            view.place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+            x += size.width + spacing
+            lineHeight = max(lineHeight, size.height)
+        }
+    }
+}
+
+/// Additions in green, deletions in red, monospaced digits so columns of rows line up.
+struct DiffSizeText: View {
+    let text: String
+
+    var body: some View {
+        let parts = text.split(separator: " ", maxSplits: 1).map(String.init)
+        HStack(spacing: 3) {
+            Text(verbatim: parts.first ?? text).foregroundStyle(.green.mix(with: .primary, by: 0.3))
+            if parts.count > 1 { Text(verbatim: parts[1]).foregroundStyle(.red.mix(with: .primary, by: 0.25)) }
+        }
+        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+        .fixedSize()
+        .accessibilityLabel(Text(verbatim: text))
+    }
+}
+
 struct PillView: View {
     let pill: Pill
 
     var body: some View {
         Text(verbatim: title)
-            .font(.system(size: 10.5, weight: .medium))
+            .font(.system(size: 9.5, weight: .regular))
             .padding(.horizontal, 6)
             .padding(.vertical, 1.5)
             // Pure tints read poorly on the translucent popover; pull the text toward the

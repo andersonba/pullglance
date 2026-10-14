@@ -282,7 +282,8 @@ private struct PRNode: Decodable {
             createdAt: createdAt ?? updatedAt,
             isReadByViewer: isReadByViewer ?? true,
             changedFiles: changedFiles,
-            linesChanged: additions.map { $0 + (deletions ?? 0) },
+            additions: additions,
+            deletions: deletions,
             viewerReviewedBefore: viewerLatestReview != nil,
             viewerRequested: viewerLatestReviewRequest != nil
         )

@@ -36,7 +36,7 @@ import Testing
         let pr = try #require(page.pullRequests.first)
         #expect(pr.createdAt == ISO8601DateFormatter().date(from: "2026-10-01T10:00:00Z"))
         #expect(pr.isReadByViewer == false)
-        #expect(pr.changedFiles == 3 && pr.linesChanged == 16)
+        #expect(pr.changedFiles == 3 && pr.additions == 12 && pr.deletions == 4 && pr.linesChanged == 16)
         #expect(pr.viewerReviewedBefore && pr.viewerRequested)
         // Absent (older fixtures, lists fetched before the fields existed): read, unknown size, never reviewed.
         let bare = page.pullRequests[1]

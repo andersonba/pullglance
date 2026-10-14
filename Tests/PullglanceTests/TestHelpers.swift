@@ -36,6 +36,8 @@ func makePR(
     isReadByViewer: Bool = true,
     changedFiles: Int? = 10,
     linesChanged: Int? = 200,
+    additions: Int? = nil,
+    deletions: Int? = nil,
     viewerReviewedBefore: Bool = false,
     viewerRequested: Bool = true
 ) -> PullRequest {
@@ -52,7 +54,8 @@ func makePR(
         nodeID: nodeID, hasMergeState: hasMergeState, usesMergeQueue: usesMergeQueue,
         mergeQueuePosition: mergeQueuePosition, queueMergeMethod: queueMergeMethod,
         isBlocked: isBlocked, canEnableAutoMerge: canEnableAutoMerge, autoMergeMethod: autoMergeMethod,
-        createdAt: createdAt ?? updatedAt, isReadByViewer: isReadByViewer, changedFiles: changedFiles, linesChanged: linesChanged,
+        createdAt: createdAt ?? updatedAt, isReadByViewer: isReadByViewer, changedFiles: changedFiles,
+        additions: additions ?? linesChanged, deletions: additions == nil ? (linesChanged == nil ? nil : 0) : deletions,
         viewerReviewedBefore: viewerReviewedBefore, viewerRequested: viewerRequested
     )
 }

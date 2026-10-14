@@ -61,7 +61,9 @@ struct PullRequest: Sendable, Equatable, Identifiable {
     let isReadByViewer: Bool
     /// Size of the diff; nil when the list did not carry it (unknown is not small).
     let changedFiles: Int?
-    let linesChanged: Int?
+    let additions: Int?
+    let deletions: Int?
+    var linesChanged: Int? { additions.map { $0 + (deletions ?? 0) } }
     /// You reviewed this pull request before (`viewerLatestReview` exists).
     let viewerReviewedBefore: Bool
     /// You are asked right now (`viewerLatestReviewRequest` exists); with the above, a re-review.
