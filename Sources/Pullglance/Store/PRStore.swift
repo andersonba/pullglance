@@ -224,6 +224,11 @@ final class PRStore {
         quickAuthorFilter = quickAuthorFilter == [login] ? [] : [login]
     }
 
+    /// Same gesture on a row's repository name.
+    func toggleQuickRepo(_ repo: String) {
+        quickRepoFilter = quickRepoFilter == [repo] ? [] : [repo]
+    }
+
     /// Sections shown in the popover. Missing from defaults means all.
     /// Persisted as the hidden set, so a section added in a later version shows up for existing users.
     var visibleSections: Set<Section> {

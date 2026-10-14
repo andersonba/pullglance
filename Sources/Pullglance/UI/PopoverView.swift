@@ -536,7 +536,9 @@ struct PopoverView: View {
                 handlesTap: !reordering,
                 showsGrip: reordering && reorderable,
                 onAuthorTap: reordering ? nil : { withAnimation(.easeInOut(duration: 0.2)) { store.toggleQuickAuthor(pr.author) } },
-                isAuthorFiltered: store.quickAuthorFilter == [pr.author]
+                isAuthorFiltered: store.quickAuthorFilter == [pr.author],
+                onRepoTap: reordering ? nil : { withAnimation(.easeInOut(duration: 0.2)) { store.toggleQuickRepo(pr.repo) } },
+                isRepoFiltered: store.quickRepoFilter == [pr.repo]
             )
             // In reorder mode nothing inside the row is clickable; the whole row is the drag handle.
             .allowsHitTesting(!reordering)

@@ -23,6 +23,9 @@ struct PRRow: View {
     var onAuthorTap: (() -> Void)? = nil
     /// Whether the lists are already narrowed to this author, for the hint and the ring.
     var isAuthorFiltered = false
+    /// A click on the repository name narrows the lists to this repository; nil keeps it plain text.
+    var onRepoTap: (() -> Void)? = nil
+    var isRepoFiltered = false
 
     private var isRunning: Bool { if case .running = actionState { return true }; return false }
 
@@ -35,7 +38,14 @@ struct PRRow: View {
                     .truncationMode(.tail)
                     .help(Text(verbatim: pr.title))
                 HStack(spacing: 4) {
-                    Text(verbatim: "\(pr.repoName) #\(pr.number)")
+                    HStack(spacing: 0) {
+                        if let onRepoTap {
+                            RepoFilterLink(name: pr.repoName, isActive: isRepoFiltered, action: onRepoTap)
+                        } else {
+                            Text(verbatim: pr.repoName)
+                        }
+                        Text(verbatim: " #\(pr.number)")
+                    }
                     if showAuthor { Text(verbatim: "· \(pr.author)") }
                     if let teamLabel { Text(verbatim: "· \(teamLabel)").foregroundStyle(.purple) }
                     Spacer(minLength: 8)
@@ -246,6 +256,27 @@ struct CIDot: View {
 
 /// The author's GitHub picture from `AvatarCache`; a neutral initial until it arrives or when there is none
 /// (deleted account, offline). Reading the cache in `body` keeps a redrawn row from flashing the initial.
+/// The repository name as a quiet link: accent color under the pointer and while the lists are narrowed to it.
+struct RepoFilterLink: View {
+    let name: String
+    let isActive: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(verbatim: name)
+                .foregroundStyle(isActive || hovering ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+                .underline(hovering, color: Color.accentColor)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(.easeInOut(duration: 0.12), value: hovering)
+        .help(isActive ? Text("Show all repositories", bundle: .app) : Text("Show only \(name)", bundle: .app))
+    }
+}
+
 /// The avatar as a button: a ring under the pointer, a filled ring while the lists are narrowed to this person.
 struct AuthorFilterButton: View {
     let login: String

@@ -88,5 +88,16 @@ import Testing
         store.toggleQuickAuthor("bob")
         #expect(store.quickAuthorFilter.isEmpty)
     }
+
+    /// Same gesture on the repository name in the row.
+    @Test func repoNameClickTogglesASingleRepository() async throws {
+        let store = PRStore(client: try await gh(), defaults: testDefaults(), now: { Date() })
+        store.toggleQuickRepo("acme/web")
+        #expect(store.quickRepoFilter == ["acme/web"])
+        store.toggleQuickRepo("acme/api")
+        #expect(store.quickRepoFilter == ["acme/api"])
+        store.toggleQuickRepo("acme/api")
+        #expect(store.quickRepoFilter.isEmpty)
+    }
 }
 

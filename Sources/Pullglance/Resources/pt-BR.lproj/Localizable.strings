@@ -131,6 +131,7 @@
 "No authors match" = "Nenhum autor encontrado";
 "Clear author filter" = "Limpar filtro de autor";
 "Show all authors" = "Mostrar todos os autores";
+"Show all repositories" = "Mostrar todos os repositórios";
 "Show only %@" = "Mostrar só %@";
 "No repositories match" = "Nenhum repositório encontrado";
 "Applies to both tabs. Not saved." = "Vale para as duas abas. Não é salvo.";
