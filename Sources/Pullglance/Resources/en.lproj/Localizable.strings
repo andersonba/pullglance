@@ -208,6 +208,9 @@
 "Open review · Copy link" = "Open review · Copy link";
 "Keyboard from here" = "Keyboard from here";
 "Review window" = "Review window";
+"Review window (beta)" = "Review window (beta)";
+"Adds a Review tab here while on." = "Adds a Review tab here while on.";
+"Opens pull requests in a window of the app, with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser." = "Opens pull requests in a window of the app, with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser.";
 "Quick filters" = "Quick filters";
 "Switch tab" = "Switch tab";
 "Start" = "Start";

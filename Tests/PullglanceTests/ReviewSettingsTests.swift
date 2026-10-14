@@ -42,6 +42,17 @@ import Testing
         #expect(ReviewSettings.load(defaults).filePill == .top)
     }
 
+    /// The window is a beta: off unless turned on, and settings saved before the flag existed stay off.
+    @Test func theReviewWindowIsOffByDefaultAndForOlderSettings() throws {
+        #expect(ReviewSettings.default.windowEnabled == false)
+        let older = Data(#"{"presets":{},"customGlobsText":"","autoMark":false,"rememberCompare":true,"verify":true,"loadBeforeMark":true}"#.utf8)
+        #expect(try JSONDecoder().decode(ReviewSettings.self, from: older).windowEnabled == false)
+        var s = ReviewSettings.default
+        s.windowEnabled = true
+        let again = try JSONDecoder().decode(ReviewSettings.self, from: try JSONEncoder().encode(s))
+        #expect(again.windowEnabled)
+    }
+
     @Test func presetChoiceIsPerRepository() {
         let defaults = testDefaults()
         ReviewPresetChoice.preset("python").save(defaults, repo: "acme/web")

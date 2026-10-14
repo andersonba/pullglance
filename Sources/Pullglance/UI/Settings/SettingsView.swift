@@ -44,6 +44,7 @@ enum SettingsOpener {
 struct SettingsView: View {
     @Bindable var store: PRStore
     @Bindable private var selection = SettingsSelection.shared
+    @Bindable private var review = ReviewSettingsStore.shared
 
     var body: some View {
         TabView(selection: $selection.tab) {
@@ -56,14 +57,20 @@ struct SettingsView: View {
             FiltersSettingsView(store: store)
                 .tabItem { Label { Text("Filters", bundle: .app) } icon: { Image(systemName: "line.3.horizontal.decrease.circle") } }
                 .tag(SettingsTab.filters)
-            ReviewSettingsView()
-                .tabItem { Label { Text("Review", bundle: .app) } icon: { Image(systemName: "checklist") } }
-                .tag(SettingsTab.review)
+            // The review window is a beta (Diagnostics turns it on); its tab exists only while it is on.
+            if review.settings.windowEnabled {
+                ReviewSettingsView()
+                    .tabItem { Label { Text("Review", bundle: .app) } icon: { Image(systemName: "checklist") } }
+                    .tag(SettingsTab.review)
+            }
             DiagnosticsSettingsView(store: store)
                 .tabItem { Label { Text("Diagnostics", bundle: .app) } icon: { Image(systemName: "stethoscope") } }
                 .tag(SettingsTab.diagnostics)
         }
         .frame(width: 520)
+        .onChange(of: review.settings.windowEnabled) { _, on in
+            if !on, selection.tab == .review { selection.tab = .diagnostics }
+        }
     }
 }
 
@@ -621,6 +628,7 @@ private struct ReorderSectionGroup: View {
 
 struct DiagnosticsSettingsView: View {
     @Bindable var store: PRStore
+    @Bindable private var review = ReviewSettingsStore.shared
     var avatars: AvatarCache = .shared
     @State private var includeScreenshots = false
     @State private var exporting = false
@@ -694,8 +702,20 @@ struct DiagnosticsSettingsView: View {
             .controlSize(.small)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
+            Divider()
+            HStack(spacing: 10) {
+                Toggle(isOn: $review.settings.windowEnabled) { Text("Review window (beta)", bundle: .app) }
+                    .toggleStyle(.checkbox)
+                    .help(Text("Opens pull requests in a window of the app, with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser.", bundle: .app))
+                Spacer()
+                Text("Adds a Review tab here while on.", bundle: .app).foregroundStyle(.tertiary)
+            }
+            .font(.caption)
+            .controlSize(.small)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
         }
-        .frame(height: 440)
+        .frame(height: 480)
         .task { await avatars.refreshUsage() }
     }
 

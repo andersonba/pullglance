@@ -51,9 +51,9 @@ With the popover open, `↓` focuses the first row; `↑↓` move, `←→` swit
 - The funnel next to the tabs narrows both tabs to a few repositories or a few authors, for the session. Clicking a row's avatar or repository name does the same for that author or repository.
 - Settings › Filters hides organizations or accounts, and per owner keeps everything except a few repositories or only a chosen few. These leave the searches themselves, so lists, totals and the badge all follow.
 
-## Review window
+## Review window (beta)
 
-A click on a row opens the pull request in a window of its own, with a review bar above the page: the pull request's state, the file progress, and one primary action (merge when ready, approve otherwise) with the rest in its menu. On the Files tab a floating pill shows the current file, steps to the previous or next one, marks it viewed, and marks all test files viewed by preset or by your own globs (Settings › Review). Compare pages remember what you collapsed. The GitHub session lives in the app, separate from your browser; downloads are quarantined like a browser's.
+Off by default; Settings › Review turns it on. With it on, a click on a row opens the pull request in a window of its own, with a review bar above the page: the pull request's state, the file progress, and one primary action (merge when ready, approve otherwise) with the rest in its menu. On the Files tab a floating pill shows the current file, steps to the previous or next one, marks it viewed, and marks all test files viewed by preset or by your own globs (Settings › Review). Compare pages remember what you collapsed. The GitHub session lives in the app, separate from your browser; downloads are quarantined like a browser's.
 
 ## Settings (⌘,)
 

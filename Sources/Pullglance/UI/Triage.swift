@@ -78,7 +78,7 @@ struct TriageFooter: View {
     var body: some View {
         HStack(spacing: 8) {
             HStack(spacing: 2) { key("↑↓"); key("←→") }.layoutPriority(1)
-            hint("↩", Text("Review", bundle: .app))
+            hint("↩", Text(ReviewSettingsStore.shared.settings.windowEnabled ? "Review" : "Open", bundle: .app))
             hint("P", Text(isPinned ? "Unpin" : "Pin", bundle: .app))
             hint("S", Text(isDormant ? "Wake" : "Snooze", bundle: .app))
             hint("O", Text(verbatim: "GitHub"))
@@ -145,12 +145,14 @@ struct ShortcutsCard: View {
                 line(Text("Open on GitHub · Copy link", bundle: .app), ["O", "⌘C"])
                 line(Text("Exit", bundle: .app), ["esc"])
             }
-            group(Text("Review window", bundle: .app)) {
-                line(Text("Mark viewed · Mark tests", bundle: .app), ["⌘↩", "⇧⌘V"])
-                line(Text("Previous · Next file", bundle: .app), ["⌘↑", "⌘↓"])
-                line(Text("Approve · Comment · Merge", bundle: .app), ["⇧⌘A", "⇧⌘C", "⇧⌘M"])
-                line(Text("Review bar", bundle: .app), ["⌥⌘B"])
-                line(Text("Find · Address bar · Open in browser", bundle: .app), ["⌘F", "⌘L", "⇧⌘O"])
+            if ReviewSettingsStore.shared.settings.windowEnabled {
+                group(Text("Review window", bundle: .app)) {
+                    line(Text("Mark viewed · Mark tests", bundle: .app), ["⌘↩", "⇧⌘V"])
+                    line(Text("Previous · Next file", bundle: .app), ["⌘↑", "⌘↓"])
+                    line(Text("Approve · Comment · Merge", bundle: .app), ["⇧⌘A", "⇧⌘C", "⇧⌘M"])
+                    line(Text("Review bar", bundle: .app), ["⌥⌘B"])
+                    line(Text("Find · Address bar · Open in browser", bundle: .app), ["⌘F", "⌘L", "⇧⌘O"])
+                }
             }
         }
         .padding(16)

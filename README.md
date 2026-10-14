@@ -19,7 +19,6 @@ Pullglance talks to GitHub through the `gh` CLI you are already logged into. No 
 
 - **See what depends on you.** Failing checks, approvals ready to merge, reviews asked of you, with a number on the menu bar.
 - **Act from the row.** Merge, comment, snooze, pin, from the mouse or the keyboard.
-- **Review in its own window.** Mark test files as viewed by preset, step through the files, approve or merge from a bar above the page.
 
 ## Install
 

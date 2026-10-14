@@ -101,7 +101,7 @@ struct PRRow: View {
             // (review requests land on the diff, the user's own on the conversation). "Open on GitHub"
             // in the context menu keeps the browser.
             if case .failed(let action, _) = actionState { onAction(action); return }
-            if let review = ReviewWindowController.shared {
+            if ReviewSettingsStore.shared.settings.windowEnabled, let review = ReviewWindowController.shared {
                 review.open(pr, landing: section.tab == .review ? .files : .conversation)
             } else {
                 PopoverDismissal.open(pr.url)

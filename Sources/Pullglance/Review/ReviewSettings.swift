@@ -34,6 +34,8 @@ struct ReviewSettings: Codable, Equatable, Sendable {
     var verify: Bool
     var loadBeforeMark: Bool
     var filePill: FilePillPosition = .bottom
+    /// The review window is a beta: off, rows open on GitHub in the browser as they always did.
+    var windowEnabled: Bool = false
 
     static let `default` = ReviewSettings(
         presets: Dictionary(uniqueKeysWithValues: ReviewPresets.all.map { ($0.id, $0.enabled) }),
@@ -59,6 +61,7 @@ struct ReviewSettings: Codable, Equatable, Sendable {
         verify = try c.decode(Bool.self, forKey: .verify)
         loadBeforeMark = try c.decode(Bool.self, forKey: .loadBeforeMark)
         filePill = try c.decodeIfPresent(FilePillPosition.self, forKey: .filePill) ?? .bottom
+        windowEnabled = try c.decodeIfPresent(Bool.self, forKey: .windowEnabled) ?? false
     }
 
     static let key = "reviewSettings"

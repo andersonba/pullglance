@@ -208,6 +208,9 @@
 "Open review · Copy link" = "Abrir review · Copiar link";
 "Keyboard from here" = "Teclado a partir daqui";
 "Review window" = "Janela de review";
+"Review window (beta)" = "Janela de review (beta)";
+"Adds a Review tab here while on." = "Com ela ligada, aparece a aba Review aqui.";
+"Opens pull requests in a window of the app, with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser." = "Abre os pull requests numa janela do app, com barra de review e controles de arquivo. Desligada, o clique abre o pull request no GitHub, no seu navegador.";
 "Quick filters" = "Filtros rápidos";
 "Switch tab" = "Trocar de aba";
 "Start" = "Começar";
