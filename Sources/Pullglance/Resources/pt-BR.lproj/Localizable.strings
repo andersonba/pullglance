@@ -78,6 +78,16 @@
 "All" = "Tudo";
 "Action" = "Ação";
 "Ready" = "Prontos";
+"Re-review" = "Re-review";
+"New activity" = "Novidades";
+"Quick · %lld files" = "Rápido · %lld arquivos";
+"Waiting %lldd" = "Esperando %lldd";
+"Priority" = "Prioridade";
+"Recent" = "Recentes";
+"Manual" = "Manual";
+"Reorder rows…" = "Reordenar linhas…";
+"Back to Priority" = "Voltar para Prioridade";
+"Back to Recent" = "Voltar para Recentes";
 "Waiting" = "Aguardando";
 "Yours" = "Seus";
 "Teams" = "Times";

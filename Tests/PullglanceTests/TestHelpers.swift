@@ -31,7 +31,13 @@ func makePR(
     queueMergeMethod: MergeMethod? = nil,
     isBlocked: Bool = false,
     canEnableAutoMerge: Bool = false,
-    autoMergeMethod: MergeMethod? = nil
+    autoMergeMethod: MergeMethod? = nil,
+    createdAt: Date? = nil,
+    isReadByViewer: Bool = true,
+    changedFiles: Int? = 10,
+    linesChanged: Int? = 200,
+    viewerReviewedBefore: Bool = false,
+    viewerRequested: Bool = true
 ) -> PullRequest {
     PullRequest(
         repo: repo, number: number, title: title,
@@ -45,7 +51,9 @@ func makePR(
         mergeOptions: mergeOptions,
         nodeID: nodeID, hasMergeState: hasMergeState, usesMergeQueue: usesMergeQueue,
         mergeQueuePosition: mergeQueuePosition, queueMergeMethod: queueMergeMethod,
-        isBlocked: isBlocked, canEnableAutoMerge: canEnableAutoMerge, autoMergeMethod: autoMergeMethod
+        isBlocked: isBlocked, canEnableAutoMerge: canEnableAutoMerge, autoMergeMethod: autoMergeMethod,
+        createdAt: createdAt ?? updatedAt, isReadByViewer: isReadByViewer, changedFiles: changedFiles, linesChanged: linesChanged,
+        viewerReviewedBefore: viewerReviewedBefore, viewerRequested: viewerRequested
     )
 }
 
@@ -64,13 +72,13 @@ func pullRequestEnvelope(_ node: String?, state: String = "OPEN") -> Data {
 }
 
 /// `mergeable: nil` writes a null, as a list fetched without merge fields decodes.
-func node(number: Int, ci: String?, decision: String? = nil, draft: Bool = false, mergeable: String? = "MERGEABLE", mergeState: String = "CLEAN", headRefOid: String = "abc1234", repo: String = "acme/web", repoExtra: String = "\"mergeCommitAllowed\":false,\"squashMergeAllowed\":true,\"rebaseMergeAllowed\":false,\"deleteBranchOnMerge\":true,\"viewerDefaultMergeMethod\":\"SQUASH\"", prExtra: String = "") -> String {
+func node(number: Int, ci: String?, decision: String? = nil, draft: Bool = false, mergeable: String? = "MERGEABLE", mergeState: String = "CLEAN", updatedAt: String = "2026-10-10T10:00:00Z", headRefOid: String = "abc1234", repo: String = "acme/web", repoExtra: String = "\"mergeCommitAllowed\":false,\"squashMergeAllowed\":true,\"rebaseMergeAllowed\":false,\"deleteBranchOnMerge\":true,\"viewerDefaultMergeMethod\":\"SQUASH\"", prExtra: String = "") -> String {
     let rollup = ci.map { "{\"state\":\"\($0)\"}" } ?? "null"
     let dec = decision.map { "\"\($0)\"" } ?? "null"
     let extra = prExtra.isEmpty ? "" : prExtra + ","
     let mergeableJSON = mergeable.map { "\"\($0)\"" } ?? "null"
     return """
-    {\(extra)"number":\(number),"title":"PR \(number)","url":"https://github.com/\(repo)/pull/\(number)","isDraft":\(draft),"mergeable":\(mergeableJSON),"mergeStateStatus":"\(mergeState)","baseRefName":"main","headRefName":"feature-\(number)","headRefOid":"\(headRefOid)","updatedAt":"2026-10-10T10:00:00Z","repository":{"nameWithOwner":"\(repo)",\(repoExtra)},"author":{"login":"someone","avatarUrl":"https://example.com/someone.png"},"reviewDecision":\(dec),"reviewThreads":{"nodes":[]},"reviewRequests":{"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":\(rollup)}}]}}
+    {\(extra)"number":\(number),"title":"PR \(number)","url":"https://github.com/\(repo)/pull/\(number)","isDraft":\(draft),"mergeable":\(mergeableJSON),"mergeStateStatus":"\(mergeState)","baseRefName":"main","headRefName":"feature-\(number)","headRefOid":"\(headRefOid)","updatedAt":"\(updatedAt)","repository":{"nameWithOwner":"\(repo)",\(repoExtra)},"author":{"login":"someone","avatarUrl":"https://example.com/someone.png"},"reviewDecision":\(dec),"reviewThreads":{"nodes":[]},"reviewRequests":{"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":\(rollup)}}]}}
     """
 }
 

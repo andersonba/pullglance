@@ -41,7 +41,9 @@ struct PRRow: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                let rowPills = pills(for: pr)
+                // Review rows lead with why they are where they are (see `reviewSignal`).
+                let reason: [Pill] = section.tab == .review ? reviewSignal(for: pr, now: Date()).map { [.reason($0)] } ?? [] : []
+                let rowPills = reason + pills(for: pr)
                 // Kept in place while an action runs or has failed, only dimmed: dropping them changed the
                 // row's height and shifted everything below for the duration of a refresh.
                 if !rowPills.isEmpty, !isDormant {
@@ -286,6 +288,10 @@ struct PillView: View {
 
     private var title: String {
         switch pill {
+        case .reason(.reReview): String(localized: "Re-review", bundle: .app)
+        case .reason(.newActivity): String(localized: "New activity", bundle: .app)
+        case .reason(.quick(let files)): String(format: String(localized: "Quick · %lld files", bundle: .app), files)
+        case .reason(.waiting(let days)): String(format: String(localized: "Waiting %lldd", bundle: .app), days)
         case .ciFailed: String(localized: "CI failed", bundle: .app)
         case .ciRunning: String(localized: "CI running", bundle: .app)
         case .changesRequested: String(localized: "Changes requested", bundle: .app)
@@ -302,6 +308,7 @@ struct PillView: View {
 
     private var tint: Color {
         switch pill {
+        case .reason: .blue
         case .ciFailed, .changesRequested, .conflicts: .red
         case .ciRunning: .yellow
         case .approved, .readyToMerge: .green

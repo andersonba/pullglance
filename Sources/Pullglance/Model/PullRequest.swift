@@ -55,6 +55,17 @@ struct PullRequest: Sendable, Equatable, Identifiable {
     let canEnableAutoMerge: Bool
     /// Auto-merge is already on, with this strategy; nil otherwise.
     let autoMergeMethod: MergeMethod?
+    /// The review signals (see `reviewSignal(for:now:)`). `createdAt` falls back to `updatedAt` when absent.
+    let createdAt: Date
+    /// GitHub's `isReadByViewer`: false means activity you have not looked at yet. True when unknown.
+    let isReadByViewer: Bool
+    /// Size of the diff; nil when the list did not carry it (unknown is not small).
+    let changedFiles: Int?
+    let linesChanged: Int?
+    /// You reviewed this pull request before (`viewerLatestReview` exists).
+    let viewerReviewedBefore: Bool
+    /// You are asked right now (`viewerLatestReviewRequest` exists); with the above, a re-review.
+    let viewerRequested: Bool
 
     /// Where GitHub itself shows "Enable auto-merge": the viewer may, nothing is scheduled yet, and the PR
     /// cannot merge right now. A queue base takes the queue path instead; unknown merge state is not a yes.

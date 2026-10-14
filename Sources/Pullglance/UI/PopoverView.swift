@@ -477,6 +477,24 @@ struct PopoverView: View {
             }
     }
 
+    /// The review sections' header menu: order and reordering in one place. In reorder mode the footer and
+    /// the hover action take over, as in every other section.
+    private func sortMenu(for section: Section) -> SectionHeader.SortMenu? {
+        guard !reordering else { return nil }
+        return .init(
+            sort: store.sort(for: section),
+            isManual: store.isManuallyOrdered(section),
+            setSort: { sort in
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    store.resetManualOrder(for: section)
+                    store.setSort(sort, for: section)
+                }
+            },
+            reorder: { setReordering(true) },
+            clearManual: { withAnimation(.easeInOut(duration: 0.25)) { store.resetManualOrder(for: section) } }
+        )
+    }
+
     /// Header action: "Reorder" to enter the mode; inside it, "Sort by update" on hand-ordered sections.
     private func headerAction(for section: Section) -> SectionHeader.HoverAction? {
         guard Self.isReorderable(section) else { return nil }
@@ -610,7 +628,7 @@ struct PopoverView: View {
 
     @ViewBuilder private var directSection: some View {
         let direct = store.directList
-        SectionHeader(title: Section.needsYourReview.title, count: store.direct.total, hoverAction: headerAction(for: .needsYourReview))
+        SectionHeader(title: Section.needsYourReview.title, count: store.direct.total, hoverAction: reordering ? headerAction(for: .needsYourReview) : nil, sortMenu: sortMenu(for: .needsYourReview))
         if direct.isEmpty {
             Text("Nothing pending in reviews.", bundle: .app)
                 .font(.caption)
@@ -630,7 +648,8 @@ struct PopoverView: View {
             title: Section.needsTeamsReview.title,
             count: store.viaTeamTotal,
             expanded: $store.isViaTeamExpanded,
-            detail: store.isViaTeamExpanded ? String(localized: "\(20) most recent", bundle: .app) : nil
+            detail: store.isViaTeamExpanded ? String(localized: "\(20) most recent", bundle: .app) : nil,
+            sortMenu: store.isViaTeamExpanded ? sortMenu(for: .needsTeamsReview) : nil
         )
         if store.isViaTeamExpanded || reviewFilter == .needsTeamsReview {
             if store.viaTeam == nil, store.viaTeamError != nil {

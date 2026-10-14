@@ -30,6 +30,20 @@ import Testing
         #expect(page.pullRequests.map(\.hasMergeState) == [true, true, true, false])
     }
 
+    @Test func decodesTheReviewSignals() throws {
+        let rich = node(number: 1, ci: "SUCCESS", prExtra: "\"createdAt\":\"2026-10-01T10:00:00Z\",\"isReadByViewer\":false,\"changedFiles\":3,\"additions\":12,\"deletions\":4,\"viewerLatestReview\":{\"state\":\"CHANGES_REQUESTED\"},\"viewerLatestReviewRequest\":{\"id\":\"RR_1\"}")
+        let page = try parseSearchResponse(envelope(nodes: [rich, node(number: 2, ci: nil)]))
+        let pr = try #require(page.pullRequests.first)
+        #expect(pr.createdAt == ISO8601DateFormatter().date(from: "2026-10-01T10:00:00Z"))
+        #expect(pr.isReadByViewer == false)
+        #expect(pr.changedFiles == 3 && pr.linesChanged == 16)
+        #expect(pr.viewerReviewedBefore && pr.viewerRequested)
+        // Absent (older fixtures, lists fetched before the fields existed): read, unknown size, never reviewed.
+        let bare = page.pullRequests[1]
+        #expect(bare.createdAt == bare.updatedAt)
+        #expect(bare.isReadByViewer && bare.changedFiles == nil && bare.linesChanged == nil && !bare.viewerReviewedBefore && !bare.viewerRequested)
+    }
+
     @Test func decodesAutoMergeFields() throws {
         let blocked = node(number: 1, ci: "PENDING", mergeState: "BLOCKED", prExtra: "\"viewerCanEnableAutoMerge\":true,\"autoMergeRequest\":null")
         let scheduled = node(number: 2, ci: "PENDING", mergeState: "BLOCKED", prExtra: "\"viewerCanEnableAutoMerge\":false,\"autoMergeRequest\":{\"mergeMethod\":\"SQUASH\"}")
@@ -248,6 +262,28 @@ import Testing
         let mine = store.triageRows(for: .mine, filter: nil)
         #expect(mine.first?.pr.id == ready.id && mine.first?.section == .pinnedMine)
         #expect(mine.map(\.section).filter { $0 == .readyToMerge }.count == store.mineGroups.readyToMerge.count)
+    }
+
+    /// Review requests come out by priority unless the user asked for recency, or ordered by hand.
+    @Test func reviewListsFollowTheChosenSort() async throws {
+        let gh = FakeGH()
+        await gh.set(.success(try fixture("search-mine.json")), for: SearchQuery.mine)
+        let old = node(number: 1, ci: "SUCCESS", updatedAt: "2026-10-10T12:00:00Z", prExtra: "\"createdAt\":\"2026-09-20T10:00:00Z\"")
+        let quick = node(number: 2, ci: "SUCCESS", updatedAt: "2026-10-10T09:00:00Z", prExtra: "\"createdAt\":\"2026-10-10T09:00:00Z\",\"changedFiles\":2,\"additions\":5,\"deletions\":1")
+        let reReview = node(number: 3, ci: "SUCCESS", updatedAt: "2026-10-10T08:00:00Z", prExtra: "\"createdAt\":\"2026-10-10T08:00:00Z\",\"viewerLatestReview\":{\"state\":\"APPROVED\"},\"viewerLatestReviewRequest\":{\"id\":\"RR\"}")
+        await gh.set(.success(envelope(nodes: [old, quick, reReview])), for: SearchQuery.direct)
+        let defaults = testDefaults()
+        let store = PRStore(client: gh, defaults: defaults, now: { Date() })
+        await store.refresh()
+        #expect(store.sort(for: .needsYourReview) == .priority)
+        #expect(store.directList.map(\.number) == [3, 2, 1])
+        store.setSort(.recent, for: .needsYourReview)
+        #expect(store.directList.map(\.number) == [1, 2, 3], "newest update first; the fixture dates all share one day otherwise")
+        let reloaded = PRStore(client: gh, defaults: defaults, now: { Date() })
+        #expect(reloaded.sort(for: .needsYourReview) == .recent)
+        store.setSort(.priority, for: .needsYourReview)
+        store.setManualOrder(["acme/web#1", "acme/web#3", "acme/web#2"], for: .needsYourReview)
+        #expect(store.directList.map(\.number) == [1, 3, 2], "a hand-made order beats both")
     }
 
     @Test func snoozedPRWakesByItselfOnNewActivity() async throws {

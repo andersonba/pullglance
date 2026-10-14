@@ -64,6 +64,7 @@ final class PRStore {
     static let dormantKey = "dormant"
     static let pinnedKey = "pinned"
     static let manualOrdersKey = "manualOrders"
+    static let sectionSortsKey = "sectionSorts"
     static let verboseLoggingKey = "verboseLogging"
     static let hiddenSectionsKey = "hiddenSections"
     static let badgeSectionsKey = "badgeSections"
@@ -114,6 +115,26 @@ final class PRStore {
 
     private func manuallyOrdered(_ prs: [PullRequest], _ section: Section) -> [PullRequest] {
         applyManualOrder(prs, ids: manualOrders[section.rawValue] ?? [])
+    }
+
+    /// The user's sort per section, where it differs from the default. Stored per machine.
+    private(set) var sectionSorts: [String: ListSort] = [:] {
+        didSet { defaults.set(try? JSONEncoder().encode(sectionSorts), forKey: Self.sectionSortsKey) }
+    }
+
+    func sort(for section: Section) -> ListSort { sectionSorts[section.rawValue] ?? ListSort.default(for: section) }
+
+    func setSort(_ sort: ListSort, for section: Section) {
+        sectionSorts[section.rawValue] = sort == ListSort.default(for: section) ? nil : sort
+    }
+
+    /// A hand-made order beats the sort; otherwise priority or recency, as chosen for the section.
+    private func ordered(_ prs: [PullRequest], _ section: Section) -> [PullRequest] {
+        if isManuallyOrdered(section) { return manuallyOrdered(prs, section) }
+        switch sort(for: section) {
+        case .priority: return sortedByPriority(prs, now: now())
+        case .recent: return sortedByRecency(prs)
+        }
     }
 
     private(set) var dormant: [String: DormantMark] {
@@ -377,6 +398,7 @@ final class PRStore {
         self.repoRules = rules
         self.dormant = defaults.data(forKey: Self.dormantKey).flatMap { try? JSONDecoder().decode([String: DormantMark].self, from: $0) } ?? [:]
         self.pinned = Set(defaults.stringArray(forKey: Self.pinnedKey) ?? [])
+        self.sectionSorts = defaults.data(forKey: Self.sectionSortsKey).flatMap { try? JSONDecoder().decode([String: ListSort].self, from: $0) } ?? [:]
         self.manualOrders = defaults.data(forKey: Self.manualOrdersKey).flatMap { try? JSONDecoder().decode([String: [String]].self, from: $0) } ?? [:]
         if let legacyVisible = Self.sections(in: defaults, key: "visibleSections") {
             // Older builds stored the visible set, before the Snoozed and Pinned sections existed; those must not come up hidden.
@@ -498,10 +520,11 @@ final class PRStore {
     /// Snoozed and pinned rows live in their own sections.
     private func inPlace(_ pr: PullRequest) -> Bool { !dormantIDs.contains(pr.id) && !pinned.contains(pr.id) }
     var directList: [PullRequest] {
-        manuallyOrdered(sortedByRecency(lens(direct.value)).filter(inPlace), .needsYourReview)
+        ordered(lens(direct.value).filter(inPlace), .needsYourReview)
     }
+    /// The 20 most recent team requests (the sample GitHub is asked for), then ordered like the others.
     var viaTeamList: [PullRequest] {
-        filterViaTeam(all: lens(viaTeam?.value ?? []), direct: direct.value, viewerLogin: viewerLogin).filter(inPlace)
+        ordered(filterViaTeam(all: lens(viaTeam?.value ?? []), direct: direct.value, viewerLogin: viewerLogin).filter(inPlace), .needsTeamsReview)
     }
     /// Pinned review requests, direct and team, in the user's order.
     var pinnedReviewList: [PullRequest] {

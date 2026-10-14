@@ -1,4 +1,6 @@
 enum Pill: Hashable, Sendable {
+    /// Why this review request comes first; review rows only, ahead of the rest.
+    case reason(ReviewSignal)
     case ciFailed
     case ciRunning
     case changesRequested

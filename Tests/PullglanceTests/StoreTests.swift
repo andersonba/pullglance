@@ -34,6 +34,9 @@ import Testing
         #expect(store.badgeCount == 6)
         #expect(store.viewerLogin == "octocat")
         #expect(store.mineGroups.needsAction.map(\.number) == [101])
+        // Reviews come by priority; with no signals in the fixture that is the oldest request first.
+        #expect(store.directList.map(\.number) == [203, 201, 202])
+        store.setSort(.recent, for: .needsYourReview)
         #expect(store.directList.map(\.number) == [201, 202, 203])
         #expect(await gh.callCount(for: SearchQuery.viaTeam) == 0)
     }

@@ -173,6 +173,13 @@ private struct PRNode: Decodable {
     let headRefName: String?
     let headRefOid: String?
     let updatedAt: Date?
+    let createdAt: Date?
+    let isReadByViewer: Bool?
+    let changedFiles: Int?
+    let additions: Int?
+    let deletions: Int?
+    let viewerLatestReview: LatestReview?
+    let viewerLatestReviewRequest: ReviewRequestRef?
     let repository: Repository?
     let author: Login?
     let reviewDecision: String?
@@ -207,6 +214,8 @@ private struct PRNode: Decodable {
     }
     struct QueueEntry: Decodable { let position: Int? }
     struct AutoMerge: Decodable { let mergeMethod: String? }
+    struct LatestReview: Decodable { let state: String? }
+    struct ReviewRequestRef: Decodable { let id: String? }
     struct Queue: Decodable {
         let configuration: Configuration?
         struct Configuration: Decodable { let mergeMethod: String? }
@@ -269,7 +278,13 @@ private struct PRNode: Decodable {
             queueMergeMethod: mergeQueue?.configuration?.mergeMethod.flatMap(MergeMethod.init(apiValue:)),
             isBlocked: mergeStateStatus == "BLOCKED",
             canEnableAutoMerge: viewerCanEnableAutoMerge ?? false,
-            autoMergeMethod: autoMergeRequest?.mergeMethod.flatMap(MergeMethod.init(apiValue:))
+            autoMergeMethod: autoMergeRequest?.mergeMethod.flatMap(MergeMethod.init(apiValue:)),
+            createdAt: createdAt ?? updatedAt,
+            isReadByViewer: isReadByViewer ?? true,
+            changedFiles: changedFiles,
+            linesChanged: additions.map { $0 + (deletions ?? 0) },
+            viewerReviewedBefore: viewerLatestReview != nil,
+            viewerRequested: viewerLatestReviewRequest != nil
         )
     }
 }

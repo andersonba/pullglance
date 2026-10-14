@@ -4,7 +4,9 @@ query($q: String!, $withMerge: Boolean!, $first: Int!) {
     issueCount
     nodes {
       ... on PullRequest {
-        number title url isDraft updatedAt baseRefName headRefName headRefOid
+        number title url isDraft updatedAt createdAt baseRefName headRefName headRefOid
+        isReadByViewer changedFiles additions deletions
+        viewerLatestReview { state } viewerLatestReviewRequest { id }
         mergeable @include(if: $withMerge)
         mergeStateStatus @include(if: $withMerge)
         id @include(if: $withMerge)
