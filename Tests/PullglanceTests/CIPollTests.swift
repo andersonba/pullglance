@@ -62,7 +62,8 @@ private final class Clock: @unchecked Sendable {
         store.holdsAutoRefresh = false
         await gh.setDelay(.milliseconds(200))
         let cycle = Task { await store.refresh() }
-        for _ in 0..<100 where await gh.calls.count < 3 { try await Task.sleep(for: .milliseconds(10)) }
+        let cycleStarted = await waitUntil { await gh.calls.count >= 3 }
+        #expect(cycleStarted)
         #expect(await store.pollPendingCI() == 0, "a cycle is in flight")
         await cycle.value
         await gh.setDelay(.zero)
@@ -80,7 +81,9 @@ private final class Clock: @unchecked Sendable {
         store.wake(pr)
         await gh.setDelay(.milliseconds(200))
         let manual = Task { await store.refreshOne(pr) }
-        for _ in 0..<100 where await gh.lookups.count < 2 { try await Task.sleep(for: .milliseconds(10)) }
+        // The manual lookup must be in flight before the poll runs; on a loaded machine that takes a moment.
+        let manualStarted = await waitUntil { await gh.lookups.count >= 2 }
+        #expect(manualStarted)
         #expect(await store.pollPendingCI() == 1, "the user's own refresh is running on #104; only #203 is checked")
         #expect(await gh.lookups.map(\.number) == [203, 104, 203])
         _ = await manual.value
