@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  swift:
+    name: Swift (macOS)
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      # Xcode 26.2 = Swift 6.2.3, same as local. Keep in sync with the Xcode you develop with.
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Build
+        run: swift build --build-tests
+
+      - name: Test
+        run: |
+          mkdir -p .build/ci/results .build/ci/attachments
+          swift test --skip-build \
+            --xunit-output .build/ci/results/junit.xml \
+            --attachments-path .build/ci/attachments
+
+      - name: Package Pullglance.app
+        run: |
+          Scripts/make-app.sh
+          ditto -c -k --keepParent build/Pullglance.app build/Pullglance.zip
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: swift-test-results
+          path: |
+            .build/ci/
+            ~/Library/Logs/DiagnosticReports/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload app
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Pullglance-${{ github.sha }}
+          path: build/Pullglance.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  web:
+    name: Web (review.js)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: Web/package-lock.json
+
+      - name: Install
+        working-directory: Web
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck, test and build
+        run: Scripts/build-review-js.sh
+
+      - name: Check that the committed bundle is up to date
+        run: |
+          changes="$(git status --porcelain -- Sources/Pullglance/Resources)"
+          if [ -n "$changes" ]; then
+            echo "::error::Sources/Pullglance/Resources is out of date with Web/. Run Scripts/build-review-js.sh and commit the result."
+            echo "$changes"
+            git diff --stat -- Sources/Pullglance/Resources
+            exit 1
+          fi
