@@ -93,6 +93,16 @@ struct GeneralSettingsView: View {
                 } label: {
                     Text("Refresh every", bundle: .app)
                 }
+                LabeledContent {
+                    HStack(spacing: 10) {
+                        Toggle(isOn: $store.rollsBadge) { EmptyView() }.labelsHidden()
+                        Button { store.previewBadgeRoll() } label: { Text("Preview", bundle: .app) }
+                            .controlSize(.small)
+                            .disabled(!store.rollsBadge || store.badgeCount == nil)
+                    }
+                } label: {
+                    Text("Roll the number when it changes", bundle: .app)
+                }
             }
             SwiftUI.Section {
                 LabeledContent {

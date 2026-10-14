@@ -192,6 +192,37 @@ import Testing
         #expect(store.viaTeam?.total == 154)
     }
 
+    /// The menu bar number rolls when data changes it: never on the first load, never because a setting
+    /// moved the count, and not when the roll is off.
+    @Test func badgeRollsOnlyWhenDataChangesTheCount() async throws {
+        let gh = try await happyGH()
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() }, badgeRollDuration: .milliseconds(60))
+        await store.refresh()
+        #expect(store.badgeRoll == nil, "first load")
+        let direct = try JSONSerialization.jsonObject(with: try fixture("search-direct.json")) as! [String: Any]
+        var data = direct["data"] as! [String: Any]
+        var search = data["search"] as! [String: Any]
+        var nodes = search["nodes"] as! [Any]
+        nodes.append(try JSONSerialization.jsonObject(with: Data(node(number: 9, ci: "SUCCESS", author: "alice").utf8)))
+        search["nodes"] = nodes; data["search"] = search
+        await gh.set(.success(try JSONSerialization.data(withJSONObject: ["data": data])), for: SearchQuery.direct)
+        let before = store.badgeText
+        await store.refresh()
+        let roll = try #require(store.badgeRoll)
+        #expect(roll.from == before && roll.to == store.badgeText && roll.up)
+        let settled = await waitUntil { store.badgeRoll == nil }
+        #expect(settled, "the roll is brief")
+        // A setting that moves the count is not news.
+        store.badgeSections = Set(Section.allCases)
+        #expect(store.badgeRoll == nil)
+        store.rollsBadge = false
+        nodes.append(try JSONSerialization.jsonObject(with: Data(node(number: 10, ci: "SUCCESS", author: "bob").utf8)))
+        search["nodes"] = nodes; data["search"] = search
+        await gh.set(.success(try JSONSerialization.data(withJSONObject: ["data": data])), for: SearchQuery.direct)
+        await store.refresh()
+        #expect(store.badgeRoll == nil, "turned off")
+    }
+
     @Test func sectionPreferencesDefaultAndPersist() async throws {
         let defaults = testDefaults()
         let store = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })
@@ -348,3 +379,4 @@ import Testing
         #expect(reloaded.refreshInterval == .seconds(300))
     }
 }
+

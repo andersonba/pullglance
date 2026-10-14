@@ -79,6 +79,7 @@ final class PRStore {
     static let dualBadgeFirstKey = "dualBadgeFirst"
     static let dualBadgeSecondKey = "dualBadgeSecond"
     static let badgeModeKey = "badgeMode"
+    static let badgeRollKey = "badgeRoll"
     static let sectionOrderKey = "sectionOrder"
 
     private(set) var mine = Snapshot<[PullRequest]>(value: [], total: 0, fetchedAt: nil)
@@ -96,6 +97,14 @@ final class PRStore {
     private(set) var badgeCount: Int? = nil
     /// The second number in dual mode; nil in single mode or before the first successful refresh.
     private(set) var badgeSecondCount: Int? = nil
+    /// The odometer roll in flight when the menu bar text changes because of data; nil otherwise.
+    private(set) var badgeRoll: BadgeRoll? = nil
+    private var badgeRollTask: Task<Void, Never>?
+    private let badgeRollDuration: Duration
+    /// Whether the menu bar number rolls when it changes. Stored; on by default.
+    var rollsBadge: Bool {
+        didSet { defaults.set(rollsBadge, forKey: Self.badgeRollKey) }
+    }
 
     /// What the menu bar shows next to the icon, once there is data.
     var badgeText: String? {
@@ -149,7 +158,7 @@ final class PRStore {
         didSet {
             guard dormant != oldValue else { return }
             defaults.set(try? JSONEncoder().encode(dormant), forKey: Self.dormantKey)
-            recomputeBadge()
+            recomputeBadge(source: .data)
         }
     }
     private var dormantIDs: Set<String> { Set(dormant.keys) }
@@ -393,7 +402,9 @@ final class PRStore {
     private var pendingRefresh = false
     private var timerTask: Task<Void, Never>?
 
-    init(client: any GHRunning, defaults: UserDefaults = .standard, now: @escaping @Sendable () -> Date = { Date() }, successLinger: Duration = .seconds(1), log: AppLog = .shared, ciPollInterval: Duration = .seconds(20)) {
+    init(client: any GHRunning, defaults: UserDefaults = .standard, now: @escaping @Sendable () -> Date = { Date() }, successLinger: Duration = .seconds(1), log: AppLog = .shared, ciPollInterval: Duration = .seconds(20), badgeRollDuration: Duration = .milliseconds(360)) {
+        self.badgeRollDuration = badgeRollDuration
+        self.rollsBadge = defaults.object(forKey: Self.badgeRollKey) as? Bool ?? true
         self.client = client
         self.defaults = defaults
         self.now = now
@@ -830,7 +841,7 @@ final class PRStore {
                 case .open(let fresh):
                     replaceLocally(fresh)
                     wakeChanged(in: [fresh])
-                    recomputeBadge()
+                    recomputeBadge(source: .data)
                     appLog.info("refresh \(pr.id): ok")
                 case .closed, .notFound:
                     appLog.info("refresh \(pr.id): gone")
@@ -1149,7 +1160,7 @@ final class PRStore {
             viaTeam = snapshot
             viaTeamError = nil
             wakeChanged(in: snapshot.value)
-            recomputeBadge()
+            recomputeBadge(source: .data)
         }
     }
 
@@ -1213,8 +1224,7 @@ final class PRStore {
         if errors.isEmpty {
             lastError = nil
             phase = .ok(date)
-            badgeCount = 0
-            recomputeBadge()
+            recomputeBadge(source: .data, firstValue: 0)
             let present = Set((mine.value + direct.value).map(\.id))
             let pruned = pruneManualOrders(manualOrders, keeping: present)
             if pruned != manualOrders { manualOrders = pruned }
@@ -1226,7 +1236,15 @@ final class PRStore {
     }
 
     /// Only once a full cycle has succeeded; before that the badge stays nil on purpose.
-    private func recomputeBadge() {
+    enum BadgeChangeSource { case settings, data }
+
+    /// `firstValue` is the successful-refresh path: it makes the badge exist before the first data arrives.
+    /// A change that comes from data (a refresh, a lookup, a snoozed row waking) rolls the menu bar number;
+    /// one that comes from a setting or the first load does not.
+    private func recomputeBadge(source: BadgeChangeSource = .settings, firstValue: Int? = nil) {
+        let previous = badgeCount
+        let previousText = badgeText
+        if badgeCount == nil, let firstValue { badgeCount = firstValue }
         guard badgeCount != nil else { return }
         let count = { (sections: Set<Section>) in
             computeBadgeCount(mine: self.allowed(self.mine.value), direct: self.allowed(self.direct.value), viaTeam: self.viaTeamList, counting: sections, dormant: self.dormantIDs.union(self.mergedIDs))
@@ -1234,6 +1252,33 @@ final class PRStore {
         let counted = countedSections
         badgeCount = count(counted.first)
         badgeSecondCount = counted.second.map(count)
+        guard source == .data, rollsBadge, let previous, let now = badgeCount, now != previous,
+              let previousText, let text = badgeText, previousText != text else { return }
+        roll(from: previousText, to: text, up: now > previous)
+    }
+
+    /// Settings › General "Preview": one step up from one less, so the roll can be seen on demand.
+    func previewBadgeRoll() {
+        guard let count = badgeCount else { return }
+        let before = Pullglance.badgeText(first: max(count - 1, 0), second: badgeSecondCount, mode: badgeMode) ?? "0"
+        roll(from: before, to: badgeText ?? "1", up: true)
+    }
+
+    /// Steps `badgeRoll.progress` from 0 to 1 with an ease-out, a dozen frames; each frame redraws the label.
+    private func roll(from: String, to: String, up: Bool) {
+        badgeRollTask?.cancel()
+        badgeRoll = BadgeRoll(from: from, to: to, progress: 0, up: up)
+        let frames = 12
+        badgeRollTask = Task { [weak self, badgeRollDuration] in
+            for frame in 1...frames {
+                try? await Task.sleep(for: badgeRollDuration / frames)
+                guard !Task.isCancelled, let self else { return }
+                let t = Double(frame) / Double(frames)
+                self.badgeRoll?.progress = 1 - pow(1 - t, 3)
+            }
+            guard !Task.isCancelled else { return }
+            self?.badgeRoll = nil
+        }
     }
 
     private func mostSevere(_ errors: [ErrorKind]) -> ErrorKind {

@@ -73,6 +73,16 @@ enum BadgeMode: String, Codable, Sendable, CaseIterable {
     case single, dual
 }
 
+/// One rolling change of the menu bar text, frame by frame (see `PRStore.badgeRoll`).
+struct BadgeRoll: Equatable, Sendable {
+    let from: String
+    let to: String
+    /// 0 shows `from`, 1 shows `to`.
+    var progress: Double
+    /// New digits come from below when the count went up.
+    let up: Bool
+}
+
 /// Which of the two numbers a section counts toward.
 enum BadgeSlot: Sendable, Equatable {
     case first, second
