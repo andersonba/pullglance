@@ -1,74 +1,58 @@
-# Pullglance
+<p align="center">
+  <img src="docs/images/icon.png" width="96" height="96" alt="">
+</p>
 
-Your pull requests and review requests at a glance, in the macOS menu bar. Vibe coded.
+<h1 align="center">Pullglance</h1>
 
-It talks to GitHub through the `gh` CLI you are already logged into. No GitHub App, no OAuth, no server, no tokens of its own.
+<p align="center">Your pull requests and review requests at a glance, in the macOS menu bar. <em>Vibe coded.</em></p>
 
-## What you see
+<p align="center">
+  <a href="https://github.com/andersonba/pullglance/actions/workflows/ci.yml"><img src="https://github.com/andersonba/pullglance/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
+</p>
 
-- **My PRs**, in four sections: *Needs action* (failing checks, requested changes, merge conflicts, branch behind base), *Ready to merge*, *Waiting for review or checks*, *Drafts*.
-- **To review**: pull requests where you were asked directly, plus a collapsed section for requests to your teams.
-- **A number on the menu bar icon.** By default it adds up *Needs action*, *Ready to merge* and *Needs your review*: everything that depends on you. It can also show two numbers, each adding up sections of your choice.
+<p align="center">
+  <img src="docs/images/hero.png" width="560" alt="The Pullglance popover under the menu bar, showing review requests ordered by priority">
+</p>
 
-Click a row to open the PR, the CI dot to open its checks. A row of chips under the tabs isolates one section (keys `1`–`4`, `0` for all). The folder icon narrows both tabs to a few repositories for the session.
+Pullglance talks to GitHub through the `gh` CLI you are already logged into. No GitHub App, no OAuth, no server, no tokens of its own.
 
-## Acting on a pull request
-
-Swipe a row to the left, or right-click it:
-
-- **Merge** (only in *Ready to merge*): a confirmation with the merge method, defaulting to the one you used last in that repository. Refused by GitHub if the branch moved since the row was shown.
-- **Comment**, **Open on GitHub**, **Copy link**, **Refresh** this one pull request.
-- **Snooze**: the row moves to a *Snoozed* section at the bottom and leaves the badge until the PR gets a new commit, a review decision or a CI result.
-
-Hold a row for a moment, or click *Reorder* on a section title, to drag rows into your own order within a section. *Sort by update* brings a section back.
-
-While the popover is open, rows with CI still running are checked every 20 seconds, so a finished run moves the row and brings *Merge* with it. Everything refreshes every 2 minutes.
-
-## Review window
-
-One click opens the pull request in a window of its own, with a review bar above the page: mark the test files as viewed by preset, jump to the next unviewed file, and approve, comment or merge without leaving the bar. Compare pages remember what you collapsed. The GitHub session lives in the app, separate from your browser.
-
-## Settings (⌘,)
-
-- **General**: launch at login, refresh interval, language.
-- **Sections**: show or hide sections, drag to reorder them, choose what the badge counts, one number or two.
-- **Filters**: hide organizations or accounts, and per owner either keep everything except a few repositories or only a chosen few. Hidden owners and excluded repositories leave the searches themselves, so lists, totals and the badge all follow.
-- **Review**: which files count as tests, by preset or your own globs, and how marking behaves: automatically on opening a pull request, after loading the whole file list, verified on the server. Compare pages can remember viewed files, and that memory can be cleared.
-- **Diagnostics**: the failures of the last refreshes, the avatar cache, a verbose log toggle and *Export diagnostics…*, which zips a summary, the log and optional screenshots for a bug report.
+- **See what depends on you.** Failing checks, approvals ready to merge, reviews asked of you, with a number on the menu bar.
+- **Act from the row.** Merge, comment, snooze, pin, from the mouse or the keyboard.
+- **Review in its own window.** Mark test files as viewed by preset, step through the files, approve or merge from a bar above the page.
 
 ## Install
 
-Requires macOS 15+ and [GitHub CLI](https://cli.github.com):
+Requires macOS 15 and [GitHub CLI](https://cli.github.com).
 
 ```sh
 brew install gh && gh auth login
+```
+
+Download `Pullglance.app` from [Releases](https://github.com/andersonba/pullglance/releases), or build it yourself:
+
+```sh
 git clone https://github.com/andersonba/pullglance && cd pullglance
 Scripts/make-app.sh --install
 ```
 
-That builds `Pullglance.app`, signs it ad hoc and copies it to `/Applications`. Turn on *Launch at login* from the app's menu.
+## Privacy
 
-## Run from source
+Everything stays on your Mac. Preferences in `UserDefaults`, author avatars in `~/Library/Caches`, a small rolling log in `~/Library/Logs/Pullglance` with no titles, bodies or tokens in it. Nothing is sent anywhere but GitHub, through `gh`.
+
+## Developing
 
 ```sh
-swift run              # start the app
-swift test             # run the tests
-Scripts/snapshot.sh    # render the popover and Settings to PNG files, then exit
+swift run                     # start the app
+swift test                    # run the tests
+Scripts/build-review-js.sh    # rebuild the review window's page script
 ```
 
-The UI follows your system language (English, Portuguese). To change it for this app only: System Settings → General → Language & Region → Applications.
+How it works, section by section: [docs/how-it-works.md](docs/how-it-works.md).
 
-## How it works
+## Contributing
 
-Three GraphQL searches through `gh api graphql`, run together:
-
-- `is:pr is:open author:@me`, one page of 100
-- `is:pr is:open user-review-requested:@me`, one page of 100
-- `is:pr is:open review-requested:@me -user-review-requested:@me`, one page of 30, only while the team section is open or counted in the badge
-
-Merging runs `gh pr merge` pinned to the commit you saw. When the repository deletes merged branches itself the app never asks `gh` to, because deleting right after the merge makes GitHub close pull requests stacked on that branch instead of retargeting them; when you ask for the deletion, it first checks that nothing is based on the branch.
-
-On disk: preferences in `UserDefaults`, author avatars in `~/Library/Caches`, and a small rolling log in `~/Library/Logs/Pullglance` with no titles, bodies or tokens in it.
+Issues and pull requests are welcome. Small, focused changes land faster.
 
 ## License
 

@@ -88,6 +88,8 @@ struct SwipeActionsRow<Content: View, MenuContent: View>: View {
         .onChange(of: openRow) { _, new in
             if new != id, offsetX > 0 { close() }
         }
+        // A row told to start open (the demo snapshot) slides its tiles out as soon as it appears.
+        .onAppear { if openRow == id { position.scrollTo(edge: .trailing) } }
         .onChange(of: actions) { _, _ in close() }
     }
 

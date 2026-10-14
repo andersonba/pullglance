@@ -43,9 +43,11 @@ struct PopoverView: View {
 
     enum Tab: Hashable { case mine, review }
 
-    init(store: PRStore, tab: Tab = .mine) {
+    /// `openRow` starts with that row's swipe tiles revealed (the demo snapshot); nil in the app.
+    init(store: PRStore, tab: Tab = .mine, openRow: PullRequest.ID? = nil) {
         self.store = store
         _tab = State(initialValue: tab)
+        _openRow = State(initialValue: openRow)
     }
 
     var body: some View {

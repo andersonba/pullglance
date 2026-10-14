@@ -14,9 +14,17 @@ struct PullglanceApp: App {
         NSApplication.shared.setActivationPolicy(.accessory)
         // Tooltips are the way to read truncated titles here, so show them faster than the 1 s system default.
         UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 250])
-        let store = PRStore(client: GHClient())
-        _store = State(initialValue: store)
         snapshot = SnapshotOptions.parse(CommandLine.arguments)
+        let store: PRStore
+        if snapshot?.demo == true {
+            // Fictional data in a throwaway defaults suite: nothing of the user's is read or written.
+            let demoDefaults = UserDefaults(suiteName: "pullglance.demo")!
+            demoDefaults.removePersistentDomain(forName: "pullglance.demo")
+            store = PRStore(client: DemoGH(), defaults: demoDefaults)
+        } else {
+            store = PRStore(client: GHClient())
+        }
+        _store = State(initialValue: store)
         if let snapshot {
             // Debug run: render to files and leave; no menu bar item, no timer.
             Task { @MainActor in

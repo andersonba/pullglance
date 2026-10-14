@@ -1,6 +1,7 @@
 #!/bin/bash
-# Renders the popover and the Settings tabs to PNG files, using the real gh data. Usage: Scripts/snapshot.sh [dir]
+# Renders the popover and the Settings tabs to PNG files. Usage: Scripts/snapshot.sh [dir] [--demo]
+# --demo uses fictional data and also writes hero.png, the README image.
 set -e
 cd "$(dirname "$0")/.."
 swift build 2>&1 | grep -E "error|warning: unre" || true
-.build/debug/Pullglance --snapshot ${1:+"$1"}
+.build/debug/Pullglance --snapshot "$@"
