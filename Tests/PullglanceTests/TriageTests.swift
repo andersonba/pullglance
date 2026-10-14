@@ -46,6 +46,7 @@ import Testing
         #expect(TriageKey(characters: nil, keyCode: 123, modifiers: []) == .left)
         #expect(TriageKey(characters: nil, keyCode: 124, modifiers: []) == .right)
         #expect(TriageKey(characters: nil, keyCode: 53, modifiers: []) == .escape)
+        #expect(TriageKey(characters: " ", keyCode: 49, modifiers: []) == .space)
         #expect(TriageKey(characters: "p", keyCode: 35, modifiers: [.command]) == nil, "⌘P is someone else's")
         #expect(TriageKey(characters: "x", keyCode: 7, modifiers: []) == nil)
         // The rest of the row menu, same initials; two with ⌘ because they are the system's letters.

@@ -32,7 +32,7 @@ struct TriageFocus: Equatable {
 /// The keys triage answers to: plain keys, plus ⌘C (copy link) and ⌘/ (the shortcuts card), the two whose
 /// plain letters are taken. Anything else with ⌘, ⌥ or ⌃ belongs to the menus.
 enum TriageKey: Equatable {
-    case up, down, left, right, pin, snooze, open, review, refresh, comment, merge, copyLink, shortcuts, escape
+    case up, down, left, right, space, pin, snooze, open, review, refresh, comment, merge, copyLink, shortcuts, escape
 
     init?(characters: String?, keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
         let held = modifiers.intersection([.command, .option, .control])
@@ -52,6 +52,7 @@ enum TriageKey: Equatable {
         case 124: self = .right; return
         case 53: self = .escape; return
         case 36, 76: self = .review; return
+        case 49: self = .space; return
         default: break
         }
         switch characters?.lowercased() {
@@ -131,6 +132,10 @@ struct ShortcutsCard: View {
                 line(Text("Quick filters", bundle: .app), ["0", "–", "9"])
                 line(Text("Switch tab", bundle: .app), ["←", "→"])
                 line(Text("Settings…", bundle: .app), ["⌘,"])
+            }
+            group(Text("Row under the pointer", bundle: .app)) {
+                line(Text("Open review · Copy link", bundle: .app), ["↩", "⌘C"])
+                line(Text("Keyboard from here", bundle: .app), ["space"])
             }
             group(Text("Focused row", bundle: .app)) {
                 line(Text("Start", bundle: .app), ["↓"])

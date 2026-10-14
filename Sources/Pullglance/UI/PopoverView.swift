@@ -29,6 +29,11 @@ struct PopoverView: View {
     @State private var rowFrames: [PullRequest.ID: CGRect] = [:]
     /// Keyboard triage: the focused row, if any. See `TriageFocus`.
     @State private var focus = TriageFocus()
+    /// The row under the pointer: ↩ and ⌘C act on it without a focus, and space adopts it as the focus.
+    @State private var hoveredRow: PullRequest.ID? = nil
+    /// A row that just answered a key (copied its link, opened): a brief glow says which one.
+    @State private var glowingRow: PullRequest.ID? = nil
+    @State private var glowTask: Task<Void, Never>? = nil
     /// The shortcuts card (⌘/ or the ⋯ menu).
     @State private var showingShortcuts = false
     private static let listSpace = "list"
@@ -231,10 +236,16 @@ struct PopoverView: View {
         guard store.hasAnyData, store.blockingError == nil else { return false }
         let rows = triageRows
         let ids = rows.map(\.pr.id)
+        // Without a focus, ↩ and ⌘C act on the row under the pointer; space makes that row the focus.
+        let hovered = focus.id == nil ? rows.first { $0.pr.id == hoveredRow } : nil
         switch key {
         case .down:
             openRow = nil
             focus.move(1, in: ids)
+            return true
+        case .space:
+            openRow = nil
+            if let hovered { focus.set(hovered.pr.id) } else if focus.id == nil { focus.move(1, in: ids) }
             return true
         case .up:
             guard focus.id != nil else { return false }
@@ -257,6 +268,8 @@ struct PopoverView: View {
         case .shortcuts:
             return true   // handled above
         case .pin, .snooze, .open, .review, .refresh, .comment, .merge, .copyLink:
+            if let hovered, key == .review { glow(hovered.pr.id); openReview(hovered.pr, section: hovered.section); return true }
+            if let hovered, key == .copyLink { glow(hovered.pr.id); handle(.copyLink, for: hovered.pr); return true }
             guard let id = focus.id, let row = rows.first(where: { $0.pr.id == id }) else { return false }
             switch key {
             case .pin, .snooze:
@@ -277,12 +290,24 @@ struct PopoverView: View {
                 let offered = allActions(for: origin, dormant: store.isDormant(row.pr), offersMerge: row.pr.offersAutoMerge, autoMergeOn: row.pr.autoMergeMethod != nil)
                 if offered.contains(.merge) { handle(.merge, for: row.pr) }
             case .copyLink:
+                glow(row.pr.id)
                 handle(.copyLink, for: row.pr)
             default:
                 focus.clear()
                 openReview(row.pr, section: row.section)
             }
             return true
+        }
+    }
+
+    /// A short accent glow on a row that just answered a key: on quickly, off slowly.
+    private func glow(_ id: PullRequest.ID) {
+        glowTask?.cancel()
+        withAnimation(.easeOut(duration: 0.08)) { glowingRow = id }
+        glowTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(140))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.45)) { glowingRow = nil }
         }
     }
 
@@ -420,8 +445,12 @@ struct PopoverView: View {
         let reorderable = Self.isReorderable(section) && !dormant
         let lifted = rowDrag?.id == pr.id
         let focused = focus.id == pr.id
+        let glowing = glowingRow == pr.id
         return rowView(pr, section: section, showAuthor: showAuthor, teamLabel: teamLabel, dormant: dormant, pinned: pinnedRow, reorderable: reorderable, among: among)
-            .background(focused ? Color.accentColor.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 8))
+            .onHover { inside in
+                if inside { hoveredRow = pr.id } else if hoveredRow == pr.id { hoveredRow = nil }
+            }
+            .background(glowing ? Color.accentColor.opacity(0.22) : focused ? Color.accentColor.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 8))
             .overlay {
                 if focused {
                     RoundedRectangle(cornerRadius: 8).strokeBorder(Color.accentColor, lineWidth: 2).padding(1.5).allowsHitTesting(false)
