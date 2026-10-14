@@ -67,6 +67,31 @@
     window.scrollTo(0, y0);
   }
 
+  // 7. File boxes in page order (the review pill's cursor geometry): does an earlier box reach past the next
+  //    file's top? Indices and pixels only. Scroll a few files down (onto a collapsed one) before pasting.
+  const boxes = q('[id^="diff-"]').filter((el) => /^diff-[0-9a-f]{20,}$/.test(el.id)).map((el, i) => {
+    const r = el.getBoundingClientRect();
+    const s = getComputedStyle(el);
+    return { i, top: Math.round(r.top), bottom: Math.round(r.bottom), position: s.position, display: s.display,
+      hasHeaderLink: !!el.querySelector('h3 a[href^="#diff-"]'), hasTable: !!el.querySelector('table'),
+      viewed: el.querySelector('button[aria-pressed][aria-label="Viewed"], button[aria-pressed][aria-label="Not Viewed"]')?.getAttribute('aria-pressed') ?? null,
+      nestedBoxes: q('[id^="diff-"]', el).filter((x) => /^diff-[0-9a-f]{20,}$/.test(x.id)).length };
+  });
+  out.fileBoxes = {
+    count: boxes.length,
+    duplicateIds: boxes.length - new Set(q('[id^="diff-"]').filter((el) => /^diff-[0-9a-f]{20,}$/.test(el.id)).map((el) => el.id)).size,
+    boxes,
+    overlaps: boxes.slice(1).filter((b, k) => boxes[k].bottom > b.top + 1).map((b) => ({ earlier: b.i - 1, later: b.i, by: boxes[b.i - 1].bottom - b.top })),
+    stackAtTop: (typeof document.elementsFromPoint === 'function' ? document.elementsFromPoint(innerWidth / 2, 1) : []).slice(0, 8)
+      .map((el) => ({ el: sel(el), position: getComputedStyle(el).position, bottom: Math.round(el.getBoundingClientRect().bottom) })),
+  };
+
+  // 8. Large-diff placeholder ("Load Diff"): its structure, without its text.
+  const loadDiff = q('button').find((b) => /load diff/i.test(b.textContent || ''));
+  out.largeDiff = loadDiff ? { buttonChain: chain(loadDiff, 8), insideDiffBox: !!loadDiff.closest('[id^="diff-"]'),
+    boxHasHeaderLink: !!loadDiff.closest('[id^="diff-"]')?.querySelector('h3 a[href^="#diff-"]'),
+    boxHasViewedButton: !!loadDiff.closest('[id^="diff-"]')?.querySelector('button[aria-pressed][aria-label="Viewed"], button[aria-pressed][aria-label="Not Viewed"]') } : 'no Load Diff button on the page';
+
   const text = JSON.stringify(out, null, 1);
   console.log(text);
   try { copy(text); console.log('%c(copied to clipboard)', 'color: green'); } catch {}

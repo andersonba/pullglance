@@ -14,7 +14,7 @@ export interface Deps { post(event: { name: string; payload: unknown }): void; a
 export interface FileCursor { id: string; path: string; index: number; total: number; viewed: boolean }
 
 /** What a step decided, for the app's verbose log. */
-export interface StepReport { moved: boolean; from: number | null; to: number | null; total: number; via?: 'element' | 'hash' }
+export interface StepReport { moved: boolean; from: number | null; to: number | null; total: number; via?: 'element' | 'hash'; top?: number; scrollY?: number }
 
 const CURSOR_PROBE = 4           // px below the visible top: the file whose box covers this point is the current one
 const CURSOR_NEAR = 72           // a file starting this close below the visible top counts too (gaps between diffs)
@@ -121,17 +121,37 @@ export function install(deps: Deps) {
   /**
    * Where the reader is: the file whose box covers the top edge; else one starting just below it (the gap
    * between two diffs); else the last one above. -1 when the page is above every file.
+   *
+   * Decided by position, not list order: when two boxes cover the edge, the one that starts lower (later on
+   * a tie) is the file the reader is on. A box of an earlier file can reach past the top edge (seen on a
+   * page of collapsed files): taking the first covering one in list order pinned the cursor to it.
    */
   async function cursorIndex(listing: FileListing): Promise<number> {
+    const jumped = intendedIndex(listing)
+    if (jumped !== null) return jumped
     const line = visibleTop(listing.files[0]?.id) + CURSOR_PROBE
     const placed = listing.files.flatMap((f, index) => {
       const r = elementOf(f.id)?.getBoundingClientRect()
       return r ? [{ index, top: r.top, bottom: r.bottom }] : []
     })
-    const covering = placed.find((x) => x.top <= line && x.bottom > line)
-    const near = placed.find((x) => x.top > line && x.top <= line + CURSOR_NEAR)
-    const above = placed.filter((x) => x.top <= line)
-    return (covering ?? near ?? above[above.length - 1])?.index ?? -1
+    type Placed = (typeof placed)[number]
+    const lowest = (xs: Placed[]) => xs.reduce<Placed | undefined>((best, x) => !best || x.top >= best.top ? x : best, undefined)
+    const covering = lowest(placed.filter((x) => x.top <= line && x.bottom > line))
+    const near = placed.filter((x) => x.top > line && x.top <= line + CURSOR_NEAR).reduce<Placed | undefined>((best, x) => !best || x.top < best.top ? x : best, undefined)
+    const above = lowest(placed.filter((x) => x.top <= line))
+    return (covering ?? near ?? above)?.index ?? -1
+  }
+
+  // The file the last jump went to, while the page has not scrolled since. The last files of a pull request
+  // can never reach the top edge (the page ends first), so the edge alone cannot say the reader is on them.
+  // Programmatic scrolls (the jump, the anchoring) move `scrollY` along; any other scroll is the reader's.
+  let intent: { id: string; scrollY: number } | null = null
+  const INTENT_SLACK = 2   // px of scrollY drift still counted as "not scrolled"
+  const intendedIndex = (listing: FileListing): number | null => {
+    if (!intent) return null
+    const index = listing.files.findIndex((f) => f.id === intent!.id)
+    if (index < 0 || Math.abs(window.scrollY - intent.scrollY) > INTENT_SLACK) { intent = null; return null }
+    return index
   }
 
   /** Why there is no cursor, for the app's log: the list failed to read, is empty, or has no element on the page yet. */
@@ -167,7 +187,7 @@ export function install(deps: Deps) {
   // the page shifts under the reader. Chrome compensates natively, WebKit does not. For a short while after a
   // jump: if the page did not scroll between two frames but the file moved, move the page by the same amount.
   let stopAnchor: (() => void) | null = null
-  const anchor = (el: Element) => {
+  const anchor = (el: Element, anchoredId: string) => {
     stopAnchor?.()
     const until = performance.now() + ANCHOR_MS
     let lastY = window.scrollY
@@ -176,7 +196,10 @@ export function install(deps: Deps) {
     const tick = () => {
       const y = window.scrollY
       const top = el.getBoundingClientRect().top
-      if (y === lastY && Math.abs(top - lastTop) > 0.5) window.scrollBy(0, top - lastTop)
+      if (y === lastY && Math.abs(top - lastTop) > 0.5) {
+        window.scrollBy(0, top - lastTop)
+        if (intent?.id === anchoredId) intent.scrollY = window.scrollY   // our scroll, not the reader's
+      }
       lastY = window.scrollY
       lastTop = el.getBoundingClientRect().top
       if (performance.now() < until) frame = requestAnimationFrame(tick)
@@ -194,8 +217,10 @@ export function install(deps: Deps) {
       // Then under the page's fixed header, where the content really starts (scroll-margin-top may or may not be set).
       const off = el.getBoundingClientRect().top - visibleTop(id)
       if (Math.abs(off) > 0.5) window.scrollBy({ top: off, behavior: 'instant' as ScrollBehavior })
-      anchor(el)
+      intent = { id, scrollY: window.scrollY }
+      anchor(el, id)
     } else {
+      intent = null
       if (location.hash === `#diff-${id}`) location.hash = ''
       location.hash = `#diff-${id}`
     }
@@ -211,13 +236,16 @@ export function install(deps: Deps) {
     const to = from + delta
     const target = listing.files[to]
     if (!target) return { moved: false, from, to: null, total: listing.files.length }
-    return { moved: true, from, to, total: listing.files.length, via: jumpTo(target.id) }
+    const via = jumpTo(target.id)
+    // Positions only, for the app's log (it already prints `top` and `scrollY`): where the target landed.
+    const top = elementOf(target.id)?.getBoundingClientRect().top
+    return { moved: true, from, to, total: listing.files.length, via, top: top === undefined ? undefined : Math.round(top), scrollY: Math.round(window.scrollY) }
   }
 
   /** Next or previous file not yet viewed, from where the reader is. */
-  async function scrollToUnviewed(direction: 'next' | 'previous'): Promise<boolean> {
+  async function scrollToUnviewed(direction: 'next' | 'previous', fromIndex?: number): Promise<boolean> {
     const listing = await files()
-    const from = await cursorIndex(listing)
+    const from = fromIndex ?? await cursorIndex(listing)
     const target = direction === 'next'
       ? listing.files.find((f, i) => i > from && !f.viewed)
       : [...listing.files].reverse().find((f) => listing.files.indexOf(f) < from && !f.viewed)
@@ -250,7 +278,8 @@ export function install(deps: Deps) {
         const file = (await files()).files.find((f) => f.id === cursor.id)
         if (file) { await adapter.setViewed(file, true, signal); marked = true; invalidateListing() }
       }
-      const moved = await scrollToUnviewed('next')
+      // From the file just handled: marking collapses it, the page reflows and may scroll (which ends a jump intent).
+      const moved = await scrollToUnviewed('next', cursor?.index)
       return { marked, moved }
     })
   }
@@ -263,6 +292,7 @@ export function install(deps: Deps) {
     lock.cancel()
     deps.post({ name: 'context', payload: context() })
     invalidateListing()
+    intent = null
     lastCursorKey = ''
     listingWatch?.reset()
     for (const ms of [600, 1500, 3000]) setTimeout(() => { invalidateListing(); void postCursor() }, ms)
@@ -293,7 +323,7 @@ export function install(deps: Deps) {
       // The file list may render after the first read (a navigation inside GitHub): look again a few times.
       for (const ms of [600, 1500, 3000]) setTimeout(() => { invalidateListing(); void postCursor() }, ms)
     },
-    counts, mark, undo, unmarkAll, scrollToUnviewed,
+    counts, mark, undo, unmarkAll, scrollToUnviewed: (direction: 'next' | 'previous') => scrollToUnviewed(direction),
     currentFile, stepFile, markCurrentAndNext, setCurrentViewed,
     flush: () => adapter.flushMemory(),
   }

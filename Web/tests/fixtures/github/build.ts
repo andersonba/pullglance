@@ -1,6 +1,10 @@
-import { EMBEDDED_SCRIPT_OPEN, FILE_HEADER, TOOLBAR, VIEWED_BUTTON_ARIA, VIEWED_BUTTON_CSS_ONLY } from './fragments'
+import { DIFF_BODY, EMBEDDED_SCRIPT_OPEN, FILE_HEADER, LARGE_DIFF_BODY, TOOLBAR, VIEWED_BUTTON_ARIA, VIEWED_BUTTON_CSS_ONLY } from './fragments'
 
-export interface FixtureFile { path: string; viewed?: boolean; rendered?: boolean; digest?: string }
+/**
+ * `largeDiff`: GitHub's "Large diffs are not rendered by default." placeholder instead of the diff body.
+ * Markup assumed (not captured from a live page): header present, a "Load Diff" button, no diff table.
+ */
+export interface FixtureFile { path: string; viewed?: boolean; rendered?: boolean; digest?: string; largeDiff?: boolean }
 export interface FixtureOptions {
   files: FixtureFile[]
   basePath?: string
@@ -8,6 +12,8 @@ export interface FixtureOptions {
   baseOid?: string
   variant?: 'aria' | 'css-only' | 'no-embedded' | 'broken-json'
   simulateToggle?: boolean
+  /** Wraps each file in a `#diff-<digest>` container, as the live new Files UI does. */
+  containers?: boolean
 }
 
 export function digestOf(path: string): string {
@@ -68,7 +74,11 @@ export function buildFilesPageHtml(options: FixtureOptions): string {
   }
   const headers = opts.files
     .filter((f) => f.rendered !== false)
-    .map((f) => fill(FILE_HEADER, { digest: f.digest ?? digestOf(f.path), path: esc(f.path), viewedButton: viewedButton(f.viewed ?? false, opts.variant) }))
+    .map((f) => {
+      const digest = f.digest ?? digestOf(f.path)
+      const header = fill(FILE_HEADER, { digest, path: esc(f.path), viewedButton: viewedButton(f.viewed ?? false, opts.variant), body: f.largeDiff ? LARGE_DIFF_BODY : DIFF_BODY })
+      return opts.containers ? `<div id="diff-${digest}" class="Diff-module__diff__x">${header}</div>` : header
+    })
     .join('\n')
   const toolbar = fill(TOOLBAR, { viewedCount: String(opts.files.filter((f) => f.viewed).length), total: String(opts.files.length) })
   let embedded = ''

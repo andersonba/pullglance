@@ -33,4 +33,9 @@ export const FILE_HEADER = `
     </div>
   </div>
 </div>
-<div class="Diff-module__diffContent__x"><table><tbody><tr><td>+ linha</td></tr></tbody></table></div>`
+{{body}}`
+
+export const DIFF_BODY = `<div class="Diff-module__diffContent__x"><table><tbody><tr><td>+ linha</td></tr></tbody></table></div>`
+
+/** Assumed shape of the large-diff placeholder: a message and a "Load Diff" button, no table. */
+export const LARGE_DIFF_BODY = `<div class="Diff-module__diffContent__x"><div class="text-center p-3"><button type="button" class="prc-Button-ButtonBase-9n-Xk" data-variant="invisible">Load Diff</button><p class="color-fg-muted">Large diffs are not rendered by default.</p></div></div>`
