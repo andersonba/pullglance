@@ -209,6 +209,13 @@
 "Keyboard from here" = "Teclado a partir daqui";
 "Review window" = "Janela de review";
 "Review window (beta)" = "Janela de review (beta)";
+"Advanced" = "Avançado";
+"Experimental" = "Experimental";
+"Storage" = "Armazenamento";
+"Log file" = "Arquivo de log";
+"Export…" = "Exportar…";
+"Compare memory" = "Memória de compare";
+"Viewed files remembered on compare pages" = "Arquivos vistos lembrados nas páginas de compare";
 "Adds a Review tab here while on." = "Com ela ligada, aparece a aba Review aqui.";
 "Opens pull requests in a window of the app, with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser." = "Abre os pull requests numa janela do app, com barra de review e controles de arquivo. Desligada, o clique abre o pull request no GitHub, no seu navegador.";
 "Quick filters" = "Filtros rápidos";
@@ -308,7 +315,6 @@
 "Load the whole file list before marking" = "Carregar a lista inteira de arquivos antes de marcar";
 "Verify on the server after marking" = "Verificar no servidor depois de marcar";
 "Remember viewed files on compare pages" = "Lembrar arquivos vistos em páginas de compare";
-"Clear compare memory" = "Limpar memória do compare";
 "Behavior" = "Comportamento";
 
 "The page did not respond. Reload and try again." = "A página não respondeu. Recarregue e tente de novo.";

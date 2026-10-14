@@ -209,6 +209,13 @@
 "Keyboard from here" = "Keyboard from here";
 "Review window" = "Review window";
 "Review window (beta)" = "Review window (beta)";
+"Advanced" = "Advanced";
+"Experimental" = "Experimental";
+"Storage" = "Storage";
+"Log file" = "Log file";
+"Export…" = "Export…";
+"Compare memory" = "Compare memory";
+"Viewed files remembered on compare pages" = "Viewed files remembered on compare pages";
 "Adds a Review tab here while on." = "Adds a Review tab here while on.";
 "Opens pull requests in a window of the app, with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser." = "Opens pull requests in a window of the app, with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser.";
 "Quick filters" = "Quick filters";
@@ -308,7 +315,6 @@
 "Load the whole file list before marking" = "Load the whole file list before marking";
 "Verify on the server after marking" = "Verify on the server after marking";
 "Remember viewed files on compare pages" = "Remember viewed files on compare pages";
-"Clear compare memory" = "Clear compare memory";
 "Behavior" = "Behavior";
 
 "The page did not respond. Reload and try again." = "The page did not respond. Reload and try again.";

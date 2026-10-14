@@ -7,7 +7,7 @@ enum SettingsTab: String, Hashable, CaseIterable {
     case sections
     case filters
     case review
-    case diagnostics
+    case advanced
 }
 
 /// Which tab the Settings window should show; set before calling `openSettings`.
@@ -63,13 +63,13 @@ struct SettingsView: View {
                     .tabItem { Label { Text("Review", bundle: .app) } icon: { Image(systemName: "checklist") } }
                     .tag(SettingsTab.review)
             }
-            DiagnosticsSettingsView(store: store)
-                .tabItem { Label { Text("Diagnostics", bundle: .app) } icon: { Image(systemName: "stethoscope") } }
-                .tag(SettingsTab.diagnostics)
+            AdvancedSettingsView(store: store)
+                .tabItem { Label { Text("Advanced", bundle: .app) } icon: { Image(systemName: "gearshape.2") } }
+                .tag(SettingsTab.advanced)
         }
         .frame(width: 520)
         .onChange(of: review.settings.windowEnabled) { _, on in
-            if !on, selection.tab == .review { selection.tab = .diagnostics }
+            if !on, selection.tab == .review { selection.tab = .advanced }
         }
     }
 }
@@ -626,7 +626,7 @@ private struct ReorderSectionGroup: View {
     }
 }
 
-struct DiagnosticsSettingsView: View {
+struct AdvancedSettingsView: View {
     @Bindable var store: PRStore
     @Bindable private var review = ReviewSettingsStore.shared
     var avatars: AvatarCache = .shared
@@ -636,86 +636,97 @@ struct DiagnosticsSettingsView: View {
     private static let timestamp: Date.FormatStyle = .dateTime.year().month(.twoDigits).day().hour().minute().second()
 
     var body: some View {
-        VStack(spacing: 0) {
-            if store.failureLog.isEmpty {
-                VStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle").font(.system(size: 26)).foregroundStyle(.green)
-                    Text("No failures so far", bundle: .app).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                Table(store.failureLog) {
-                    TableColumn(Text("Time", bundle: .app)) { entry in
-                        Text(entry.date, format: .dateTime.hour().minute().second()).monospacedDigit()
-                    }
-                    .width(70)
-                    TableColumn(Text("Type", bundle: .app)) { entry in Text(verbatim: entry.category) }
-                        .width(90)
-                    TableColumn(Text("Search", bundle: .app)) { entry in Text(verbatim: entry.search.rawValue) }
-                        .width(50)
-                    TableColumn(Text("Message", bundle: .app)) { entry in
-                        Text(verbatim: entry.message).help(Text(verbatim: entry.message))
+        Form {
+            SwiftUI.Section {
+                Toggle(isOn: $review.settings.windowEnabled) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Review window (beta)", bundle: .app)
+                        Text("Opens pull requests in a window of the app, with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser.", bundle: .app)
+                            .font(.caption2).foregroundStyle(.tertiary)
+                        Text("Adds a Review tab here while on.", bundle: .app)
+                            .font(.caption2).foregroundStyle(.tertiary)
                     }
                 }
-                .font(.caption)
+            } header: {
+                Text("Experimental", bundle: .app)
             }
-            HStack {
-                Text(verbatim: "\(store.failureLog.count) / \(PRStore.failureLogLimit)")
-                    .font(.caption).foregroundStyle(.tertiary)
-                Spacer()
-                Button { copyAll() } label: { Text("Copy all", bundle: .app) }
-                    .disabled(store.failureLog.isEmpty)
-                Button { store.clearFailureLog() } label: { Text("Clear", bundle: .app) }
-                    .disabled(store.failureLog.isEmpty)
+            SwiftUI.Section {
+                LabeledContent {
+                    Button { Task { await avatars.clear() } } label: { Text("Clear", bundle: .app) }
+                        .controlSize(.small)
+                        .disabled(avatars.usage.files == 0)
+                } label: {
+                    Text("Avatar cache", bundle: .app)
+                    Text(avatarUsage).font(.caption2).foregroundStyle(.tertiary)
+                }
+                LabeledContent {
+                    Button { ReviewStorage(defaults: .standard).clearPersistent() } label: { Text("Clear", bundle: .app) }
+                        .controlSize(.small)
+                } label: {
+                    Text("Compare memory", bundle: .app)
+                    Text("Viewed files remembered on compare pages", bundle: .app).font(.caption2).foregroundStyle(.tertiary)
+                }
+            } header: {
+                Text("Storage", bundle: .app)
             }
-            .controlSize(.small)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            Divider()
-            HStack(spacing: 10) {
+            SwiftUI.Section {
+                Group {
+                    if store.failureLog.isEmpty {
+                        VStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle").font(.system(size: 22)).foregroundStyle(.green)
+                            Text("No failures so far", bundle: .app).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        Table(store.failureLog) {
+                            TableColumn(Text("Time", bundle: .app)) { entry in
+                                Text(entry.date, format: .dateTime.hour().minute().second()).monospacedDigit()
+                            }
+                            .width(70)
+                            TableColumn(Text("Type", bundle: .app)) { entry in Text(verbatim: entry.category) }
+                                .width(90)
+                            TableColumn(Text("Search", bundle: .app)) { entry in Text(verbatim: entry.search.rawValue) }
+                                .width(50)
+                            TableColumn(Text("Message", bundle: .app)) { entry in
+                                Text(verbatim: entry.message).help(Text(verbatim: entry.message))
+                            }
+                        }
+                        .font(.caption)
+                    }
+                }
+                .frame(height: 120)
+                HStack {
+                    Text(verbatim: "\(store.failureLog.count) / \(PRStore.failureLogLimit)")
+                        .font(.caption).foregroundStyle(.tertiary)
+                    Spacer()
+                    Button { copyAll() } label: { Text("Copy all", bundle: .app) }
+                        .disabled(store.failureLog.isEmpty)
+                    Button { store.clearFailureLog() } label: { Text("Clear", bundle: .app) }
+                        .disabled(store.failureLog.isEmpty)
+                }
+                .controlSize(.small)
                 Toggle(isOn: $store.verboseLogging) { Text("Verbose logging", bundle: .app) }
-                    .toggleStyle(.checkbox)
                     .help(Text("Also records gh commands and timings in the log file", bundle: .app))
-                Spacer()
-                Toggle(isOn: $includeScreenshots) { Text("Include screenshots", bundle: .app) }
-                    .toggleStyle(.checkbox)
-                    .help(Text("Pictures of the popover; they show pull request titles", bundle: .app))
-                Button { NSWorkspace.shared.activateFileViewerSelecting([store.appLog.fileURL]) } label: { Text("Show in Finder", bundle: .app) }
-                    .disabled(!FileManager.default.fileExists(atPath: store.appLog.fileURL.path))
-                Button { exportDiagnostics() } label: { Text("Export diagnostics…", bundle: .app) }
-                    .disabled(exporting)
+                LabeledContent {
+                    HStack(spacing: 8) {
+                        Toggle(isOn: $includeScreenshots) { Text("Include screenshots", bundle: .app) }
+                            .toggleStyle(.checkbox)
+                            .help(Text("Pictures of the popover; they show pull request titles", bundle: .app))
+                        Button { NSWorkspace.shared.activateFileViewerSelecting([store.appLog.fileURL]) } label: { Text("Show in Finder", bundle: .app) }
+                            .disabled(!FileManager.default.fileExists(atPath: store.appLog.fileURL.path))
+                        Button { exportDiagnostics() } label: { Text("Export…", bundle: .app) }
+                            .disabled(exporting)
+                    }
+                    .controlSize(.small)
+                } label: {
+                    Text("Log file", bundle: .app)
+                }
+            } header: {
+                Text("Diagnostics", bundle: .app)
             }
-            .font(.caption)
-            .controlSize(.small)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            Divider()
-            HStack {
-                Text("Avatar cache", bundle: .app)
-                Text(verbatim: "·").foregroundStyle(.tertiary)
-                Text(avatarUsage).foregroundStyle(.secondary)
-                Spacer()
-                Button { Task { await avatars.clear() } } label: { Text("Clear cache", bundle: .app) }
-                    .disabled(avatars.usage.files == 0)
-            }
-            .font(.caption)
-            .controlSize(.small)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            Divider()
-            HStack(spacing: 10) {
-                Toggle(isOn: $review.settings.windowEnabled) { Text("Review window (beta)", bundle: .app) }
-                    .toggleStyle(.checkbox)
-                    .help(Text("Opens pull requests in a window of the app, with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser.", bundle: .app))
-                Spacer()
-                Text("Adds a Review tab here while on.", bundle: .app).foregroundStyle(.tertiary)
-            }
-            .font(.caption)
-            .controlSize(.small)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
         }
-        .frame(height: 480)
+        .formStyle(.grouped)
+        .frame(height: 640)
         .task { await avatars.refreshUsage() }
     }
 

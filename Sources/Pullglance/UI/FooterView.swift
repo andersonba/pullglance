@@ -20,7 +20,7 @@ struct FooterView: View {
             Spacer(minLength: 0)
             if store.lastError != nil {
                 Button {
-                    open(tab: .diagnostics)
+                    open(tab: .advanced)
                 } label: {
                     Image(systemName: "arrow.up.forward.square")
                 }

@@ -61,8 +61,6 @@ struct ReviewSettingsView: View {
                 Toggle(isOn: $store.settings.loadBeforeMark) { Text("Load the whole file list before marking", bundle: .app) }
                 Toggle(isOn: $store.settings.verify) { Text("Verify on the server after marking", bundle: .app) }
                 Toggle(isOn: $store.settings.rememberCompare) { Text("Remember viewed files on compare pages", bundle: .app) }
-                Button { ReviewStorage(defaults: .standard).clearPersistent() } label: { Text("Clear compare memory", bundle: .app) }
-                    .controlSize(.small)
             } header: {
                 Text("Behavior", bundle: .app)
             }
