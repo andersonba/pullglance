@@ -46,6 +46,25 @@ struct FooterView: View {
                 .buttonStyle(.plain)
                 .help(Text("Clear repository filter", bundle: .app))
             }
+            if !store.quickAuthorFilter.isEmpty {
+                Button {
+                    store.quickAuthorFilter = []
+                } label: {
+                    HStack(spacing: 4) {
+                        if let first = store.availableAuthors.first(where: { store.quickAuthorFilter.contains($0.login) }) {
+                            AuthorAvatar(login: first.login, url: first.avatarURL).frame(width: 12, height: 12)
+                        }
+                        Text(verbatim: authorFilterLabel)
+                    }
+                    .font(.caption2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.accentColor.opacity(0.15), in: Capsule())
+                    .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .help(Text("Clear author filter", bundle: .app))
+            }
             if !store.hiddenOwners.isEmpty {
                 Button {
                     open(tab: .filters)
@@ -75,6 +94,13 @@ struct FooterView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
         .background(.bar)
+    }
+
+    /// One author: the login; several: the first and how many more.
+    private var authorFilterLabel: String {
+        let logins = store.quickAuthorFilter.sorted()
+        guard let first = logins.first else { return "" }
+        return logins.count == 1 ? first : "\(first) +\(logins.count - 1)"
     }
 
     /// One repo: its short name; several: a count.

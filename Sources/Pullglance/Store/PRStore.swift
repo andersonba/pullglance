@@ -44,6 +44,14 @@ struct RepoInfo: Equatable, Identifiable, Sendable {
     var name: String { fullName.split(separator: "/").last.map(String.init) ?? fullName }
 }
 
+/// An author present in what is shown, for the quick filter.
+struct AuthorInfo: Equatable, Identifiable, Sendable {
+    let login: String
+    let avatarURL: URL?
+    let count: Int
+    var id: String { login }
+}
+
 /// An organization or account that can own pull requests shown by the app.
 struct OwnerInfo: Equatable, Identifiable, Sendable {
     let login: String
@@ -206,6 +214,9 @@ final class PRStore {
     /// Session-only lens over the loaded lists: show only these repositories. Empty means no filter.
     /// Does not touch the badge; the tab numbers follow it.
     var quickRepoFilter: Set<String> = []
+    /// Same lens by author login: "what did alice ask me to review". Stacks with the repository one.
+    var quickAuthorFilter: Set<String> = []
+    var hasQuickFilter: Bool { !quickRepoFilter.isEmpty || !quickAuthorFilter.isEmpty }
 
     /// Sections shown in the popover. Missing from defaults means all.
     /// Persisted as the hidden set, so a section added in a later version shows up for existing users.
@@ -505,7 +516,7 @@ final class PRStore {
     /// "Only" rules plus the session quick filter: what the lists show.
     private func lens(_ prs: [PullRequest]) -> [PullRequest] {
         let base = allowed(prs)
-        return quickRepoFilter.isEmpty ? base : base.filter { quickRepoFilter.contains($0.repo) }
+        return base.filter { (quickRepoFilter.isEmpty || quickRepoFilter.contains($0.repo)) && (quickAuthorFilter.isEmpty || quickAuthorFilter.contains($0.author)) }
     }
 
     var mineGroups: MineGroups {
@@ -868,12 +879,29 @@ final class PRStore {
         mine.value + direct.value + (wantsTeamFetch ? (viaTeam?.value ?? []) : [])
     }
 
-    /// Repositories present in what is shown, for the quick filter.
+    /// Repositories present in what is shown, for the quick filter, counted under the author lens (the two
+    /// stack, so the numbers say what choosing one would leave). A chosen repository stays listed at 0.
     var availableRepos: [RepoInfo] {
         var counts: [String: Int] = [:]
-        for pr in allowed(loadedPullRequests) { counts[pr.repo, default: 0] += 1 }
+        for pr in allowed(loadedPullRequests) where quickAuthorFilter.isEmpty || quickAuthorFilter.contains(pr.author) { counts[pr.repo, default: 0] += 1 }
+        for repo in quickRepoFilter where counts[repo] == nil { counts[repo] = 0 }
         return counts.keys.sorted().map { RepoInfo(fullName: $0, openCount: counts[$0] ?? 0) }
     }
+    /// Authors present in what is shown, counted under the repository lens, most pull requests first, then
+    /// by login. A chosen author stays listed at 0.
+    var availableAuthors: [AuthorInfo] {
+        var counts: [String: Int] = [:]
+        var avatars: [String: URL] = [:]
+        for pr in allowed(loadedPullRequests) {
+            if let url = pr.authorAvatarURL { avatars[pr.author] = url }
+            guard quickRepoFilter.isEmpty || quickRepoFilter.contains(pr.repo) else { continue }
+            counts[pr.author, default: 0] += 1
+        }
+        for login in quickAuthorFilter where counts[login] == nil { counts[login] = 0 }
+        return counts.map { AuthorInfo(login: $0.key, avatarURL: avatars[$0.key], count: $0.value) }
+            .sorted { $0.count != $1.count ? $0.count > $1.count : $0.login < $1.login }
+    }
+
     /// Approximate count for the header: team requests minus the ones already shown as direct.
     var viaTeamTotal: Int? { viaTeam.map { max(0, $0.total - direct.total) } }
     var hasAnyData: Bool { mine.fetchedAt != nil || direct.fetchedAt != nil }
@@ -888,7 +916,7 @@ final class PRStore {
     /// is on, in which case only the matching loaded rows count. Team requests are not counted here.
     var reviewTabCount: Int {
         guard visibleSections.contains(.needsYourReview) else { return 0 }
-        return quickRepoFilter.isEmpty && !hasOnlyRules ? direct.total : directList.count
+        return !hasQuickFilter && !hasOnlyRules ? direct.total : directList.count
     }
 
     /// Everything that can own a PR of yours: your account, your organizations, owners seen in results,

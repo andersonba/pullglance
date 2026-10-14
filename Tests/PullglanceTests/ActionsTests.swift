@@ -334,6 +334,9 @@ import Testing
         let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() }, successLinger: .milliseconds(150))
         await store.refresh()
         let pr = try #require(store.mineGroups.readyToMerge.first)
+        // Scripted before the merge: the lookup after the linger must not race the test's own awaits.
+        let inQueue = node(number: 102, ci: "SUCCESS", decision: "APPROVED", headRefOid: "feedface", prExtra: "\"id\":\"PR_q\",\"isMergeQueueEnabled\":true,\"mergeQueueEntry\":{\"position\":2,\"state\":\"AWAITING_CHECKS\"}")
+        await gh.setPullRequest(.success(pullRequestEnvelope(inQueue)), number: 102)
         let result = await store.merge(pr, method: .squash, deleteBranch: true)
         guard case .success(let note?) = result else { Issue.record("expected a note, got \(result)"); return }
         #expect(note.contains("2"))
@@ -344,8 +347,6 @@ import Testing
         #expect(call.oid == "feedface")
         #expect(store.actionState(for: pr) == .succeeded(.merge))
         // Queued is not merged: the row stays, and a lookup brings the queue entry in for the pill.
-        let inQueue = node(number: 102, ci: "SUCCESS", decision: "APPROVED", headRefOid: "feedface", prExtra: "\"id\":\"PR_q\",\"isMergeQueueEnabled\":true,\"mergeQueueEntry\":{\"position\":2,\"state\":\"AWAITING_CHECKS\"}")
-        await gh.setPullRequest(.success(pullRequestEnvelope(inQueue)), number: 102)
         let queuedShown = await waitUntil { store.mine.value.first { $0.id == pr.id }?.mergeQueuePosition == 2 }
         #expect(queuedShown)
         #expect(store.actionState(for: pr) == nil)
@@ -412,6 +413,9 @@ import Testing
         await store.refresh()
         let pr = try #require(store.mine.value.first { $0.number == 104 })
         #expect(pr.offersAutoMerge)
+        // Scripted before the merge: the lookup after the linger must not race the test's own awaits.
+        let scheduled = node(number: 104, ci: "PENDING", decision: "APPROVED", mergeState: "BLOCKED", headRefOid: "cafe", prExtra: "\"id\":\"PR_b\",\"viewerCanEnableAutoMerge\":false,\"autoMergeRequest\":{\"mergeMethod\":\"REBASE\"}")
+        await gh.setPullRequest(.success(pullRequestEnvelope(scheduled)), number: 104)
         let result = await store.merge(pr, method: .rebase, deleteBranch: true)
         guard case .success(let note?) = result else { Issue.record("expected a note, got \(result)"); return }
         #expect(note.isEmpty == false)
@@ -421,8 +425,6 @@ import Testing
         #expect(call.oid == "cafe")
         #expect(await gh.merges.isEmpty)
         #expect(await gh.dependentQueries.isEmpty, "the branch is GitHub's to delete, later")
-        let scheduled = node(number: 104, ci: "PENDING", decision: "APPROVED", mergeState: "BLOCKED", headRefOid: "cafe", prExtra: "\"id\":\"PR_b\",\"viewerCanEnableAutoMerge\":false,\"autoMergeRequest\":{\"mergeMethod\":\"REBASE\"}")
-        await gh.setPullRequest(.success(pullRequestEnvelope(scheduled)), number: 104)
         let scheduledShown = await waitUntil { store.mine.value.first { $0.number == 104 }?.autoMergeMethod == .rebase }
         #expect(scheduledShown)
         #expect(store.actionState(for: pr) == nil)

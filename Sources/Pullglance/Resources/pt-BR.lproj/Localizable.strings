@@ -123,8 +123,13 @@
 "Error" = "Erro";
 
 /* Repository filter */
-"Filter by repository" = "Filtrar por repositório";
 "Search repositories" = "Buscar repositórios";
+"Filter by repository or author" = "Filtrar por repositório ou autor";
+"Repositories" = "Repositórios";
+"Authors" = "Autores";
+"Search authors" = "Buscar autores";
+"No authors match" = "Nenhum autor encontrado";
+"Clear author filter" = "Limpar filtro de autor";
 "No repositories match" = "Nenhum repositório encontrado";
 "Applies to both tabs. Not saved." = "Vale para as duas abas. Não é salvo.";
 "Clear repository filter" = "Limpar filtro de repositório";

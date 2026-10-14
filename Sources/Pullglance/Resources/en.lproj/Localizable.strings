@@ -123,8 +123,13 @@
 "Error" = "Error";
 
 /* Repository filter */
-"Filter by repository" = "Filter by repository";
 "Search repositories" = "Search repositories";
+"Filter by repository or author" = "Filter by repository or author";
+"Repositories" = "Repositories";
+"Authors" = "Authors";
+"Search authors" = "Search authors";
+"No authors match" = "No authors match";
+"Clear author filter" = "Clear author filter";
 "No repositories match" = "No repositories match";
 "Applies to both tabs. Not saved." = "Applies to both tabs. Not saved.";
 "Clear repository filter" = "Clear repository filter";

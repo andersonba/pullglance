@@ -72,13 +72,13 @@ func pullRequestEnvelope(_ node: String?, state: String = "OPEN") -> Data {
 }
 
 /// `mergeable: nil` writes a null, as a list fetched without merge fields decodes.
-func node(number: Int, ci: String?, decision: String? = nil, draft: Bool = false, mergeable: String? = "MERGEABLE", mergeState: String = "CLEAN", updatedAt: String = "2026-10-10T10:00:00Z", headRefOid: String = "abc1234", repo: String = "acme/web", repoExtra: String = "\"mergeCommitAllowed\":false,\"squashMergeAllowed\":true,\"rebaseMergeAllowed\":false,\"deleteBranchOnMerge\":true,\"viewerDefaultMergeMethod\":\"SQUASH\"", prExtra: String = "") -> String {
+func node(number: Int, ci: String?, decision: String? = nil, draft: Bool = false, mergeable: String? = "MERGEABLE", mergeState: String = "CLEAN", updatedAt: String = "2026-10-10T10:00:00Z", author: String = "someone", headRefOid: String = "abc1234", repo: String = "acme/web", repoExtra: String = "\"mergeCommitAllowed\":false,\"squashMergeAllowed\":true,\"rebaseMergeAllowed\":false,\"deleteBranchOnMerge\":true,\"viewerDefaultMergeMethod\":\"SQUASH\"", prExtra: String = "") -> String {
     let rollup = ci.map { "{\"state\":\"\($0)\"}" } ?? "null"
     let dec = decision.map { "\"\($0)\"" } ?? "null"
     let extra = prExtra.isEmpty ? "" : prExtra + ","
     let mergeableJSON = mergeable.map { "\"\($0)\"" } ?? "null"
     return """
-    {\(extra)"number":\(number),"title":"PR \(number)","url":"https://github.com/\(repo)/pull/\(number)","isDraft":\(draft),"mergeable":\(mergeableJSON),"mergeStateStatus":"\(mergeState)","baseRefName":"main","headRefName":"feature-\(number)","headRefOid":"\(headRefOid)","updatedAt":"\(updatedAt)","repository":{"nameWithOwner":"\(repo)",\(repoExtra)},"author":{"login":"someone","avatarUrl":"https://example.com/someone.png"},"reviewDecision":\(dec),"reviewThreads":{"nodes":[]},"reviewRequests":{"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":\(rollup)}}]}}
+    {\(extra)"number":\(number),"title":"PR \(number)","url":"https://github.com/\(repo)/pull/\(number)","isDraft":\(draft),"mergeable":\(mergeableJSON),"mergeStateStatus":"\(mergeState)","baseRefName":"main","headRefName":"feature-\(number)","headRefOid":"\(headRefOid)","updatedAt":"\(updatedAt)","repository":{"nameWithOwner":"\(repo)",\(repoExtra)},"author":{"login":"\(author)","avatarUrl":"https://example.com/\(author).png"},"reviewDecision":\(dec),"reviewThreads":{"nodes":[]},"reviewRequests":{"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":\(rollup)}}]}}
     """
 }
 
