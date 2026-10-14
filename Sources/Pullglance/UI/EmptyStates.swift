@@ -15,10 +15,19 @@ struct EmptyStateView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: symbol)
-                .font(.system(size: 28))
-                .foregroundStyle(tint)
-                .padding(.bottom, 4)
+            if kind == .allClear, let nap = Self.sleepingMascot {
+                // Nothing to do: the mascot takes a nap.
+                Image(nsImage: nap)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 128)
+                    .accessibilityHidden(true)
+            } else {
+                Image(systemName: symbol)
+                    .font(.system(size: 28))
+                    .foregroundStyle(tint)
+                    .padding(.bottom, 4)
+            }
             switch kind {
             case .allClear:
                 Text("All clear", bundle: .app).font(.headline)
@@ -60,6 +69,9 @@ struct EmptyStateView: View {
         .padding(.vertical, 36)
         .padding(.horizontal, 24)
     }
+
+    /// Loaded by URL: a processed SwiftPM resource is a plain file in the bundle, not a named asset.
+    private static let sleepingMascot: NSImage? = Bundle.app.url(forResource: "mascot-sleeping", withExtension: "png").flatMap { NSImage(contentsOf: $0) }
 
     private var symbol: String {
         switch kind {

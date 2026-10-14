@@ -20,7 +20,7 @@ cp "$RELEASE/$APP_NAME" "$OUT/Contents/MacOS/$APP_NAME"
 cp -R "$RELEASE/${APP_NAME}_${APP_NAME}.bundle" "$OUT/Contents/Resources/"
 
 echo "==> icon"
-swift Scripts/make-icon.swift build/AppIcon.iconset
+swift Scripts/make-icon.swift Assets/mascot.png build/AppIcon.iconset
 iconutil -c icns build/AppIcon.iconset -o "$OUT/Contents/Resources/AppIcon.icns"
 
 cat > "$OUT/Contents/Info.plist" <<PLIST

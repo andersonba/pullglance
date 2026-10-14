@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/icon.png" width="96" height="96" alt="">
+  <img src="docs/images/mascot-glance.png" width="150" alt="">
 </p>
 
 <h1 align="center">Pullglance</h1>
