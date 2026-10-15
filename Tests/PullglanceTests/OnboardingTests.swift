@@ -21,9 +21,9 @@ import Testing
 @MainActor
 @Suite struct RequirementCheckerTests {
     private nonisolated static let ghURL = URL(fileURLWithPath: "/opt/homebrew/bin/gh")
-    private nonisolated static let authOK = Data("github.com\n  ✓ Logged in to github.com account octocat (keyring)\n".utf8)
+    private nonisolated static let authOK = GHClient.AuthStatus.loggedIn(login: "octocat")
 
-    private func checker(found: Bool, version: GHOutcome = .success(Data("gh version 2.86.0 (2026-09-01)\n".utf8)), auth: GHOutcome) -> (RequirementChecker, Counter) {
+    private func checker(found: Bool, version: GHOutcome = .success(Data("gh version 2.86.0 (2026-09-01)\n".utf8)), auth: GHClient.AuthStatus) -> (RequirementChecker, Counter) {
         let counter = Counter()
         let checker = RequirementChecker(
             locate: { found ? Self.ghURL : nil },
@@ -33,7 +33,7 @@ import Testing
     }
 
     @Test func missingGhIsMissingAndSkipsTheLoginProbe() async {
-        let (checker, counter) = checker(found: false, auth: .success(Self.authOK))
+        let (checker, counter) = checker(found: false, auth: Self.authOK)
         await checker.checkOnce()
         #expect(checker.installed == .missing)
         #expect(checker.loggedIn == .unknown)
@@ -42,7 +42,7 @@ import Testing
     }
 
     @Test func loggedOutIsMissingLogin() async {
-        let (checker, _) = checker(found: true, auth: .notAuthenticated)
+        let (checker, _) = checker(found: true, auth: .loggedOut)
         await checker.checkOnce()
         #expect(checker.installed == .ok("/opt/homebrew/bin/gh · 2.86.0"))
         #expect(checker.loggedIn == .missing)
@@ -50,7 +50,7 @@ import Testing
     }
 
     @Test func bothOkCarriesTheLogin() async {
-        let (checker, _) = checker(found: true, auth: .success(Self.authOK))
+        let (checker, _) = checker(found: true, auth: Self.authOK)
         await checker.checkOnce()
         #expect(checker.loggedIn == .ok("octocat"))
         #expect(checker.allPassed)
@@ -58,13 +58,13 @@ import Testing
 
     /// Network down, or any other gh failure: say so, rather than "not logged in" forever.
     @Test func otherFailuresAreReportedAsSuch() async {
-        let (checker, _) = checker(found: true, auth: .failure("error connecting to github.com"))
+        let (checker, _) = checker(found: true, auth: .unverifiable("error connecting to github.com"))
         await checker.checkOnce()
         #expect(checker.loggedIn == .failed("error connecting to github.com"))
     }
 
     @Test func pollingStopsOnceBothPass() async throws {
-        let (checker, counter) = checker(found: true, auth: .success(Self.authOK))
+        let (checker, counter) = checker(found: true, auth: Self.authOK)
         checker.start()
         #expect(await waitUntil { checker.allPassed })
         let probes = counter.value
@@ -73,7 +73,7 @@ import Testing
     }
 
     @Test func stopEndsThePolling() async throws {
-        let (checker, counter) = checker(found: true, auth: .notAuthenticated)
+        let (checker, counter) = checker(found: true, auth: .loggedOut)
         checker.start()
         #expect(await waitUntil { counter.value >= 2 })
         checker.stop()
@@ -124,5 +124,76 @@ final class Counter: @unchecked Sendable {
         #expect(store.hasUnseenWoke)
         store.popoverDidOpen()
         #expect(store.hasUnseenWoke == false)
+    }
+}
+
+/// What `gh auth status` says, in the JSON form (gh ≥ 2.50-ish) and the text form before it.
+@Suite struct AuthStatusInterpretationTests {
+    @Test func jsonSuccessCarriesTheLogin() {
+        let json = Data(#"{"hosts":{"github.com":[{"state":"success","active":true,"host":"github.com","login":"octocat","tokenSource":"keyring"}]}}"#.utf8)
+        #expect(GHClient.interpretAuthStatus(json: json) == .loggedIn(login: "octocat"))
+    }
+
+    /// A token gh could not verify: offline, or expired. Either way "not logged in" would be wrong.
+    @Test func jsonErrorAndTimeoutAreUnverifiable() {
+        let error = Data(#"{"hosts":{"github.com":[{"state":"error","active":true,"host":"github.com","login":"octocat","error":"token invalid"}]}}"#.utf8)
+        #expect(GHClient.interpretAuthStatus(json: error) == .unverifiable("token invalid"))
+        let timeout = Data(#"{"hosts":{"github.com":[{"state":"timeout","active":true,"host":"github.com","login":"octocat"}]}}"#.utf8)
+        #expect(GHClient.interpretAuthStatus(json: timeout) == .unverifiable("timeout"))
+    }
+
+    /// Only github.com matters: a second host or account in trouble must not block the step.
+    @Test func jsonLooksOnlyAtGitHubComAndItsActiveAccount() {
+        let json = Data(#"{"hosts":{"ghe.example.com":[{"state":"error","active":true,"host":"ghe.example.com","login":"old"}],"github.com":[{"state":"error","active":false,"host":"github.com","login":"spare"},{"state":"success","active":true,"host":"github.com","login":"octocat"}]}}"#.utf8)
+        #expect(GHClient.interpretAuthStatus(json: json) == .loggedIn(login: "octocat"))
+    }
+
+    @Test func jsonWithoutTheHostIsLoggedOut() {
+        #expect(GHClient.interpretAuthStatus(json: Data(#"{"hosts":{}}"#.utf8)) == .loggedOut)
+        #expect(GHClient.interpretAuthStatus(json: Data("garbage".utf8)) == nil)
+    }
+
+    @Test func textFormsForOlderGh() {
+        #expect(GHClient.interpretAuthStatus(text: .success(Data("github.com\n  ✓ Logged in to github.com account octocat (keyring)\n".utf8))) == .loggedIn(login: "octocat"))
+        #expect(GHClient.interpretAuthStatus(text: .success(Data("You are not logged into any accounts on github.com\n".utf8))) == .loggedOut)
+        #expect(GHClient.interpretAuthStatus(text: .notAuthenticated) == .loggedOut)
+        #expect(GHClient.interpretAuthStatus(text: .failure("gh timed out")) == .unverifiable("gh timed out"))
+    }
+}
+
+@MainActor
+@Suite struct RequirementCheckerFlickerTests {
+    /// Re-checking must not pass through "checking": the row would blink and its button vanish every 2 s.
+    @Test func reCheckingKeepsTheLastState() async {
+        let seen = Recorder()
+        var checker: RequirementChecker!
+        checker = RequirementChecker(
+            locate: { URL(fileURLWithPath: "/opt/homebrew/bin/gh") },
+            probe: { _ in
+                let state = await MainActor.run { checker.loggedIn }
+                seen.append(state)
+                return (.success(Data("gh version 2.86.0\n".utf8)), .loggedOut)
+            },
+            interval: .seconds(1))
+        await checker.checkOnce()
+        await checker.checkOnce()
+        #expect(seen.values == [.checking, .missing])
+        #expect(checker.loggedIn == .missing)
+    }
+}
+
+final class Recorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [RequirementState] = []
+    var values: [RequirementState] { lock.withLock { items } }
+    func append(_ state: RequirementState) { lock.withLock { items.append(state) } }
+}
+
+@Suite struct AppActivationTests {
+    /// Closing one of our regular windows must not take the Dock icon from another that stays open.
+    @Test func returnsToAccessoryOnlyWhenNoOtherRegularWindowStays() {
+        #expect(AppActivation.shouldReturnToAccessory(otherVisible: []))
+        #expect(AppActivation.shouldReturnToAccessory(otherVisible: [false]))
+        #expect(AppActivation.shouldReturnToAccessory(otherVisible: [true, false]) == false)
     }
 }

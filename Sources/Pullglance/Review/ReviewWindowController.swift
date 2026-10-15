@@ -129,7 +129,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         Task { _ = try? await bridge.call("flush", ["args": []]) }
         host.closeOwnedPopups()
         sender.orderOut(nil)
-        NSApp.setActivationPolicy(.accessory)
+        AppActivation.windowClosed(sender)
         return false
     }
 

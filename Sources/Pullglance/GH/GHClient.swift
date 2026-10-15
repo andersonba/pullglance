@@ -142,6 +142,72 @@ struct GHClient: GHRunning {
     func version() async -> GHOutcome { await run(["--version"]) }
     func authStatus() async -> GHOutcome { await run(["auth", "status"]) }
 
+    /// What `gh auth status` says about github.com's active account, and nothing else: a second host or
+    /// account in trouble makes the plain command exit 1, which must not read as "not logged in".
+    enum AuthStatus: Equatable, Sendable {
+        case loggedIn(login: String?)
+        case loggedOut
+        /// gh could not verify the token: offline, or the token expired. Not the same as logged out.
+        case unverifiable(String)
+        case failed(String)
+    }
+
+    /// `--json hosts` carries a `state` per account; the text form before it (older gh) is parsed as a
+    /// fallback, where an exit 1 cannot tell an expired token from a logged-out gh.
+    func checkAuth(host: String = "github.com") async -> AuthStatus {
+        let json = await run(["auth", "status", "--hostname", host, "--active", "--json", "hosts"])
+        switch json {
+        case .success(let data):
+            return Self.interpretAuthStatus(json: data, host: host) ?? Self.interpretAuthStatus(text: json)
+        case .failure(let message) where message.contains("unknown flag"):
+            return Self.interpretAuthStatus(text: await run(["auth", "status", "--hostname", host]))
+        default:
+            return Self.interpretAuthStatus(text: json)
+        }
+    }
+
+    private struct AuthHosts: Decodable {
+        struct Entry: Decodable {
+            let state: String
+            let active: Bool?
+            let login: String?
+            let error: String?
+        }
+        let hosts: [String: [Entry]]
+    }
+
+    static func interpretAuthStatus(json: Data, host: String = "github.com") -> AuthStatus? {
+        guard let decoded = try? JSONDecoder().decode(AuthHosts.self, from: json) else { return nil }
+        let entries = decoded.hosts[host] ?? []
+        guard let entry = entries.first(where: { $0.active == true }) ?? entries.first else { return .loggedOut }
+        switch entry.state {
+        case "success": return .loggedIn(login: entry.login)
+        default: return .unverifiable(entry.error ?? entry.state)
+        }
+    }
+
+    static func interpretAuthStatus(text outcome: GHOutcome) -> AuthStatus {
+        switch outcome {
+        case .success(let data):
+            let text = String(decoding: data, as: UTF8.self)
+            if let login = login(fromAuthStatusText: text) { return .loggedIn(login: login) }
+            return text.contains("Logged in") ? .loggedIn(login: nil) : .loggedOut
+        case .notAuthenticated: return .loggedOut
+        case .failure(let message): return .unverifiable(message)
+        case .ghNotFound: return .failed("gh not found")
+        }
+    }
+
+    /// "Logged in to github.com account octocat (keyring)" or the older "… as octocat (…)".
+    static func login(fromAuthStatusText text: String) -> String? {
+        for marker in [" account ", " as "] {
+            guard let range = text.range(of: marker) else { continue }
+            let login = text[range.upperBound...].prefix { !$0.isWhitespace && $0 != "(" }
+            if !login.isEmpty { return String(login) }
+        }
+        return nil
+    }
+
     func merge(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?) async -> GHOutcome {
         await run(Self.mergeArguments(url: url, method: method, deleteBranch: deleteBranch, matchHeadCommit: matchHeadCommit))
     }

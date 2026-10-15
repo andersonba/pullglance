@@ -112,7 +112,7 @@ enum SnapshotRunner {
             }
             // The welcome window, one PNG per step, with gh pretending to be ready.
             let checker = RequirementChecker(locate: { URL(fileURLWithPath: "/opt/homebrew/bin/gh") },
-                                             probe: { _ in (.success(Data("gh version 2.86.0\n".utf8)), .success(Data("Logged in to github.com account octocat (keyring)\n".utf8))) })
+                                             probe: { _ in (.success(Data("gh version 2.86.0\n".utf8)), .loggedIn(login: "octocat")) })
             await checker.checkOnce()
             for index in OnboardingStep.all.indices {
                 await write("onboarding-\(index + 1)") {

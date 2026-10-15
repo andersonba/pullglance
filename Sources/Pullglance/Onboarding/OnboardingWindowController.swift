@@ -10,7 +10,8 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     private static var store: PRStore?
     private static var progress = OnboardingProgress()
 
-    static var isShowing: Bool { shared?.window?.isVisible == true }
+    /// For `AppActivation`: the window, if it was ever created.
+    static var window: NSWindow? { shared?.window }
 
     static func configure(store: PRStore, progress: OnboardingProgress = OnboardingProgress()) {
         self.store = store
@@ -93,6 +94,6 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
             Self.progress.markCompleted(version: AppInfo.version)
         }
         model.step = 0
-        NSApp.setActivationPolicy(.accessory)
+        if let window { AppActivation.windowClosed(window) }
     }
 }

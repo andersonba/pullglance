@@ -144,7 +144,10 @@ struct OnboardingView: View {
                 detail.font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
-            if case .missing = state { fix().controlSize(.small) }
+            switch state {
+            case .missing, .failed: fix().controlSize(.small)
+            default: EmptyView()
+            }
         }
         .padding(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
         .background(.background, in: RoundedRectangle(cornerRadius: 9))
