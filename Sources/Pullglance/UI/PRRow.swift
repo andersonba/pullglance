@@ -205,6 +205,9 @@ struct PRRowMenu: View {
                 }
             }
             .disabled(isRunning && (action == .merge || action == .comment || action == .refresh || action == .disableAutoMerge))
+            // The key shown next to the item, as every Mac menu does; the key itself is handled by the
+            // popover's monitor on the focused or hovered row, not registered here.
+            .keyboardShortcut(Self.shortcut(for: action))
             if action == .snooze {
                 // Right under Snooze: the timed ones. Under Wake it reads as "change the snooze", so it also
                 // offers the plain kind, and checks what the row has now.
@@ -220,6 +223,19 @@ struct PRRowMenu: View {
                     Label { Text("Snooze for…", bundle: .app) } icon: { Image(systemName: "clock") }
                 }
             }
+        }
+    }
+
+    private static func shortcut(for action: PRAction) -> KeyboardShortcut? {
+        switch action {
+        case .pin: KeyboardShortcut("p", modifiers: [])
+        case .snooze: KeyboardShortcut("s", modifiers: [])
+        case .comment: KeyboardShortcut("c", modifiers: [])
+        case .merge: KeyboardShortcut("m", modifiers: [])
+        case .open: KeyboardShortcut("o", modifiers: [])
+        case .refresh: KeyboardShortcut("r", modifiers: [])
+        case .copyLink: KeyboardShortcut("c", modifiers: .command)
+        case .approve, .disableAutoMerge: nil
         }
     }
 

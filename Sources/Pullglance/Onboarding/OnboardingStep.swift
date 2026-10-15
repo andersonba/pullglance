@@ -48,7 +48,7 @@ struct OnboardingStep: Identifiable, Equatable, Sendable {
                        content: .badgeAndTabs, button: "Continue"),
         OnboardingStep(id: "actions", pose: .neutral,
                        title: "Act from the row",
-                       text: "Swipe a row for Pin, Snooze and Comment. Press ↓ to drive the list from the keyboard, ⌘/ shows every key. Right-click the icon up there for the menu.",
+                       text: "Swipe a row for Pin, Snooze and Comment. Press ↓ to drive the list from the keyboard, ⌘/ shows every key. The same keys work on the row under the pointer. Right-click the icon up there for the menu.",
                        content: .rowActions, button: "Continue"),
         OnboardingStep(id: "snooze", pose: .pointing,
                        title: "Snooze what can wait",
