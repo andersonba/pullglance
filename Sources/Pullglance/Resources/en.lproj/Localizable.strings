@@ -200,6 +200,7 @@
 "1 week" = "1 week";
 "%@ left" = "%@ left";
 "Woke" = "Woke";
+"Logged in" = "Logged in";
 "Notify when a snooze ends" = "Notify when a snooze ends";
 "Only for snoozes with a length; the ones ended by activity stay quiet." = "Only for snoozes with a length; the ones ended by activity stay quiet.";
 "Snooze ended" = "Snooze ended";

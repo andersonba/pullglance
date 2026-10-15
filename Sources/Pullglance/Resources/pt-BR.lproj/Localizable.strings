@@ -200,6 +200,7 @@
 "1 week" = "1 semana";
 "%@ left" = "faltam %@";
 "Woke" = "Acordou";
+"Logged in" = "Conectado";
 "Notify when a snooze ends" = "Avisar quando um adormecimento terminar";
 "Only for snoozes with a length; the ones ended by activity stay quiet." = "Só para os com duração; os que terminam por atividade ficam em silêncio.";
 "Snooze ended" = "Adormecimento terminou";
