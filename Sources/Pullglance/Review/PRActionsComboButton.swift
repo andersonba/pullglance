@@ -12,6 +12,8 @@ struct PRActionsComboButton: NSViewRepresentable {
     let primary: Primary
     /// False on the viewer's own pull request: no Approve anywhere.
     var canReview = true
+    /// The viewer's own draft: "Mark as ready for review" in the menu.
+    var offersMarkReady = false
 
     func makeCoordinator() -> Coordinator { Coordinator(session: session, actions: actions) }
 
@@ -26,6 +28,7 @@ struct PRActionsComboButton: NSViewRepresentable {
     func updateNSView(_ button: NSComboButton, context: Context) {
         context.coordinator.primaryAction = primary
         context.coordinator.canReview = canReview
+        context.coordinator.offersMarkReady = offersMarkReady
         switch primary {
         case .approve:
             button.title = String(localized: "Approve", bundle: .app)
@@ -47,6 +50,7 @@ struct PRActionsComboButton: NSViewRepresentable {
         let actions: ReviewBarActions
         var primaryAction: Primary = .approve
         var canReview = true
+        var offersMarkReady = false
 
         init(session: ReviewSession, actions: ReviewBarActions) {
             self.session = session
@@ -64,6 +68,7 @@ struct PRActionsComboButton: NSViewRepresentable {
         @objc func approve() { actions.approve() }
         @objc func comment() { actions.comment() }
         @objc func merge() { actions.merge() }
+        @objc func markReady() { actions.markReady() }
         @objc func snooze() { actions.snooze() }
         @objc func undo() { Task { await session.undo() } }
         @objc func unmarkAll() { Task { await session.unmarkAll() } }
@@ -85,6 +90,7 @@ struct PRActionsComboButton: NSViewRepresentable {
             if primaryAction != .comment { add(String(localized: "Comment…", bundle: .app), #selector(comment)) }
             if primaryAction != .merge { add(String(localized: "Merge…", bundle: .app), #selector(merge)) }
             if canReview, primaryAction != .approve { add(String(localized: "Approve…", bundle: .app), #selector(approve)) }
+            if offersMarkReady { add(String(localized: "Mark as ready for review", bundle: .app), #selector(markReady)) }
             let dormant = session.pullRequest.map(session.store.isDormant) == true
             add(String(localized: dormant ? "Wake" : "Snooze", bundle: .app), #selector(snooze))
             menu.addItem(.separator())

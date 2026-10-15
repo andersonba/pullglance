@@ -17,6 +17,7 @@ struct DemoGH: GHRunning {
     func enableAutoMerge(pullRequestID: String, method: MergeMethod, expectedHeadOid: String) async -> GHOutcome { .failure("demo") }
     func disableAutoMerge(pullRequestID: String) async -> GHOutcome { .failure("demo") }
     func comment(url: URL, body: String) async -> GHOutcome { .failure("demo") }
+    func markReady(url: URL) async -> GHOutcome { .failure("demo") }
     func approve(url: URL, body: String?) async -> GHOutcome { .failure("demo") }
     func openPullRequests(repo: String, base: String) async -> GHOutcome { .success(Data("[]".utf8)) }
     func pullRequest(owner: String, name: String, number: Int, includeMergeState: Bool) async -> GHOutcome { .failure("demo") }

@@ -146,6 +146,7 @@ struct SwipeTile: View {
         case .comment: Text("Comment", bundle: .app)
         case .approve: Text("Approve", bundle: .app)
         case .open: Text("Open", bundle: .app)
+        case .markReady: Text("Ready", bundle: .app)
         case .snooze: Text(isDormant ? "Wake" : "Snooze", bundle: .app)
         case .pin: Text(isPinned ? "Unpin" : "Pin", bundle: .app)
         default: Text("More", bundle: .app)
@@ -158,6 +159,7 @@ struct SwipeTile: View {
         case .comment: "text.bubble"
         case .approve: "checkmark.circle"
         case .open: "arrow.up.forward.square"
+        case .markReady: "checkmark.seal"
         case .snooze: isDormant ? "sun.max" : "moon.zzz"
         case .pin: isPinned ? "pin.slash.fill" : "pin.fill"
         default: "ellipsis"
@@ -170,6 +172,7 @@ struct SwipeTile: View {
         case .comment: .blue
         case .approve: .green
         case .open: .teal
+        case .markReady: .green
         case .snooze: .orange
         case .pin: .yellow
         default: .gray

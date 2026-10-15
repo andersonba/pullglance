@@ -469,6 +469,10 @@ struct PopoverView: View {
             Task { _ = await store.refreshOne(pr) }
         case .disableAutoMerge:
             Task { _ = await store.disableAutoMerge(pr) }
+        case .markReady:
+            Task {
+                if case .success = await store.markReady(pr) { show(toast: String(localized: "Marked as ready for review", bundle: .app)) }
+            }
         case .pin:
             withAnimation(.easeInOut(duration: 0.3)) { store.isPinned(pr) ? store.unpin(pr) : store.pin(pr) }
         }

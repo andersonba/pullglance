@@ -533,6 +533,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
             approve: { [weak self] in self?.approvePR() },
             comment: { [weak self] in self?.commentPR() },
             merge: { [weak self] in self?.mergePR() },
+            markReady: { [weak self] in self?.markReadyPR() },
             snooze: { [weak self] in self?.snoozePR() },
             openInBrowser: { [weak self] in self?.openInBrowser() },
             copyLink: { [weak self] in
@@ -650,6 +651,14 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     @objc func snoozePR() {
         guard let pr = session.pullRequest else { return }
         if store.isDormant(pr) { store.wake(pr) } else { store.snooze(pr) }
+    }
+
+    /// The viewer's own draft becomes ready for review; the bar follows the store's refreshed row.
+    func markReadyPR() {
+        guard let pr = session.pullRequest, pr.isDraft else { return }
+        Task { [weak self] in
+            if case .failure(let message) = await self?.store.markReady(pr) ?? .failure("") { await self?.session.report(.failure(message)) }
+        }
     }
 
     // MARK: error overlay

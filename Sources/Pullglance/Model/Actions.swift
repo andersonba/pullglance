@@ -55,6 +55,8 @@ enum PRAction: Equatable, Sendable {
     case disableAutoMerge
     /// Pin to the top of the tab, or unpin when already there.
     case pin
+    /// `gh pr ready`: only on the viewer's own drafts.
+    case markReady
 }
 
 /// The two buttons revealed by a swipe, per section. Merge only where merging is the point. Review rows
@@ -62,6 +64,7 @@ enum PRAction: Equatable, Sendable {
 func quickActions(for section: Section, dormant: Bool = false) -> [PRAction] {
     if dormant { return [.snooze, .open] }
     switch section {
+    case .drafts: return [.markReady, .comment]
     case .readyToMerge: return [.merge, .comment]
     case .needsYourReview, .needsTeamsReview: return [.pin, .comment]
     default: return [.open, .comment]
@@ -71,7 +74,8 @@ func quickActions(for section: Section, dormant: Bool = false) -> [PRAction] {
 /// The full context menu, per section. `offersMerge` is "Merge when checks pass" outside Ready to merge;
 /// `autoMergeOn` replaces Merge with the way to call it off.
 func allActions(for section: Section, dormant: Bool = false, offersMerge: Bool = false, autoMergeOn: Bool = false) -> [PRAction] {
-    let merge: [PRAction] = autoMergeOn ? [.disableAutoMerge] : (section == .readyToMerge || offersMerge) ? [.merge] : []
+    // A draft merges nowhere and takes no auto-merge: its one action is to be marked ready.
+    let merge: [PRAction] = section == .drafts ? [.markReady] : autoMergeOn ? [.disableAutoMerge] : (section == .readyToMerge || offersMerge) ? [.merge] : []
     return (dormant ? [.snooze, .pin] + merge + [.comment, .open, .copyLink] : [.pin] + merge + [.comment, .snooze, .open, .copyLink]) + [.refresh]
 }
 

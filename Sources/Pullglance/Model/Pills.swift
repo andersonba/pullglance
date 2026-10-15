@@ -31,7 +31,7 @@ func pills(for pr: PullRequest) -> [Pill] {
         result.append(.changesRequested)
     case .approved:
         result.append(.approved)
-        if pr.mergeQueuePosition == nil, pr.ciState == .success, !pr.hasConflicts, !pr.isBehindBase { result.append(.readyToMerge) }
+        if !pr.isDraft, pr.mergeQueuePosition == nil, pr.ciState == .success, !pr.hasConflicts, !pr.isBehindBase { result.append(.readyToMerge) }
     case .reviewRequired, nil:
         result.append(.awaitingReview)
     }

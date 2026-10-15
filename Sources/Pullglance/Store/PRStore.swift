@@ -848,6 +848,21 @@ final class PRStore {
         return result
     }
 
+    /// `gh pr ready` on a draft of yours. The row is read again so it leaves Drafts by itself.
+    func markReady(_ pr: PullRequest) async -> ActionResult {
+        setActionState(.running(.markReady), for: pr)
+        let result = outcomeResult(await client.markReady(url: pr.url))
+        appLog.info("ready \(pr.id): \(result.logDescription)")
+        switch result {
+        case .success:
+            clearActionState(for: pr)
+            _ = await refreshOne(pr, quiet: true)
+        case .failure(let message):
+            setActionState(.failed(.markReady, message), for: pr)
+        }
+        return result
+    }
+
     /// GitHub's "Disable auto-merge". The row is read again so the pill and the menu follow.
     func disableAutoMerge(_ pr: PullRequest) async -> ActionResult {
         setActionState(.running(.disableAutoMerge), for: pr)

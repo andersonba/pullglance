@@ -9,6 +9,8 @@ import Testing
 
     @Test func approvedAndGreenIsReadyToMerge() {
         #expect(pills(for: makePR(reviewDecision: .approved, ciState: .success)) == [.approved, .readyToMerge])
+        // A draft cannot be merged, however green: no "Ready to merge" on it.
+        #expect(pills(for: makePR(isDraft: true, reviewDecision: .approved, ciState: .success)) == [.approved])
     }
 
     @Test func aQueuedPullRequestShowsItsPositionInsteadOfReady() {

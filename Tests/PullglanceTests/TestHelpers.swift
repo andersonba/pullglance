@@ -166,6 +166,14 @@ actor FakeGH: GHRunning {
     func setCommentOutcome(_ outcome: GHOutcome) { commentOutcome = outcome }
     func setApproveOutcome(_ outcome: GHOutcome) { approveOutcome = outcome }
 
+    private(set) var readied: [URL] = []
+    private var readyOutcome: GHOutcome = .success(Data())
+    func setReadyOutcome(_ outcome: GHOutcome) { readyOutcome = outcome }
+    func markReady(url: URL) async -> GHOutcome {
+        readied.append(url)
+        return readyOutcome
+    }
+
     func merge(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?) async -> GHOutcome {
         merges.append((url, method, deleteBranch, matchHeadCommit))
         if delay > .zero { try? await Task.sleep(for: delay) }

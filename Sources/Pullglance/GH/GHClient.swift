@@ -224,6 +224,10 @@ struct GHClient: GHRunning {
         await run(Self.disableAutoMergeArguments(pullRequestID: pullRequestID))
     }
 
+    func markReady(url: URL) async -> GHOutcome {
+        await run(["pr", "ready", url.absoluteString])
+    }
+
     func comment(url: URL, body: String) async -> GHOutcome {
         await run(Self.commentArguments(url: url, body: body))
     }

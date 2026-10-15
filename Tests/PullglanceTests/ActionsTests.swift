@@ -157,6 +157,11 @@ import Testing
         #expect(allActions(for: .readyToMerge) == [.pin, .merge, .comment, .snooze, .open, .copyLink, .refresh])
         #expect(allActions(for: .needsYourReview) == [.pin, .comment, .snooze, .open, .copyLink, .refresh])
         #expect(allActions(for: .drafts).contains(.merge) == false)
+        // A draft of yours: the one thing it wants is to be marked ready. No merge, no auto-merge.
+        #expect(quickActions(for: .drafts) == [.markReady, .comment])
+        #expect(allActions(for: .drafts) == [.pin, .markReady, .comment, .snooze, .open, .copyLink, .refresh])
+        #expect(allActions(for: .drafts, offersMerge: true) == [.pin, .markReady, .comment, .snooze, .open, .copyLink, .refresh])
+        #expect(allActions(for: .drafts, dormant: true) == [.snooze, .pin, .markReady, .comment, .open, .copyLink, .refresh])
         #expect(allActions(for: .readyToMerge, dormant: true) == [.snooze, .pin, .merge, .comment, .open, .copyLink, .refresh])
         #expect(allActions(for: .needsAction, dormant: true) == [.snooze, .pin, .comment, .open, .copyLink, .refresh])
     }
@@ -295,6 +300,19 @@ import Testing
         store.wakeDue()
         #expect(store.woke == [ready[0].id])
         #expect(notifier.counts.isEmpty)
+    }
+
+    /// "Mark as ready for review" runs `gh pr ready` and reads the row again, so it leaves Drafts by itself.
+    @Test func markReadyRunsGhAndRefreshesTheRow() async throws {
+        let gh = try await gh()
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() })
+        await store.refresh()
+        let draft = try #require(store.mineGroups.drafts.first)
+        let result = await store.markReady(draft)
+        guard case .success = result else { Issue.record("expected success, got \(result)"); return }
+        #expect(await gh.readied == [draft.url])
+        #expect(await gh.lookups.contains { $0.number == draft.number })
+        #expect(store.actionState(for: draft) == nil)
     }
 
     /// Pinned rows lead their tab, keep counting where they came from, and survive a relaunch.

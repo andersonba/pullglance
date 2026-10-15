@@ -202,9 +202,10 @@ struct PRRowMenu: View {
                 case .open: Label { Text("Open on GitHub", bundle: .app) } icon: { Image(systemName: "arrow.up.forward.square") }
                 case .copyLink: Label { Text("Copy link", bundle: .app) } icon: { Image(systemName: "link") }
                 case .refresh: Label { Text("Refresh", bundle: .app) } icon: { Image(systemName: "arrow.clockwise") }
+                case .markReady: Label { Text("Mark as ready for review", bundle: .app) } icon: { Image(systemName: "checkmark.seal") }
                 }
             }
-            .disabled(isRunning && (action == .merge || action == .comment || action == .refresh || action == .disableAutoMerge))
+            .disabled(isRunning && (action == .merge || action == .comment || action == .refresh || action == .disableAutoMerge || action == .markReady))
             // The key shown next to the item, as every Mac menu does; the key itself is handled by the
             // popover's monitor on the focused or hovered row, not registered here.
             .keyboardShortcut(Self.shortcut(for: action))
@@ -235,7 +236,7 @@ struct PRRowMenu: View {
         case .open: KeyboardShortcut("o", modifiers: [])
         case .refresh: KeyboardShortcut("r", modifiers: [])
         case .copyLink: KeyboardShortcut("c", modifiers: .command)
-        case .approve, .disableAutoMerge: nil
+        case .approve, .disableAutoMerge, .markReady: nil
         }
     }
 

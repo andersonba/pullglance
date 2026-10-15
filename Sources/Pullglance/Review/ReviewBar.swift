@@ -7,6 +7,7 @@ struct ReviewBarActions {
     var approve: () -> Void = {}
     var comment: () -> Void = {}
     var merge: () -> Void = {}
+    var markReady: () -> Void = {}
     var snooze: () -> Void = {}
     var openInBrowser: () -> Void = {}
     var copyLink: () -> Void = {}
@@ -70,7 +71,7 @@ struct ReviewBar: View {
                     Label { Text("Review files", bundle: .app) } icon: { Image(systemName: "arrow.right") }.labelStyle(.titleAndIcon)
                 }
             }
-            PRActionsComboButton(session: session, actions: actions, primary: showsMerge ? .merge : isOwn ? .comment : .approve, canReview: !isOwn).fixedSize()
+            PRActionsComboButton(session: session, actions: actions, primary: showsMerge ? .merge : isOwn ? .comment : .approve, canReview: !isOwn, offersMarkReady: isOwn && session.pullRequest?.isDraft == true).fixedSize()
         } else {
             moreMenu
         }
