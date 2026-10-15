@@ -50,5 +50,53 @@
       <string>Branch kept: %lld open pull requests are based on it</string>
     </dict>
   </dict>
+  <key>%lld repos</key>
+  <dict>
+    <key>NSStringLocalizedFormatKey</key>
+    <string>%#@repos@</string>
+    <key>repos</key>
+    <dict>
+      <key>NSStringFormatSpecTypeKey</key>
+      <string>NSStringPluralRuleType</string>
+      <key>NSStringFormatValueTypeKey</key>
+      <string>lld</string>
+      <key>one</key>
+      <string>%lld repo</string>
+      <key>other</key>
+      <string>%lld repos</string>
+    </dict>
+  </dict>
+  <key>Quick · %lld files</key>
+  <dict>
+    <key>NSStringLocalizedFormatKey</key>
+    <string>%#@files@</string>
+    <key>files</key>
+    <dict>
+      <key>NSStringFormatSpecTypeKey</key>
+      <string>NSStringPluralRuleType</string>
+      <key>NSStringFormatValueTypeKey</key>
+      <string>lld</string>
+      <key>one</key>
+      <string>Quick · %lld file</string>
+      <key>other</key>
+      <string>Quick · %lld files</string>
+    </dict>
+  </dict>
+  <key>%lld pull requests are back in their sections</key>
+  <dict>
+    <key>NSStringLocalizedFormatKey</key>
+    <string>%#@prs@</string>
+    <key>prs</key>
+    <dict>
+      <key>NSStringFormatSpecTypeKey</key>
+      <string>NSStringPluralRuleType</string>
+      <key>NSStringFormatValueTypeKey</key>
+      <string>lld</string>
+      <key>one</key>
+      <string>%lld pull request is back in its section</string>
+      <key>other</key>
+      <string>%lld pull requests are back in their sections</string>
+    </dict>
+  </dict>
 </dict>
 </plist>

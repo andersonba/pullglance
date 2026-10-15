@@ -203,7 +203,6 @@
 "Notify when a snooze ends" = "Notify when a snooze ends";
 "Only for snoozes with a length; the ones ended by activity stay quiet." = "Only for snoozes with a length; the ones ended by activity stay quiet.";
 "Snooze ended" = "Snooze ended";
-"A pull request is back in its section" = "A pull request is back in its section";
 "%lld pull requests are back in their sections" = "%lld pull requests are back in their sections";
 "Open on GitHub" = "Open on GitHub";
 "Copy link" = "Copy link";

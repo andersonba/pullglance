@@ -50,5 +50,160 @@
       <string>Branch mantida: %lld pull requests abertos são baseados nela</string>
     </dict>
   </dict>
+  <key>%lld repos</key>
+  <dict>
+    <key>NSStringLocalizedFormatKey</key>
+    <string>%#@repos@</string>
+    <key>repos</key>
+    <dict>
+      <key>NSStringFormatSpecTypeKey</key>
+      <string>NSStringPluralRuleType</string>
+      <key>NSStringFormatValueTypeKey</key>
+      <string>lld</string>
+      <key>one</key>
+      <string>%lld repo</string>
+      <key>other</key>
+      <string>%lld repos</string>
+    </dict>
+  </dict>
+  <key>Quick · %lld files</key>
+  <dict>
+    <key>NSStringLocalizedFormatKey</key>
+    <string>%#@files@</string>
+    <key>files</key>
+    <dict>
+      <key>NSStringFormatSpecTypeKey</key>
+      <string>NSStringPluralRuleType</string>
+      <key>NSStringFormatValueTypeKey</key>
+      <string>lld</string>
+      <key>one</key>
+      <string>Rápido · %lld arquivo</string>
+      <key>other</key>
+      <string>Rápido · %lld arquivos</string>
+    </dict>
+  </dict>
+  <key>%lld pull requests are back in their sections</key>
+  <dict>
+    <key>NSStringLocalizedFormatKey</key>
+    <string>%#@prs@</string>
+    <key>prs</key>
+    <dict>
+      <key>NSStringFormatSpecTypeKey</key>
+      <string>NSStringPluralRuleType</string>
+      <key>NSStringFormatValueTypeKey</key>
+      <string>lld</string>
+      <key>one</key>
+      <string>%lld pull request voltou para a sua seção</string>
+      <key>other</key>
+      <string>%lld pull requests voltaram para as suas seções</string>
+    </dict>
+  </dict>
+  <key>%lld open</key>
+  <dict>
+    <key>NSStringLocalizedFormatKey</key>
+    <string>%#@open@</string>
+    <key>open</key>
+    <dict>
+      <key>NSStringFormatSpecTypeKey</key>
+      <string>NSStringPluralRuleType</string>
+      <key>NSStringFormatValueTypeKey</key>
+      <string>lld</string>
+      <key>one</key>
+      <string>%lld aberto</string>
+      <key>other</key>
+      <string>%lld abertos</string>
+    </dict>
+  </dict>
+  <key>%lld hidden</key>
+  <dict>
+    <key>NSStringLocalizedFormatKey</key>
+    <string>%#@hidden@</string>
+    <key>hidden</key>
+    <dict>
+      <key>NSStringFormatSpecTypeKey</key>
+      <string>NSStringPluralRuleType</string>
+      <key>NSStringFormatValueTypeKey</key>
+      <string>lld</string>
+      <key>one</key>
+      <string>%lld oculto</string>
+      <key>other</key>
+      <string>%lld ocultos</string>
+    </dict>
+  </dict>
+  <key>%lld chosen</key>
+  <dict>
+    <key>NSStringLocalizedFormatKey</key>
+    <string>%#@chosen@</string>
+    <key>chosen</key>
+    <dict>
+      <key>NSStringFormatSpecTypeKey</key>
+      <string>NSStringPluralRuleType</string>
+      <key>NSStringFormatValueTypeKey</key>
+      <string>lld</string>
+      <key>one</key>
+      <string>%lld escolhido</string>
+      <key>other</key>
+      <string>%lld escolhidos</string>
+    </dict>
+  </dict>
+  <key>%lld marked</key>
+  <dict>
+    <key>NSStringLocalizedFormatKey</key>
+    <string>%#@marked@</string>
+    <key>marked</key>
+    <dict>
+      <key>NSStringFormatSpecTypeKey</key>
+      <string>NSStringPluralRuleType</string>
+      <key>NSStringFormatValueTypeKey</key>
+      <string>lld</string>
+      <key>one</key>
+      <string>%lld marcado</string>
+      <key>other</key>
+      <string>%lld marcados</string>
+    </dict>
+  </dict>
+  <key>%lld unmarked</key>
+  <dict>
+    <key>NSStringLocalizedFormatKey</key>
+    <string>%#@unmarked@</string>
+    <key>unmarked</key>
+    <dict>
+      <key>NSStringFormatSpecTypeKey</key>
+      <string>NSStringPluralRuleType</string>
+      <key>NSStringFormatValueTypeKey</key>
+      <string>lld</string>
+      <key>one</key>
+      <string>%lld desmarcado</string>
+      <key>other</key>
+      <string>%lld desmarcados</string>
+    </dict>
+  </dict>
+  <key>%lld marked · %lld failed</key>
+  <dict>
+    <key>NSStringLocalizedFormatKey</key>
+    <string>%#@marked@ · %#@failed@</string>
+    <key>marked</key>
+    <dict>
+      <key>NSStringFormatSpecTypeKey</key>
+      <string>NSStringPluralRuleType</string>
+      <key>NSStringFormatValueTypeKey</key>
+      <string>lld</string>
+      <key>one</key>
+      <string>%lld marcado</string>
+      <key>other</key>
+      <string>%lld marcados</string>
+    </dict>
+    <key>failed</key>
+    <dict>
+      <key>NSStringFormatSpecTypeKey</key>
+      <string>NSStringPluralRuleType</string>
+      <key>NSStringFormatValueTypeKey</key>
+      <string>lld</string>
+      <key>one</key>
+      <string>%lld falhou</string>
+      <key>other</key>
+      <string>%lld falharam</string>
+    </dict>
+  </dict>
 </dict>
 </plist>

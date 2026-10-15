@@ -10,9 +10,7 @@ final class SnoozeNotifier: SnoozeNotifying {
             guard granted else { return }
             let content = UNMutableNotificationContent()
             content.title = String(localized: "Snooze ended", bundle: .app)
-            content.body = count == 1
-                ? String(localized: "A pull request is back in its section", bundle: .app)
-                : String(format: String(localized: "%lld pull requests are back in their sections", bundle: .app), count)
+            content.body = String.localizedStringWithFormat(String(localized: "%lld pull requests are back in their sections", bundle: .app), count)
             content.sound = .default
             center.add(UNNotificationRequest(identifier: "snooze-ended-\(Date().timeIntervalSince1970)", content: content, trigger: nil))
         }
