@@ -12,6 +12,10 @@ Pullglance never talks to GitHub by itself. Everything goes through the `gh` CLI
 
 GitHub's search index lags the repository by minutes, so after each search your own pull requests are looked up directly in one batched query, which makes an approval or a finished check show up on the next refresh rather than five refreshes later. Everything refreshes every 2 minutes (configurable); while the popover is open, rows with CI still running are checked every 20 seconds.
 
+## First launch
+
+The first time it runs, Pullglance opens a short welcome window: it checks that the `gh` CLI is installed and logged in (and keeps checking while you fix either), then shows what the number counts, how the two tabs are ordered, how to act from a row, and what snooze does, with an optional switch for a notification when a timed snooze ends. Closing the window early is fine; it comes back next launch until `gh` is talking. You can reopen it any time with **Welcome…** in the icon's right-click menu.
+
 ## My PRs
 
 Four sections, in the order you choose in Settings › Sections:
