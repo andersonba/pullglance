@@ -110,6 +110,15 @@ enum SnapshotRunner {
                 let popover = try await ViewSnapshot.png(PopoverView(store: store, tab: .review, openRow: revealed), width: 380, appearance: .darkAqua, settle: .milliseconds(900))
                 return try HeroComposer.compose(popover: popover, label: MenuBarLabel.render(text: store.badgeText, isError: false))
             }
+            // The welcome window, one PNG per step, with gh pretending to be ready.
+            let checker = RequirementChecker(locate: { URL(fileURLWithPath: "/opt/homebrew/bin/gh") },
+                                             probe: { _ in (.success(Data("gh version 2.86.0\n".utf8)), .success(Data("Logged in to github.com account octocat (keyring)\n".utf8))) })
+            await checker.checkOnce()
+            for index in OnboardingStep.all.indices {
+                await write("onboarding-\(index + 1)") {
+                    try await ViewSnapshot.png(OnboardingView(store: store, checker: checker, step: .constant(index), finish: {}, quit: {}), width: 560, appearance: .aqua, settle: .milliseconds(600))
+                }
+            }
         }
         return written
     }
