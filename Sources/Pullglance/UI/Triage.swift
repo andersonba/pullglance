@@ -136,8 +136,7 @@ struct ShortcutsCard: View {
                 line(Text("Settings…", bundle: .app), ["⌘,"])
             }
             group(Text("Row under the pointer", bundle: .app)) {
-                line(Text("Open review · Copy link", bundle: .app), ["↩", "⌘C"])
-                line(Text("Snooze for…", bundle: .app), ["⇧S"])
+                line(Text("Every key of a focused row", bundle: .app), ["↩", "P", "S", "R", "C", "M", "O", "⌘C"])
                 line(Text("Keyboard from here", bundle: .app), ["space"])
             }
             group(Text("Focused row", bundle: .app)) {

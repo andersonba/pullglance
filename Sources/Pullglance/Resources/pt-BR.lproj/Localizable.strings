@@ -455,3 +455,4 @@
 "Next file (⌘↓)" = "Próximo arquivo (⌘↓)";
 "Next file with an open thread · ⌥ previous" = "Próximo arquivo com thread aberta · ⌥ anterior";
 "The thread is inside a collapsed file. Expand it to read it." = "A thread está num arquivo recolhido. Expanda para ler.";
+"Every key of a focused row" = "Todas as teclas da linha focada";

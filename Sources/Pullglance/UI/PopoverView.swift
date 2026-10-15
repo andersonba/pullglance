@@ -308,15 +308,18 @@ struct PopoverView: View {
             snoozing = pr
             return true
         case .pin, .snooze, .open, .review, .refresh, .comment, .merge, .copyLink:
-            if let hovered, key == .review { glow(hovered.pr.id); openReview(hovered.pr, section: hovered.section); return true }
-            if let hovered, key == .copyLink { glow(hovered.pr.id); handle(.copyLink, for: hovered.pr); return true }
-            guard let id = focus.id, let row = rows.first(where: { $0.pr.id == id }) else { return false }
+            // The focused row, else the one under the pointer: the same keys, every one of them. Nothing here
+            // is destructive without its own confirmation (Comment and Merge open cards; Pin and Snooze undo
+            // with the same key). The focus bookkeeping only applies when a focus exists.
+            let viaFocus = focus.id != nil
+            guard let row = viaFocus ? rows.first(where: { $0.pr.id == focus.id }) : hovered else { return false }
+            if !viaFocus { glow(row.pr.id) }
             switch key {
             case .pin, .snooze:
                 // The row leaves its place: the one that slides in is next, so a run of P and S needs no arrows.
-                let next = TriageFocus.successor(of: id, in: ids)
+                let next = viaFocus ? TriageFocus.successor(of: row.pr.id, in: ids) : nil
                 handle(key == .pin ? .pin : .snooze, for: row.pr)
-                focus.set(next)
+                if viaFocus { focus.set(next) }
             case .open:
                 focus.clear()
                 handle(.open, for: row.pr)
@@ -330,7 +333,7 @@ struct PopoverView: View {
                 let offered = allActions(for: origin, dormant: store.isDormant(row.pr), offersMerge: row.pr.offersAutoMerge, autoMergeOn: row.pr.autoMergeMethod != nil)
                 if offered.contains(.merge) { handle(.merge, for: row.pr) }
             case .copyLink:
-                glow(row.pr.id)
+                if viaFocus { glow(row.pr.id) }
                 handle(.copyLink, for: row.pr)
             default:
                 focus.clear()
