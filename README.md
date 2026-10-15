@@ -4,7 +4,7 @@
 
 <h1 align="center">Pullglance</h1>
 
-<p align="center">Your pull requests and review requests at a glance, in the macOS menu bar. <em>Vibe coded.</em></p>
+<p align="center">Your pull requests and review requests at a glance, in the macOS menu bar.</p>
 
 <p align="center">
   <a href="https://github.com/andersonba/pullglance/actions/workflows/ci.yml"><img src="https://github.com/andersonba/pullglance/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -14,6 +14,8 @@
 <p align="center">
   <img src="docs/images/hero.png" width="560" alt="The Pullglance popover under the menu bar, showing review requests ordered by priority">
 </p>
+
+I kept opening GitHub to find the one pull request that actually needed me. This is that list, in the menu bar.
 
 Pullglance talks to GitHub through the `gh` CLI you are already logged into. No GitHub App, no OAuth, no server, no tokens of its own.
 
@@ -56,3 +58,5 @@ Issues and pull requests are welcome. Small, focused changes land faster.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+<p align="center"><em>Vibe coded.</em></p>
