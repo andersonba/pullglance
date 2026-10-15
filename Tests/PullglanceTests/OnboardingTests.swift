@@ -97,3 +97,20 @@ final class Counter: @unchecked Sendable {
     var value: Int { lock.withLock { count } }
     func bump() { lock.withLock { count += 1 } }
 }
+
+@Suite struct OnboardingProgressTests {
+    @Test func dueUntilCompleted() {
+        let defaults = testDefaults()
+        let progress = OnboardingProgress(defaults: defaults)
+        #expect(progress.isDue)
+        progress.markCompleted(version: "0.1.0")
+        #expect(OnboardingProgress(defaults: defaults).isDue == false)
+        #expect(OnboardingProgress(defaults: defaults).completedVersion == "0.1.0")
+    }
+
+    /// Closing the window counts as done only once gh is talking; before that it comes back next launch.
+    @Test func closingCountsOnlyAfterGhPassed() {
+        #expect(OnboardingProgress.shouldMarkCompleted(onClose: true))
+        #expect(OnboardingProgress.shouldMarkCompleted(onClose: false) == false)
+    }
+}
