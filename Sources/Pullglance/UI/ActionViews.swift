@@ -27,7 +27,7 @@ struct MergeConfirmView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Merge #\(pr.number)?", bundle: .app).font(.headline)
+            Text("Merge #\(String(pr.number))?", bundle: .app).font(.headline)
             (Text(verbatim: pr.title).foregroundStyle(.secondary) + Text(verbatim: " → ") + Text(verbatim: pr.baseRefName).fontWeight(.semibold))
                 .font(.caption)
                 .lineLimit(2)
@@ -173,7 +173,7 @@ struct CommentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Comment on #\(pr.number)", bundle: .app).font(.headline)
+            Text("Comment on #\(String(pr.number))", bundle: .app).font(.headline)
             Text(verbatim: pr.title).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             TextEditor(text: $body_)
                 .font(.system(size: 12))
@@ -241,7 +241,7 @@ struct ApproveView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Approve #\(pr.number)", bundle: .app).font(.headline)
+            Text("Approve #\(String(pr.number))", bundle: .app).font(.headline)
             Text(verbatim: pr.title).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             TextEditor(text: $body_)
                 .font(.system(size: 12))

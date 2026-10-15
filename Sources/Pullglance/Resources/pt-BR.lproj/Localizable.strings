@@ -162,7 +162,7 @@
 "Only %lld" = "Somente %lld";
 "Applying… the lists and the badge update when the search returns." = "Aplicando… as listas e o contador atualizam quando a busca voltar.";
 "Empty comment" = "Comentário vazio";
-"Merge #%lld?" = "Mergear #%lld?";
+"Merge #%@?" = "Mergear #%@?";
 "The repository deletes the branch after merge." = "O repositório apaga a branch após o merge.";
 "Branch kept: could not check for pull requests based on it" = "Branch mantida: não deu para checar se há pull requests baseados nela";
 "Delete branch after merge" = "Apagar a branch após o merge";
@@ -181,10 +181,10 @@
 "Already merged." = "Já foi mergeado.";
 "This PR is closed." = "Este PR está fechado.";
 "You do not have permission to merge here." = "Você não tem permissão para mergear aqui.";
-"Comment on #%lld" = "Comentar em #%lld";
+"Comment on #%@" = "Comentar em #%@";
 "⌘↩ to send" = "⌘↩ envia";
 "Send" = "Enviar";
-"Comment posted on #%lld" = "Comentário publicado em #%lld";
+"Comment posted on #%@" = "Comentário publicado em #%@";
 "Link copied" = "Link copiado";
 "Merge…" = "Mergear…";
 "Comment…" = "Comentar…";
@@ -317,7 +317,7 @@
 "Could not export diagnostics" = "Não foi possível exportar o diagnóstico";
 
 /* Approve */
-"Approve #%lld" = "Aprovar #%lld";
+"Approve #%@" = "Aprovar #%@";
 "Optional comment" = "Comentário opcional";
 "⌘↩ to approve" = "⌘↩ para aprovar";
 "Approve" = "Aprovar";

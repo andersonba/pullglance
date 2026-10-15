@@ -162,7 +162,7 @@
 "Only %lld" = "Only %lld";
 "Applying… the lists and the badge update when the search returns." = "Applying… the lists and the badge update when the search returns.";
 "Empty comment" = "Empty comment";
-"Merge #%lld?" = "Merge #%lld?";
+"Merge #%@?" = "Merge #%@?";
 "The repository deletes the branch after merge." = "The repository deletes the branch after merge.";
 "Branch kept: could not check for pull requests based on it" = "Branch kept: could not check for pull requests based on it";
 "Delete branch after merge" = "Delete branch after merge";
@@ -181,10 +181,10 @@
 "Already merged." = "Already merged.";
 "This PR is closed." = "This PR is closed.";
 "You do not have permission to merge here." = "You do not have permission to merge here.";
-"Comment on #%lld" = "Comment on #%lld";
+"Comment on #%@" = "Comment on #%@";
 "⌘↩ to send" = "⌘↩ to send";
 "Send" = "Send";
-"Comment posted on #%lld" = "Comment posted on #%lld";
+"Comment posted on #%@" = "Comment posted on #%@";
 "Link copied" = "Link copied";
 "Merge…" = "Merge…";
 "Comment…" = "Comment…";
@@ -317,7 +317,7 @@
 "Could not export diagnostics" = "Could not export diagnostics";
 
 /* Approve */
-"Approve #%lld" = "Approve #%lld";
+"Approve #%@" = "Approve #%@";
 "Optional comment" = "Optional comment";
 "⌘↩ to approve" = "⌘↩ to approve";
 "Approve" = "Approve";

@@ -122,7 +122,7 @@ struct PopoverView: View {
                 if let pr = commenting {
                     CommentView(pr: pr, store: store) { result in
                         commenting = nil
-                        if case .success = result { show(toast: String(localized: "Comment posted on #\(pr.number)", bundle: .app)) }
+                        if case .success = result { show(toast: String(localized: "Comment posted on #\(String(pr.number))", bundle: .app)) }
                     }
                     .padding(.top, 24)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
