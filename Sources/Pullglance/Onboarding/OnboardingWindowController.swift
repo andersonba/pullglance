@@ -62,14 +62,19 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
     private func makeView() -> OnboardingView {
         OnboardingView(store: store, checker: checker, model: model,
+                       ghPassed: { Self.markCompletedIfDue() },
                        finish: { [unowned self] in finish() },
                        quit: { NSApp.terminate(nil) })
     }
 
     private func finish() {
-        Self.progress.markCompleted(version: AppInfo.version)
+        Self.markCompletedIfDue()
         store.showIconDot()
         window?.close()
+    }
+
+    private static func markCompletedIfDue() {
+        if progress.isDue { progress.markCompleted(version: AppInfo.version) }
     }
 
     /// ← → move between steps (Continue only when allowed), Esc closes; only while this window is key.
@@ -90,9 +95,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         checker.stop()
-        if OnboardingProgress.shouldMarkCompleted(onClose: checker.allPassed), Self.progress.isDue {
-            Self.progress.markCompleted(version: AppInfo.version)
-        }
+        if OnboardingProgress.shouldMarkCompleted(onClose: checker.allPassed) { Self.markCompletedIfDue() }
         model.step = 0
         if let window { AppActivation.windowClosed(window) }
     }

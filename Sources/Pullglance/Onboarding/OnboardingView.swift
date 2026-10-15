@@ -24,6 +24,8 @@ struct OnboardingView: View {
     @Bindable var store: PRStore
     let checker: RequirementChecker
     @Bindable var model: OnboardingModel
+    /// gh just passed: the window counts as completed from here on, whatever way it goes away (⌘Q too).
+    var ghPassed: () -> Void = {}
     let finish: () -> Void
     let quit: () -> Void
 
@@ -60,6 +62,9 @@ struct OnboardingView: View {
         .background(.windowBackground)
         .onChange(of: step, initial: true) { _, _ in
             if isGhStep { checker.start() } else { checker.stop() }
+        }
+        .onChange(of: checker.allPassed) { _, passed in
+            if passed { ghPassed() }
         }
         .onChange(of: step) { _, _ in
             withAnimation(.spring(duration: 0.3, bounce: 0.55)) { hop = true }
