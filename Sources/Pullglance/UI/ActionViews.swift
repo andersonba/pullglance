@@ -205,7 +205,7 @@ struct CommentView: View {
         .frame(width: 320)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.25), radius: 14, y: 6)
-        .onAppear { focused = true }
+        .onAppear { DispatchQueue.main.async { focused = true } }
     }
 
     private func send() {
@@ -272,7 +272,7 @@ struct ApproveView: View {
         .frame(width: 320)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.25), radius: 14, y: 6)
-        .onAppear { focused = true }
+        .onAppear { DispatchQueue.main.async { focused = true } }
     }
 
     private func send() {
