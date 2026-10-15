@@ -4,6 +4,8 @@ import SwiftUI
 struct PullglanceApp: App {
     @State private var store: PRStore
     private let snapshot: SnapshotOptions?
+    /// Kept for the life of the app: it owns the right-click monitor.
+    @State private var statusItemMenu: StatusItemMenu?
 
     init() {
         // Thin overlay scrollers app-wide, whatever "Show scroll bars" says and even with a mouse plugged in.
@@ -35,6 +37,7 @@ struct PullglanceApp: App {
         } else {
             store.start()
             ReviewWindowController.configure(store: store)
+            _statusItemMenu = State(initialValue: StatusItemMenu(store: store))
         }
         Task { await AvatarCache.shared.pruneDisk() }
     }

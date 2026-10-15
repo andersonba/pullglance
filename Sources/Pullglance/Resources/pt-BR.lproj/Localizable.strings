@@ -205,6 +205,8 @@
 "Snooze ended" = "Adormecimento terminou";
 "%lld pull requests are back in their sections" = "%lld pull requests voltaram para as suas seções";
 "Open on GitHub" = "Abrir no GitHub";
+"My PRs on GitHub" = "Meus PRs no GitHub";
+"Review requests on GitHub" = "Pedidos de review no GitHub";
 "Copy link" = "Copiar link";
 "Not allowed by this repository" = "Não permitido por este repositório";
 "Snoozed" = "Adormecidos";

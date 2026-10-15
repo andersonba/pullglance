@@ -14,9 +14,12 @@ struct MenuBarLabel: View {
     var roll: BadgeRoll? = nil
     /// A timed snooze ended while the popover was closed: an orange dot on the icon until it is opened.
     var showsWokeDot = false
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         Image(nsImage: Self.render(text: shown, isError: isError, roll: text == nil ? nil : roll, dot: showsWokeDot))
+            // The right-click menu (`StatusItemMenu`) lives in AppKit; this is its way to the Settings scene.
+            .onReceive(NotificationCenter.default.publisher(for: .openSettingsRequested)) { _ in openSettings() }
     }
 
     private var shown: String? {
