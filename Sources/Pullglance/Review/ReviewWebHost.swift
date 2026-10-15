@@ -72,8 +72,16 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
         return false
     }
 
-    static let webContentSchemes: Set<String> = ["http", "https", "about", "blob", "data", "javascript"]
+    /// What the main frame may show: real pages. Frames may also hold blob: and data: documents, which
+    /// GitHub uses for previews; javascript: is never a navigation here. A data: or javascript: main frame
+    /// typed into the address bar could dress up as the app's own window.
+    static let pageSchemes: Set<String> = ["http", "https", "about"]
+    static let frameOnlySchemes: Set<String> = ["blob", "data"]
     static let externalSchemes: Set<String> = ["mailto", "tel", "facetime", "sms"]
+
+    static func allowsScheme(_ scheme: String, isMainFrame: Bool) -> Bool {
+        pageSchemes.contains(scheme) || (!isMainFrame && frameOnlySchemes.contains(scheme))
+    }
 
     /// mailto:/tel: links go to the app registered for them, only from a click in the main frame.
     func openExternally(_ url: URL) {
@@ -100,8 +108,8 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
             if isMainFrame, isClick, let url { openExternally(url) } else { log("refused \(scheme): not a main-frame click") }
             return .cancel
         }
-        if !Self.webContentSchemes.contains(scheme) {
-            log("refused scheme \(scheme.isEmpty ? "(none)" : scheme)")
+        if !Self.allowsScheme(scheme, isMainFrame: isMainFrame) {
+            log("refused scheme \(scheme.isEmpty ? "(none)" : scheme)\(isMainFrame ? " in the main frame" : "")")
             return .cancel
         }
         guard isMainFrame else { return .allow }
@@ -200,7 +208,7 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
 
     /// Types that run when opened: the window never saves them (a page could otherwise drop an installer or
     /// a script into Downloads with the user's session behind it).
-    static let refusedDownloadExtensions: Set<String> = ["app", "pkg", "dmg", "sh", "command", "scpt", "zsh", "bash", "pl", "py", "rb", "jar"]
+    static let refusedDownloadExtensions: Set<String> = ["app", "pkg", "mpkg", "dmg", "sh", "command", "terminal", "tool", "workflow", "fileloc", "scpt", "zsh", "bash", "pl", "py", "rb", "jar"]
 
     static func isRefusedDownload(_ filename: String) -> Bool {
         // Invisible characters (controls, zero-width and bidi marks) and trailing dots or spaces would hide

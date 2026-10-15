@@ -28,7 +28,7 @@ Requires macOS 15 and [GitHub CLI](https://cli.github.com).
 brew install gh && gh auth login
 ```
 
-Download `Pullglance.app` from [Releases](https://github.com/andersonba/pullglance/releases), or build it yourself:
+Build it with Xcode 26 installed; it lands in /Applications and opens:
 
 ```sh
 git clone https://github.com/andersonba/pullglance && cd pullglance
