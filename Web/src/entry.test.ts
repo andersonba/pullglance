@@ -28,18 +28,25 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
  * A page that scrolls: each file's `#diff-<id>` box sits at a page offset, the window has a scrollY, and
  * scrollIntoView / scrollBy move it. `boxes` overrides a file's box (offset from its page top, height).
  */
-function layoutPage(paths: string[], heights: number[], boxes: Record<number, { from?: number; height: number }> = {}, viewport = 0) {
-  const tops: number[] = []
-  let y = 0
-  for (const h of heights) { tops.push(y); y += h + 8 }
-  const maxScroll = Math.max(0, y - 8 - viewport)   // the window cannot scroll past the end of the document
+function layoutPage(paths: string[], initialHeights: number[], boxes: Record<number, { from?: number; height: number }> = {}, viewport = 0) {
+  const heights = [...initialHeights]
+  let tops: number[] = []
+  let maxScroll = 0
+  const recompute = () => {
+    tops = []
+    let y = 0
+    for (const h of heights) { tops.push(y); y += h + 8 }
+    maxScroll = Math.max(0, y - 8 - viewport)   // the window cannot scroll past the end of the document
+  }
+  recompute()
   const clamp = (v: number) => Math.min(Math.max(v, 0), maxScroll)
   let scrollY = 0
   Object.defineProperty(window, 'scrollY', { configurable: true, get: () => scrollY })
   const scrollBy = (a: number | ScrollToOptions, b?: number) => { scrollY = clamp(scrollY + (typeof a === 'number' ? (b ?? 0) : (a.top ?? 0))) }
   ;(window as any).scrollBy = scrollBy
-  paths.forEach((path, i) => {
+  const patch = () => paths.forEach((path, i) => {
     const el = document.getElementById(`diff-${digestOf(path)}`) as any
+    if (!el) return
     const box = boxes[i]
     el.getBoundingClientRect = () => {
       const top = tops[i]! + (box?.from ?? 0) - scrollY
@@ -47,9 +54,14 @@ function layoutPage(paths: string[], heights: number[], boxes: Record<number, { 
     }
     el.scrollIntoView = () => { scrollY = clamp(tops[i]!) }
   })
+  patch()
   return {
     scrollTo: (index: number) => { scrollY = clamp(tops[index]!) }, scrollY: () => scrollY, topOf: (i: number) => tops[i]!,
-    maxScroll, setScroll: (v: number) => { scrollY = clamp(v) },
+    get maxScroll() { return maxScroll }, setScroll: (v: number) => { scrollY = clamp(v) },
+    /** A file changed height (collapsed after a mark): later files move up. */
+    setHeight: (i: number, h: number) => { heights[i] = h; recompute() },
+    /** GitHub re-rendered: the file nodes are new objects, patch them again. */
+    repatch: patch,
   }
 }
 
@@ -111,6 +123,21 @@ describe('cursor on a page of collapsed files with a large-diff placeholder', ()
     expect(await api.stepFile(-1)).toMatchObject({ moved: true, from: 5, to: 4 })
   })
 
+  it('highlights the file the cursor is on, and moves the highlight when stepping', async () => {
+    mountFilesPage({ files: REPORTED_PR, containers: true })
+    const api = install({ post: () => {} })
+    const page = layoutPage(REPORTED_PR.map((f) => f.path), REPORTED_HEIGHTS, STALE)
+    page.scrollTo(3)
+    const box = (i: number) => document.getElementById(`diff-${digestOf(REPORTED_PR[i]!.path)}`)!
+    await api.currentFile()
+    expect(box(3).classList.contains('pullglance-current')).toBe(true)
+    await api.stepFile(1)
+    await api.currentFile()
+    expect(box(3).classList.contains('pullglance-current')).toBe(false)
+    expect(box(4).classList.contains('pullglance-current')).toBe(true)
+    expect(document.getElementById('pullglance-style')).not.toBeNull()
+  })
+
   it('marks the unviewed file under the cursor and moves to the next unviewed, the large-diff one', async () => {
     mountFilesPage({ files: REPORTED_PR, containers: true })
     const api = install({ post: () => {} })
@@ -126,6 +153,47 @@ describe('cursor on a page of collapsed files with a large-diff placeholder', ()
     expect(await api.markCurrentAndNext()).toEqual({ marked: true, moved: true })    // the placeholder's Viewed button works too
     expect(button('src/app/utils/redact.ts').getAttribute('aria-pressed')).toBe('true')
     expect(page.scrollY()).toBe(page.topOf(10))
+  })
+
+  /// What the new Files UI does: the mark is confirmed, then the file collapses a moment later and React
+  /// swaps the nodes. The jump must land on the next unviewed file, not on the one just marked.
+  it('still lands on the next unviewed file when the marked one collapses late and its node is replaced', async () => {
+    mountFilesPage({ files: REPORTED_PR, containers: true })
+    const api = install({ post: () => {} })
+    const page = layoutPage(REPORTED_PR.map((f) => f.path), REPORTED_HEIGHTS, STALE)
+    page.scrollTo(5)
+    expect(await api.currentFile()).toMatchObject({ index: 5, viewed: false })
+    const marked = document.getElementById(`diff-${digestOf('src/app/telemetry/trail.ts')}`)!
+    const target = document.getElementById(`diff-${digestOf('src/app/utils/redact.ts')}`)!
+    // After the click confirms: 60 ms later the marked file shrinks and the target node is swapped.
+    marked.addEventListener('click', () => {
+      setTimeout(() => {
+        page.setHeight(5, COLLAPSED)
+        target.replaceWith(target.cloneNode(true))
+        page.repatch()
+      }, 60)
+    }, { capture: true })
+    expect(await api.markCurrentAndNext()).toEqual({ marked: true, moved: true })
+    await wait(400)
+    expect(page.scrollY()).toBe(page.topOf(8))
+    expect(await api.currentFile()).toMatchObject({ path: 'src/app/utils/redact.ts', index: 8, viewed: false })
+  })
+
+  /// Also what the new Files UI does: after the click it moves focus to the marked file's header, and the
+  /// browser scrolls that header into view, right under the page's bar. The reader asked for the next file.
+  it('keeps the next unviewed file at the top when GitHub scrolls the marked one back into view', async () => {
+    mountFilesPage({ files: REPORTED_PR, containers: true })
+    const api = install({ post: () => {} })
+    const page = layoutPage(REPORTED_PR.map((f) => f.path), REPORTED_HEIGHTS, STALE)
+    page.scrollTo(5)
+    const marked = document.getElementById(`diff-${digestOf('src/app/telemetry/trail.ts')}`)!
+    marked.addEventListener('click', () => {
+      setTimeout(() => { page.setHeight(5, COLLAPSED); page.setScroll(page.topOf(5)) }, 60)   // focus → scrollIntoView(marked)
+    }, { capture: true })
+    expect(await api.markCurrentAndNext()).toEqual({ marked: true, moved: true })
+    await wait(400)
+    expect(page.scrollY()).toBe(page.topOf(8))
+    expect(await api.currentFile()).toMatchObject({ path: 'src/app/utils/redact.ts', index: 8, viewed: false })
   })
 
   it('takes the later file when a box of an earlier one sits at the same top edge (a header stuck at the top)', async () => {
@@ -383,5 +451,56 @@ describe('review script API', () => {
     document.body.append(document.createElement('div'))   // more mutations: still no file list, no repeat
     await wait(300)
     expect(listingsOf(events)).toHaveLength(2)
+  })
+
+  /// Opening a review request: land on the first file that still needs eyes, wherever the reader is.
+  it('firstUnviewed goes to the first unviewed file from the top, even while reading a later one', async () => {
+    mountFilesPage({ files: [{ path: 'a.ts', viewed: true }, { path: 'b.ts' }, { path: 'c.ts' }], containers: true })
+    const api = install({ post: () => {} })
+    const page = layoutPage(['a.ts', 'b.ts', 'c.ts'], [COLLAPSED, EXPANDED, EXPANDED])
+    page.scrollTo(2)                                    // reading c
+    expect(await api.firstUnviewed()).toBe(true)
+    expect(page.scrollY()).toBe(page.topOf(1))          // b, not c: the first from the top
+    expect(await api.currentFile()).toMatchObject({ path: 'b.ts', index: 1, viewed: false })
+    await wait(300)                                     // the jump's deferred cursor read must not land in the next test
+  })
+
+  it('firstUnviewed reports false when everything is viewed', async () => {
+    mountFilesPage({ files: [{ path: 'a.ts', viewed: true }], containers: true })
+    const api = install({ post: () => {} })
+    layoutPage(['a.ts'], [COLLAPSED])
+    expect(await api.firstUnviewed()).toBe(false)
+  })
+
+  /// Files with open review threads come from the app (GraphQL); the page only has to walk them in order.
+  it('stepAmong walks the given files in page order, forward and back, wrapping around', async () => {
+    mountFilesPage({ files: [{ path: 'a.ts' }, { path: 'b.ts' }, { path: 'c.ts' }, { path: 'd.ts' }], containers: true })
+    const api = install({ post: () => {} })
+    const page = layoutPage(['a.ts', 'b.ts', 'c.ts', 'd.ts'], [EXPANDED, EXPANDED, EXPANDED, EXPANDED])
+    page.scrollTo(0)
+    expect(await api.stepAmong(['b.ts', 'd.ts'], 1)).toEqual({ moved: true, collapsed: false })
+    expect(await api.currentFile()).toMatchObject({ path: 'b.ts' })
+    expect(await api.stepAmong(['b.ts', 'd.ts'], 1)).toEqual({ moved: true, collapsed: false })
+    expect(await api.currentFile()).toMatchObject({ path: 'd.ts' })
+    expect(await api.stepAmong(['b.ts', 'd.ts'], 1)).toEqual({ moved: true, collapsed: false })      // past the last: around to the first
+    expect(await api.currentFile()).toMatchObject({ path: 'b.ts' })
+    expect(await api.stepAmong(['b.ts', 'd.ts'], -1)).toEqual({ moved: true, collapsed: false })     // before the first: around to the last
+    expect(await api.currentFile()).toMatchObject({ path: 'd.ts' })
+    expect(await api.stepAmong(['nope.ts'], 1)).toEqual({ moved: false, collapsed: false })
+    await wait(300)
+  })
+
+  /// A thread inside a file already viewed: the file is collapsed. The page says so and is left as it is;
+  /// the app tells the reader, who decides whether to open it.
+  it('stepAmong reports a collapsed file and leaves it folded and viewed', async () => {
+    mountFilesPage({ files: [{ path: 'a.ts' }, { path: 'b.ts', viewed: true }], containers: true })
+    const api = install({ post: () => {} })
+    const page = layoutPage(['a.ts', 'b.ts'], [EXPANDED, COLLAPSED])
+    const box = document.getElementById(`diff-${digestOf('b.ts')}`)!
+    page.scrollTo(0)
+    expect(await api.stepAmong(['b.ts'], 1)).toEqual({ moved: true, collapsed: true })
+    expect(box.querySelector('.diff-file-header.collapsed')).not.toBeNull()                // still folded
+    expect(box.querySelector('button[aria-pressed]')!.getAttribute('aria-pressed')).toBe('true')   // still viewed
+    await wait(300)
   })
 })

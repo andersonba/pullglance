@@ -5,7 +5,7 @@ import { digestOf } from './build'
  * cada arquivo é `.js-file.js-details-container` com `.file-header[data-path][data-anchor]`, o chevron
  * `button.js-details-target[aria-expanded]` alterna as classes `open`/`Details--on`, e a barra é o `#toc`.
  */
-export interface CompareFile { path: string; collapsed?: boolean; loadDiff?: boolean; digest?: string }
+export interface CompareFile { path: string; collapsed?: boolean; loadDiff?: boolean; digest?: string; viewed?: boolean }
 export interface CompareOptions {
   files: CompareFile[]
   owner?: string
@@ -13,11 +13,13 @@ export interface CompareOptions {
   range?: string            // default 'main...feat/x'
   pendingPage?: boolean     // simula carregamento progressivo (compare com mais de 300 arquivos)
   simulateToggle?: boolean  // default true
+  /** A página clássica de arquivos do PR: o GitHub põe o checkbox "Viewed" nativo em `.file-actions`. */
+  nativeViewed?: boolean
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
 
-function fileHtml(f: CompareFile): string {
+function fileHtml(f: CompareFile, nativeViewed = false): string {
   const digest = f.digest ?? digestOf(f.path)
   const expanded = !f.collapsed
   const body = f.loadDiff
@@ -32,7 +34,7 @@ function fileHtml(f: CompareFile): string {
       <span class="diffstat" aria-hidden="true">2</span>
       <span class="Truncate"><a title="${esc(f.path)}" class="Link--primary Truncate-text" href="#diff-${digest}">${esc(f.path)}</a></span>
     </div>
-    <div class="file-actions pt-0 mb-md-0 mb-2 pr-md-0 pr-1 flex-shrink-0"><button type="button" class="btn-link">View file</button></div>
+    <div class="file-actions pt-0 mb-md-0 mb-2 pr-md-0 pr-1 flex-shrink-0">${nativeViewed ? `<div class="d-flex flex-justify-end"><div class="js-replace-file-header-review d-flex"><form class="js-toggle-user-reviewed-file-form d-flex flex-items-stretch" data-autosubmit="true"><input type="hidden" name="_method" value="put"><label class="js-reviewed-toggle ml-2 mr-1"><input type="checkbox" class="mr-1 js-reviewed-checkbox" name="viewed"${f.viewed ? ' checked' : ''}> Viewed</label></form></div></div>` : ''}<button type="button" class="btn-link">View file</button></div>
   </div>
   <div class="js-file-content Details-content--hidden position-relative">${body}</div>
 </div>`
@@ -55,7 +57,7 @@ export function buildComparePageHtml(opts: CompareOptions): string {
     <div class="toc-diff-stats">Showing <strong>${opts.files.length} changed files</strong> with <strong>10 additions</strong> and <strong>2 deletions</strong>.</div>
   </div>
   <div id="files_bucket" class="files-bucket">
-    <div id="files" class="diff-view js-diff-container">${opts.files.map(fileHtml).join('\n')}${pending}</div>
+    <div id="files" class="diff-view js-diff-container">${opts.files.map((f) => fileHtml(f, opts.nativeViewed === true)).join('\n')}${pending}</div>
   </div>
 </div></body></html>`
 }

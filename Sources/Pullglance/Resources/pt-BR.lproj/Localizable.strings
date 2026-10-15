@@ -403,11 +403,10 @@
 "Open Link in Browser" = "Abrir link no navegador";
 
 /* Review window: file pill */
-"Previous file" = "Arquivo anterior";
-"Next file" = "Próximo arquivo";
 "Viewed → next" = "Visto → próximo";
 "Next unviewed" = "Próximo não visto";
 "File controls" = "Controles de arquivo";
+"Viewed · click to unmark" = "Visto · clique para desmarcar";
 "Top" = "Em cima";
 "Bottom" = "Embaixo";
 "Review window" = "Janela de review";
@@ -417,14 +416,11 @@
 "Previous File" = "Arquivo anterior";
 
 /* Review window: pill redesign */
-"Mark viewed" = "Marcar como visto";
 "Mark this file as viewed and go to the next unviewed one (⌘↩)" = "Marcar este arquivo como visto e ir ao próximo não visto (⌘↩)";
 "%lld of %lld" = "%lld de %lld";
 "%lld of %lld viewed" = "%lld de %lld vistos";
 "Tests · %lld" = "Testes · %lld";
 "Review files" = "Revisar arquivos";
-"Viewed" = "Visto";
-"Unmark" = "Desmarcar";
 "Pull to refresh" = "Puxe para atualizar";
 "Your pull requests, in the menu bar." = "Seus pull requests, na barra de menus.";
 "Pullglance watches the pull requests that need you and puts a number next to the clock. It talks to GitHub through the gh you already have, so it never needs a token of its own." = "O Pullglance observa os pull requests que precisam de você e põe um número ao lado do relógio. Ele fala com o GitHub pelo gh que você já tem, então nunca precisa de um token próprio.";
@@ -448,3 +444,14 @@
 "moves the focus" = "move o foco";
 "act on it" = "agem nela";
 "Welcome…" = "Boas-vindas…";
+"%lld left" = "faltam %lld";
+"Previous unviewed file" = "Arquivo não visto anterior";
+"Next unviewed file" = "Próximo arquivo não visto";
+"Capture now" = "Capturar agora";
+"Review window picture" = "Foto da janela de review";
+"A picture of the page and a summary of its structure, into the log folder. Also ⇧⌘P in the window." = "Uma imagem da página e um resumo da estrutura dela, na pasta do log. Também ⇧⌘P na janela.";
+"All viewed" = "Tudo visto";
+"Previous file (⌘↑)" = "Arquivo anterior (⌘↑)";
+"Next file (⌘↓)" = "Próximo arquivo (⌘↓)";
+"Next file with an open thread · ⌥ previous" = "Próximo arquivo com thread aberta · ⌥ anterior";
+"The thread is inside a collapsed file. Expand it to read it." = "A thread está num arquivo recolhido. Expanda para ler.";

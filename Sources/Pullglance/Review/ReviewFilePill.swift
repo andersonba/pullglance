@@ -1,76 +1,87 @@
 import AppKit
 import SwiftUI
 
-/// Floating card over the page on Files and compare pages: where the reader is, and the file work.
-/// Header: the current path, fixed width and truncated from the start so the end stays visible, plus the
-/// position. Row: ▲▼ as a segmented group, "Mark viewed" (marks and moves to the next unviewed), and the
-/// tests combo button. Every control is the small native size; the row's width never follows the file.
+/// A small capsule floating over the page on Files and compare pages: how many files are still unviewed,
+/// ▲▼ to the previous and next unviewed one, and one check. The check marks the current file and moves
+/// to the next unviewed; on a file already viewed it is filled and unmarks instead. No path: the current
+/// file is the outlined one on the page. ⌘↑ ⌘↓ still walk every file. The tests combo lives in the bar.
 struct ReviewFilePill: View {
     let session: ReviewSession
-    @Environment(\.openSettings) private var openSettings
+    /// The moment the last file got viewed: a green pulse on the capsule and a bounce of the seal.
+    @State private var celebrating = false
+
+    /// Unviewed files, from GitHub's own numbers when the bar has them (the classic page renders files
+    /// progressively, so the page's count can miss unloaded ones); the page's count on compare.
+    private var left: Int? {
+        if let counts = session.fileCounts { return max(0, counts.total - counts.viewed) }
+        return session.pageCounts.map { max(0, $0.total - $0.viewed) }
+    }
 
     var body: some View {
         if let file = session.currentFile {
-            VStack(alignment: .leading, spacing: 6) {
-                // Fixed card width: only the path flexes (and truncates); the status and position columns keep
-                // their room whether or not the file is viewed, so nothing below ever moves.
-                HStack(spacing: 6) {
-                    Image(systemName: "doc.text").font(.system(size: 11)).foregroundStyle(.secondary)
-                    Text(verbatim: file.path)
-                        .font(.system(size: 11, design: .monospaced))
-                        .lineLimit(1).truncationMode(.head)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    HStack(spacing: 6) {
-                        if file.viewed {
-                            // The way back, away from the primary button: pressing "Mark viewed" again never unmarks.
-                            Label { Text("Viewed", bundle: .app) } icon: { Image(systemName: "checkmark") }
-                                .font(.system(size: 10.5)).foregroundStyle(.green).lineLimit(1).fixedSize()
-                            Button { Task { await session.unmarkCurrent() } } label: { Text("Unmark", bundle: .app) }
-                                .buttonStyle(.plain).font(.system(size: 10.5)).foregroundStyle(.secondary).underline()
-                                .lineLimit(1).fixedSize()
-                                .disabled(session.busy)
-                        }
-                    }
-                    .frame(width: 118, alignment: .trailing)
-                    Text("\(file.index + 1) of \(file.total)", bundle: .app)
+            HStack(spacing: 8) {
+                if left == 0 {
+                    Label { Text("All viewed", bundle: .app) } icon: { Image(systemName: "checkmark.seal.fill") }
+                        .font(.system(size: 11, weight: .medium)).foregroundStyle(.green)
+                        .symbolEffect(.bounce, value: celebrating)
+                        .lineLimit(1).fixedSize()
+                } else {
+                    Text("\(left ?? 0) left", bundle: .app)
                         .font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
-                        .lineLimit(1).frame(width: 56, alignment: .trailing)
+                        .lineLimit(1).fixedSize()
                 }
-                HStack(spacing: 8) {
-                    ControlGroup {
-                        Button { Task { await session.stepFile(-1) } } label: { Image(systemName: "chevron.up") }
-                            .help(Text("Previous file", bundle: .app))
-                        Button { Task { await session.stepFile(1) } } label: { Image(systemName: "chevron.down") }
-                            .help(Text("Next file", bundle: .app))
-                    }
-                    .controlGroupStyle(.navigation)
-                    .fixedSize()
-                    .disabled(session.busy)
-                    Button { Task { await session.markCurrentAndNext() } } label: {
-                        Label { Text("Mark viewed", bundle: .app) } icon: { Image(systemName: "checkmark") }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .help(Text("Mark this file as viewed and go to the next unviewed one (⌘↩)", bundle: .app))
-                    .disabled(session.busy)
-                    TestsComboButton(session: session) {
-                        SettingsSelection.shared.tab = .review
-                        SettingsOpener.activate()
-                        openSettings()
-                    }
-                    .fixedSize()
+                // With files still unviewed the arrows go to those; once everything is viewed they walk
+                // every file, so a mark can be undone from here.
+                ControlGroup {
+                    Button { Task { left == 0 ? await session.stepFile(-1) : await session.scroll(.previous) } } label: { Image(systemName: "chevron.up") }
+                        .help(left == 0 ? Text("Previous file (⌘↑)", bundle: .app) : Text("Previous unviewed file", bundle: .app))
+                    Button { Task { left == 0 ? await session.stepFile(1) : await session.scroll(.next) } } label: { Image(systemName: "chevron.down") }
+                        .help(left == 0 ? Text("Next file (⌘↓)", bundle: .app) : Text("Next unviewed file", bundle: .app))
                 }
-                .controlSize(.small)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .controlGroupStyle(.navigation)
+                .fixedSize()
+                if let threads = session.pullRequest?.unresolvedThreads, threads > 0 {
+                    // Open review threads: click goes to the next file that has one, ⌥-click to the previous.
+                    Button {
+                        let back = NSApp.currentEvent?.modifierFlags.contains(.option) == true
+                        Task { await session.stepThread(back ? -1 : 1) }
+                    } label: {
+                        Label { Text(verbatim: "\(threads)") } icon: { Image(systemName: "text.bubble") }
+                            .labelStyle(.titleAndIcon).font(.system(size: 11)).monospacedDigit()
+                    }
+                    .help(Text("Next file with an open thread · ⌥ previous", bundle: .app))
+                }
+                Button {
+                    Task { file.viewed ? await session.unmarkCurrent() : await session.markCurrentAndNext() }
+                } label: {
+                    Image(systemName: file.viewed ? "checkmark.circle.fill" : "checkmark")
+                        .frame(width: 14)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(file.viewed ? .green : .accentColor)
+                .help(file.viewed ? Text("Viewed · click to unmark", bundle: .app) : Text("Mark this file as viewed and go to the next unviewed one (⌘↩)", bundle: .app))
             }
-            .frame(width: 440)
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
-            .padding(.bottom, 10)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.primary.opacity(0.08)))
-            .shadow(color: .black.opacity(0.16), radius: 12, y: 5)
+            .controlSize(.small)
+            .disabled(session.busy)
+            .padding(.leading, 12)
+            .padding(.trailing, 6)
+            .padding(.vertical, 5)
+            .background(.regularMaterial, in: Capsule())
+            .background(Color.green.opacity(celebrating ? 0.28 : 0), in: Capsule())
+            .overlay(Capsule().strokeBorder(celebrating ? Color.green.opacity(0.6) : .primary.opacity(0.08)))
+            .shadow(color: celebrating ? .green.opacity(0.35) : .black.opacity(0.16), radius: celebrating ? 14 : 10, y: 4)
+            .scaleEffect(celebrating ? 1.06 : 1)
+            .animation(.spring(duration: 0.35, bounce: 0.4), value: celebrating)
             .accessibilityElement(children: .contain)
             .accessibilityLabel(Text("File controls", bundle: .app))
+            .onChange(of: left) { old, new in
+                guard new == 0, (old ?? 1) > 0 else { return }
+                celebrating = true
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(1500))
+                    celebrating = false
+                }
+            }
         }
     }
 }

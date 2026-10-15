@@ -1,14 +1,17 @@
 import AppKit
 import SwiftUI
 
-/// The pull request's actions as one `NSComboButton`: the primary for the PR's state (Merge when it is
-/// ready, Approve otherwise) on the button, everything else in the attached menu.
+/// The pull request's actions as one `NSComboButton`: the primary for the PR's state on the button,
+/// everything else in the attached menu. Merge when it is ready; else Approve, or Comment on the viewer's
+/// own pull request, which GitHub lets nobody approve or request changes on (so neither is offered).
 struct PRActionsComboButton: NSViewRepresentable {
-    enum Primary { case approve, merge }
+    enum Primary { case approve, merge, comment }
 
     let session: ReviewSession
     let actions: ReviewBarActions
     let primary: Primary
+    /// False on the viewer's own pull request: no Approve anywhere.
+    var canReview = true
 
     func makeCoordinator() -> Coordinator { Coordinator(session: session, actions: actions) }
 
@@ -22,6 +25,7 @@ struct PRActionsComboButton: NSViewRepresentable {
 
     func updateNSView(_ button: NSComboButton, context: Context) {
         context.coordinator.primaryAction = primary
+        context.coordinator.canReview = canReview
         switch primary {
         case .approve:
             button.title = String(localized: "Approve", bundle: .app)
@@ -29,6 +33,9 @@ struct PRActionsComboButton: NSViewRepresentable {
         case .merge:
             button.title = String(localized: "Merge", bundle: .app)
             button.image = NSImage(systemSymbolName: "arrow.triangle.merge", accessibilityDescription: nil)
+        case .comment:
+            button.title = String(localized: "Comment", bundle: .app)
+            button.image = NSImage(systemSymbolName: "text.bubble", accessibilityDescription: nil)
         }
         button.isEnabled = session.pullRequest != nil
         button.menu = context.coordinator.menu()
@@ -39,6 +46,7 @@ struct PRActionsComboButton: NSViewRepresentable {
         let session: ReviewSession
         let actions: ReviewBarActions
         var primaryAction: Primary = .approve
+        var canReview = true
 
         init(session: ReviewSession, actions: ReviewBarActions) {
             self.session = session
@@ -49,6 +57,7 @@ struct PRActionsComboButton: NSViewRepresentable {
             switch primaryAction {
             case .approve: actions.approve()
             case .merge: actions.merge()
+            case .comment: actions.comment()
             }
         }
 
@@ -72,11 +81,10 @@ struct PRActionsComboButton: NSViewRepresentable {
                 menu.addItem(item)
             }
             menu.autoenablesItems = false
-            add(String(localized: "Comment…", bundle: .app), #selector(comment))
-            switch primaryAction {
-            case .approve: add(String(localized: "Merge…", bundle: .app), #selector(merge))
-            case .merge: add(String(localized: "Approve…", bundle: .app), #selector(approve))
-            }
+            // The two that are not on the button, and Approve only where GitHub would take it.
+            if primaryAction != .comment { add(String(localized: "Comment…", bundle: .app), #selector(comment)) }
+            if primaryAction != .merge { add(String(localized: "Merge…", bundle: .app), #selector(merge)) }
+            if canReview, primaryAction != .approve { add(String(localized: "Approve…", bundle: .app), #selector(approve)) }
             let dormant = session.pullRequest.map(session.store.isDormant) == true
             add(String(localized: dormant ? "Wake" : "Snooze", bundle: .app), #selector(snooze))
             menu.addItem(.separator())

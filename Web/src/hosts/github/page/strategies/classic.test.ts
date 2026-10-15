@@ -1,6 +1,7 @@
 import { fileHeaderClassic } from './file-header/classic-header'
 import { viewedControlClassicCollapse } from './viewed-control/classic-collapse'
 import { viewedControlClassicButton } from './viewed-control/classic-viewed-button'
+import { viewedControlClassicCheckbox } from './viewed-control/classic-checkbox'
 import { fileListClassic } from './file-list/classic-files'
 import { toolbarSlotClassicToc } from './toolbar-slot/classic-toc'
 import { PageResolver } from '../resolver'
@@ -96,5 +97,42 @@ describe('UI clássica (compare)', () => {
     const r2 = new PageResolver(document, defaultRegistry())
     r2.fileList(); r2.toolbarSlot(); r2.headers(); r2.viewedControl(r2.headers()[0]!.el)
     expect(r2.diagnostics().chosen).toMatchObject({ fileList: 'file-list/page-route', toolbarSlot: 'toolbar-slot/files-toolbar', fileHeader: 'file-header/aria-link', viewedControl: 'viewed-control/aria' })
+  })
+})
+
+describe('UI clássica (arquivos do PR): o checkbox Viewed nativo', () => {
+  it('viewed-control/classic-checkbox: lê o checked e alterna clicando no checkbox do GitHub', () => {
+    mountComparePage({ files: [{ path: 'a.ts' }, { path: 'b.ts', viewed: true, collapsed: true }], nativeViewed: true })
+    expect(viewedControlClassicCheckbox.probe(document)).toBe(true)
+    const headers = fileHeaderClassic.create(document)
+    const ctl = viewedControlClassicCheckbox.create(document)
+    const a = ctl.inHeader(headers.byId(digestOf('a.ts'))!.el)!
+    expect(a.isViewed()).toBe(false)
+    expect(ctl.inHeader(headers.byId(digestOf('b.ts'))!.el)!.isViewed()).toBe(true)
+    a.toggle()
+    expect(a.isViewed()).toBe(true)
+    expect((document.querySelector(`#diff-${digestOf('a.ts')} input.js-reviewed-checkbox`) as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('o resolver prefere o checkbox nativo e não injeta o botão Viewed onde ele existe', () => {
+    mountComparePage({ files: [{ path: 'a.ts' }, { path: 'b.ts', viewed: true }], nativeViewed: true })
+    const resolver = new PageResolver(document, defaultRegistry())
+    const header = resolver.headerById(digestOf('b.ts'))!.el
+    expect(resolver.viewedControl(header)!.isViewed()).toBe(true)
+    expect(viewedControlClassicButton.probe(document)).toBe(false)
+    expect(document.querySelector('button[data-ghra-viewed]')).toBeNull()
+  })
+
+  it('file-list/classic-files lê o checkbox nativo e não injeta o botão onde ele existe', () => {
+    mountComparePage({ files: [{ path: 'a.ts' }, { path: 'b.ts', viewed: true }, { path: 'c.ts', viewed: true, collapsed: true }], nativeViewed: true })
+    const r = fileListClassic.create(document).list()
+    expect(r.files.map((f) => [f.path, f.viewed])).toEqual([['a.ts', false], ['b.ts', true], ['c.ts', true]])
+    expect(document.querySelector('button[data-ghra-viewed]')).toBeNull()
+  })
+
+  it('no compare, sem checkbox nativo, o botão injetado continua sendo a estratégia', () => {
+    mountComparePage({ files: [{ path: 'a.ts' }] })
+    expect(viewedControlClassicCheckbox.probe(document)).toBe(false)
+    expect(viewedControlClassicButton.probe(document)).toBe(true)
   })
 })

@@ -13,6 +13,8 @@ final class ReviewSession {
         case marked(count: Int, failed: Int, canUndo: Bool)
         case undone(count: Int)
         case error(String)
+        /// Something worth knowing, not a failure; goes away by itself.
+        case info(String)
     }
     struct PageCounts: Equatable {
         var total: Int
@@ -157,9 +159,20 @@ final class ReviewSession {
             if let dict = payload as? [String: Any], let active = dict["active"] as? Bool { isEditingInPage = active }
         case "listing":
             let gen = generation
-            track { await $0.recount(); await $0.autoMarkIfNeeded(generation: gen) }
+            track { await $0.recount(); await $0.autoMarkIfNeeded(generation: gen); await $0.landIfPending() }
         default: break
         }
+    }
+
+    /// A pull request opened to be reviewed lands on its first unviewed file once its list is in: set by
+    /// the window with the PR's base path, consumed by the first listing of that page.
+    var landOnFirstUnviewed: String? = nil
+
+    func landIfPending() async {
+        guard let pending = landOnFirstUnviewed, pending == currentBasePath else { return }
+        landOnFirstUnviewed = nil
+        guard (try? await ensureSettingsPushed()) != nil else { return }
+        _ = try? await scripting.call("firstUnviewed", ["args": []])
     }
 
     private var currentBasePath: String? {
@@ -351,6 +364,20 @@ final class ReviewSession {
         await refreshFileCounts()
     }
 
+    /// Next (+1) or previous (-1) file with an unresolved review thread, from GitHub's list of threads;
+    /// wraps around. Nothing happens when the pull request has none.
+    func stepThread(_ delta: Int) async {
+        guard let paths = pullRequest?.unresolvedThreadPaths, !paths.isEmpty else { return }
+        guard (try? await ensureSettingsPushed()) != nil else { return }
+        let report = (try? await scripting.call("stepAmong", ["args": [paths, delta]])) as? [String: Any] ?? [:]
+        // The thread sits in a folded (viewed) file: say so, and leave the fold to the reader.
+        if report["collapsed"] as? Bool == true {
+            let info = Notice.info(String(localized: "The thread is inside a collapsed file. Expand it to read it.", bundle: .app))
+            notice = info
+            scheduleNoticeClear(after: info)
+        }
+    }
+
     func scroll(_ direction: ScrollDirection) async {
         guard (try? await ensureSettingsPushed()) != nil else { return }
         _ = try? await scripting.call("scrollToUnviewed", ["args": [direction.rawValue]])
@@ -366,7 +393,7 @@ final class ReviewSession {
         switch result {
         case .marked(0, 0, _), .undone(0):
             notice = nil
-        case .marked, .undone:
+        case .marked, .undone, .info:
             noticeClear = Task { [weak self, lifetime = noticeLifetime] in
                 try? await Task.sleep(for: lifetime)
                 guard let self, !Task.isCancelled, self.notice == result else { return }

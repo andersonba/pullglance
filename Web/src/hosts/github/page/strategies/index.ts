@@ -9,6 +9,7 @@ import { toolbarSlotFilesToolbar } from './toolbar-slot/files-toolbar'
 import { toolbarSlotFloating } from './toolbar-slot/floating'
 import { viewedControlAria } from './viewed-control/aria'
 import { viewedControlClassicButton } from './viewed-control/classic-viewed-button'
+import { viewedControlClassicCheckbox } from './viewed-control/classic-checkbox'
 import { viewedControlClassicCollapse } from './viewed-control/classic-collapse'
 import { viewedControlCssModule } from './viewed-control/css-module'
 
@@ -16,7 +17,7 @@ export function defaultRegistry(): StrategyRegistry {
   return {
     fileList: [fileListPageRoute, fileListClassic, fileListRenderedHeaders],
     fileHeader: [fileHeaderAriaLink, fileHeaderClassic],
-    viewedControl: [viewedControlAria, viewedControlClassicButton, viewedControlClassicCollapse, viewedControlCssModule],
+    viewedControl: [viewedControlAria, viewedControlClassicCheckbox, viewedControlClassicButton, viewedControlClassicCollapse, viewedControlCssModule],
     toolbarSlot: [toolbarSlotFilesToolbar, toolbarSlotClassicToc, toolbarSlotFloating],
   }
 }

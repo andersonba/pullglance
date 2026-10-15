@@ -23,7 +23,7 @@ fragment PullRequestFields on PullRequest {
   }
   author { login avatarUrl }
   reviewDecision
-  reviewThreads(first: 50) { nodes { isResolved } }
+  reviewThreads(first: 50) { nodes { isResolved path } }
   reviewRequests(first: 10) { nodes { requestedReviewer { __typename ... on Team { slug } } } }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
 }

@@ -221,7 +221,7 @@ private struct PRNode: Decodable {
         struct Configuration: Decodable { let mergeMethod: String? }
     }
     struct Threads: Decodable { let nodes: [Lossy<Thread>] }
-    struct Thread: Decodable { let isResolved: Bool }
+    struct Thread: Decodable { let isResolved: Bool; let path: String? }
     struct Requests: Decodable { let nodes: [Lossy<Request>] }
     struct Request: Decodable { let requestedReviewer: Reviewer? }
     struct Reviewer: Decodable {
@@ -247,7 +247,10 @@ private struct PRNode: Decodable {
         case "PENDING", "EXPECTED": ci = .pending
         default: ci = .none
         }
-        let unresolved = reviewThreads?.nodes.compactMap(\.value).filter { !$0.isResolved }.count ?? 0
+        let openThreads = reviewThreads?.nodes.compactMap(\.value).filter { !$0.isResolved } ?? []
+        let unresolved = openThreads.count
+        var threadPaths: [String] = []
+        for path in openThreads.compactMap(\.path) where !threadPaths.contains(path) { threadPaths.append(path) }
         let teams = reviewRequests?.nodes
             .compactMap { $0.value?.requestedReviewer }
             .filter { $0.typename == "Team" }
@@ -263,6 +266,7 @@ private struct PRNode: Decodable {
             reviewDecision: reviewDecision.flatMap(ReviewDecision.init(rawValue:)),
             ciState: ci,
             unresolvedThreads: unresolved,
+            unresolvedThreadPaths: threadPaths,
             requestedTeams: teams,
             hasConflicts: mergeable == "CONFLICTING",
             isBehindBase: mergeStateStatus == "BEHIND",

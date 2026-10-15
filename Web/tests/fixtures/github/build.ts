@@ -76,7 +76,7 @@ export function buildFilesPageHtml(options: FixtureOptions): string {
     .filter((f) => f.rendered !== false)
     .map((f) => {
       const digest = f.digest ?? digestOf(f.path)
-      const header = fill(FILE_HEADER, { digest, path: esc(f.path), viewedButton: viewedButton(f.viewed ?? false, opts.variant), body: f.largeDiff ? LARGE_DIFF_BODY : DIFF_BODY })
+      const header = fill(FILE_HEADER, { digest, path: esc(f.path), viewedButton: viewedButton(f.viewed ?? false, opts.variant), collapsedClass: f.viewed ? ' collapsed' : '', body: f.largeDiff ? LARGE_DIFF_BODY : DIFF_BODY })
       return opts.containers ? `<div id="diff-${digest}" class="Diff-module__diff__x">${header}</div>` : header
     })
     .join('\n')
@@ -97,6 +97,9 @@ function installToggleSimulation(doc: Document) {
   installedDocuments.add(doc)
   doc.addEventListener('click', (ev) => {
     if (!toggleEnabled) return
+    // O chevron do cabeçalho (primeiro botão) só recolhe/expande, sem mexer no Viewed, como na UI nova.
+    const chevron = (ev.target as Element).closest('[data-diff-header-wrapper] .d-flex.flex-shrink-0 > button')
+    if (chevron) { chevron.closest('.diff-file-header')?.classList.toggle('collapsed'); return }
     const btn = (ev.target as Element).closest('button[aria-label="Viewed"], button[aria-label="Not Viewed"], button[class*="MarkAsViewedButton-module__"]')
     if (!btn || btn.hasAttribute('data-ghra-viewed')) return   // o botão injetado pela extensão cuida do próprio estado
     const wasViewed = btn.getAttribute('aria-pressed') === 'true' || btn.className.includes('MarkAsViewedButton-module__viewed__')

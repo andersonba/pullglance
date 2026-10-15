@@ -20,6 +20,7 @@ const CURSOR_PROBE = 4           // px below the visible top: the file whose box
 const CURSOR_NEAR = 72           // a file starting this close below the visible top counts too (gaps between diffs)
 const CURSOR_THROTTLE_MS = 150
 const ANCHOR_MS = 1500           // after a jump: how long layout shifts above the file are compensated (WebKit has no scroll anchoring)
+const HOLD_MS = 600              // after a mark: GitHub moves focus to the marked header and the browser scrolls it into view; the reader asked for the next file
 const LISTING_MIN_INTERVAL_MS = 1000
 
 export function install(deps: Deps) {
@@ -154,15 +155,54 @@ export function install(deps: Deps) {
     return index
   }
 
+  // The current file is marked on the page: an accent outline on its box. The pill shows only a position,
+  // and on a page of collapsed files a step moves nothing else, so this is how the reader sees where they
+  // are. One class, one injected rule; GitHub's own accent color when it has one.
+  const HIGHLIGHT_CLASS = 'pullglance-current'
+  let highlighted: Element | null = null
+  const ensureHighlightStyle = () => {
+    if (document.getElementById('pullglance-style')) return
+    const style = document.createElement('style')
+    style.id = 'pullglance-style'
+    // An outline gets clipped by GitHub's overflow:hidden wrappers; a positioned pseudo-element inside the box
+    // does not, and the accent bar on the sticky header stays in view while scrolling within the file.
+    const accent = 'var(--borderColor-accent-emphasis,var(--fgColor-accent,#0969da))'
+    style.textContent = [
+      `.${HIGHLIGHT_CLASS}{position:relative}`,
+      // Border plus an inset glow. Inset, because the new Files UI paints each file box with containment
+      // (virtualized, data-estimated-height): anything drawn outside the box is clipped there, while the
+      // classic page shows it. Above the sticky file header (z 5 on the new UI, 2 on the classic), which
+      // fills a collapsed box and would otherwise cover the whole thing. Inside the box, both UIs look the same.
+      `.${HIGHLIGHT_CLASS}::after{content:"";position:absolute;inset:0;border:2px solid ${accent};border-radius:6px;pointer-events:none;z-index:6;box-shadow:inset 0 0 0 1px var(--bgColor-accent-muted,rgba(9,105,218,.25)),inset 0 0 18px 2px var(--bgColor-accent-muted,rgba(9,105,218,.35))}`,
+      `.${HIGHLIGHT_CLASS} [data-diff-header-wrapper="true"],.${HIGHLIGHT_CLASS} .file-header{box-shadow:inset 3px 0 0 ${accent}}`,
+    ].join('\n')
+    document.head.appendChild(style)
+  }
+  /** The box standing for a file: the `#diff-<id>` container, else the header's wrapper, else the header. */
+  const boxOf = (id: string): Element | null => {
+    const container = document.getElementById(`diff-${id}`)
+    if (container) return container
+    const header = adapter.resolver.headerById(id)?.el ?? null
+    return header?.closest('[data-diff-header-wrapper="true"]')?.parentElement ?? header
+  }
+  const highlight = (id: string | null) => {
+    const el = id ? boxOf(id) : null
+    if (el === highlighted) return
+    highlighted?.classList.remove(HIGHLIGHT_CLASS)
+    highlighted = el
+    if (el) { ensureHighlightStyle(); el.classList.add(HIGHLIGHT_CLASS) }
+  }
+
   /** Why there is no cursor, for the app's log: the list failed to read, is empty, or has no element on the page yet. */
   let noCursorReason = ''
   async function currentFile(): Promise<FileCursor | null> {
     let listing: FileListing | null = null
-    try { listing = await files() } catch (e) { noCursorReason = `read failed: ${(e as Error)?.name ?? 'error'}`; return null }
-    if (listing.files.length === 0) { noCursorReason = 'empty listing'; return null }
+    try { listing = await files() } catch (e) { noCursorReason = `read failed: ${(e as Error)?.name ?? 'error'}`; highlight(null); return null }
+    if (listing.files.length === 0) { noCursorReason = 'empty listing'; highlight(null); return null }
     const index = await cursorIndex(listing)
-    if (index < 0 && !listing.files.some((f) => elementOf(f.id))) { noCursorReason = `no element for ${listing.files.length} files`; return null }
+    if (index < 0 && !listing.files.some((f) => elementOf(f.id))) { noCursorReason = `no element for ${listing.files.length} files`; highlight(null); return null }
     const f = listing.files[Math.max(index, 0)]!
+    highlight(f.id)
     return { id: f.id, path: f.path, index: Math.max(index, 0), total: listing.files.length, viewed: f.viewed }
   }
 
@@ -209,8 +249,33 @@ export function install(deps: Deps) {
     stopAnchor = () => { cancelAnimationFrame(frame); stopAnchor = null }
   }
 
+  /**
+   * Keeps a file at the top of the content for a while, whoever moves the page: layout shifts, or a scroll
+   * of GitHub's own (after a mark it focuses the marked header, which scrolls it back into view). Unlike
+   * `anchor`, this corrects every displacement, so it only runs right after a mark, when no reader scrolls.
+   */
+  const hold = (id: string) => {
+    stopAnchor?.()
+    const until = performance.now() + HOLD_MS
+    let frame = 0
+    const tick = () => {
+      const el = elementOf(id)
+      if (el) {
+        const off = el.getBoundingClientRect().top - visibleTop(id)
+        if (Math.abs(off) > 0.5) {
+          window.scrollBy(0, off)
+          intent = { id, scrollY: window.scrollY }
+        }
+      }
+      if (performance.now() < until) frame = requestAnimationFrame(tick)
+      else stopAnchor = null
+    }
+    frame = requestAnimationFrame(tick)
+    stopAnchor = () => { cancelAnimationFrame(frame); stopAnchor = null }
+  }
+
   /** Puts a file at the top. Instant: a smooth scroll dies on the first lazy render in WebKit. */
-  const jumpTo = (id: string): 'element' | 'hash' => {
+  const jumpTo = (id: string, keep: 'anchor' | 'hold' = 'anchor'): 'element' | 'hash' => {
     const el = elementOf(id)
     if (el) {
       el.scrollIntoView({ block: 'start' })
@@ -218,7 +283,7 @@ export function install(deps: Deps) {
       const off = el.getBoundingClientRect().top - visibleTop(id)
       if (Math.abs(off) > 0.5) window.scrollBy({ top: off, behavior: 'instant' as ScrollBehavior })
       intent = { id, scrollY: window.scrollY }
-      anchor(el, id)
+      if (keep === 'hold') hold(id); else anchor(el, id)
     } else {
       intent = null
       if (location.hash === `#diff-${id}`) location.hash = ''
@@ -243,16 +308,40 @@ export function install(deps: Deps) {
   }
 
   /** Next or previous file not yet viewed, from where the reader is. */
-  async function scrollToUnviewed(direction: 'next' | 'previous', fromIndex?: number): Promise<boolean> {
+  async function scrollToUnviewed(direction: 'next' | 'previous', fromIndex?: number, keep: 'anchor' | 'hold' = 'anchor'): Promise<boolean> {
     const listing = await files()
     const from = fromIndex ?? await cursorIndex(listing)
     const target = direction === 'next'
       ? listing.files.find((f, i) => i > from && !f.viewed)
       : [...listing.files].reverse().find((f) => listing.files.indexOf(f) < from && !f.viewed)
     if (!target) return false
-    jumpTo(target.id)
+    jumpTo(target.id, keep)
     return true
   }
+
+  /**
+   * Next (+1) or previous (-1) file among `paths`, in page order from the cursor, wrapping around at the
+   * ends. The app passes the files that carry open review threads (from GraphQL), so this is the same on
+   * every GitHub UI. `collapsed` tells the app the thread is folded away (a viewed file): the reader
+   * decides whether to open it; the page is left as they arranged it.
+   */
+  async function stepAmong(paths: string[], delta: number): Promise<{ moved: boolean; collapsed: boolean }> {
+    const listing = await files()
+    const wanted = new Set(paths)
+    const indices = listing.files.map((f, i) => i).filter((i) => wanted.has(listing.files[i]!.path))
+    if (indices.length === 0) return { moved: false, collapsed: false }
+    const from = await cursorIndex(listing)
+    const target = delta > 0
+      ? indices.find((i) => i > from) ?? indices[0]!
+      : [...indices].reverse().find((i) => i < from) ?? indices[indices.length - 1]!
+    const id = listing.files[target]!.id
+    jumpTo(id)
+    const box = boxOf(id)
+    return { moved: true, collapsed: box !== null && isCollapsed(box) }
+  }
+
+  /** A folded diff: the new UI marks the header, the classic one the chevron. */
+  const isCollapsed = (box: Element) => box.querySelector('.diff-file-header.collapsed') !== null || box.querySelector('button.js-details-target[aria-expanded="false"]') !== null
 
   /** Marks or unmarks the file under the cursor without moving. */
   async function setCurrentViewed(viewed: boolean): Promise<boolean> {
@@ -278,8 +367,9 @@ export function install(deps: Deps) {
         const file = (await files()).files.find((f) => f.id === cursor.id)
         if (file) { await adapter.setViewed(file, true, signal); marked = true; invalidateListing() }
       }
-      // From the file just handled: marking collapses it, the page reflows and may scroll (which ends a jump intent).
-      const moved = await scrollToUnviewed('next', cursor?.index)
+      // From the file just handled: marking collapses it, the page reflows, and GitHub scrolls the marked header
+      // back into view when it moves focus there. Hold the target at the top through all of that.
+      const moved = await scrollToUnviewed('next', cursor?.index, 'hold')
       return { marked, moved }
     })
   }
@@ -293,6 +383,8 @@ export function install(deps: Deps) {
     deps.post({ name: 'context', payload: context() })
     invalidateListing()
     intent = null
+    stopAnchor?.()
+    highlight(null)
     lastCursorKey = ''
     listingWatch?.reset()
     for (const ms of [600, 1500, 3000]) setTimeout(() => { invalidateListing(); void postCursor() }, ms)
@@ -312,6 +404,61 @@ export function install(deps: Deps) {
   // On focusout the next element is not active yet; read it after the focus move settles.
   document.addEventListener('focusout', () => { queueMicrotask(updateEditing) })
 
+  /**
+   * A structural picture of the page for the app's capture: counts, selectors and positions, never a
+   * path, a title or a URL. Enough to tell which GitHub UI this is and whether the file boxes were found.
+   */
+  async function inspect(): Promise<Record<string, unknown>> {
+    const sel = (el: Element | null): string | null => el
+      ? `${el.tagName.toLowerCase()}${el.id ? '#' + el.id.replace(/[0-9a-f]{20,}/g, '…') : ''}${Array.from(el.classList).slice(0, 3).map((c) => '.' + c.replace(/__[A-Za-z0-9]+$/, '')).join('')}`
+      : null
+    const chain = (el: Element | null, n = 6): string[] => { const out: string[] = []; while (el && n--) { out.push(sel(el)!); el = el.parentElement } return out }
+    let listing: FileListing | null = null
+    try { listing = await files() } catch { listing = null }
+    const cursor = await currentFile()
+    const first = listing?.files[0]
+    // A structural outline of the current file's box and its ancestors: tags, ids (digests shortened),
+    // classes (hash suffixes dropped), data-/role/aria-label attribute names, and the styles that decide
+    // clipping and stacking. No text nodes, so nothing of the page's content.
+    const outline = (root: Element | null, maxDepth: number, maxLines: number): string[] => {
+      const lines: string[] = []
+      const walk = (el: Element, depth: number) => {
+        if (lines.length >= maxLines || depth > maxDepth) return
+        const cs = getComputedStyle(el)
+        const flags = [cs.position !== 'static' ? cs.position : '', cs.overflow !== 'visible' ? `overflow:${cs.overflow}` : '', cs.zIndex !== 'auto' ? `z:${cs.zIndex}` : '']
+          .filter(Boolean).join(' ')
+        const attrs = Array.from(el.attributes).filter((a) => /^(data-|role$|aria-label$)/.test(a.name)).slice(0, 4).map((a) => `[${a.name}]`).join('')
+        lines.push(`${'  '.repeat(depth)}${sel(el)}${attrs}${flags ? '  {' + flags + '}' : ''}`)
+        for (const child of Array.from(el.children)) walk(child, depth + 1)
+      }
+      if (root) walk(root, 0)
+      return lines
+    }
+    const box = cursor ? boxOf(cursor.id) : null
+    const ancestors = (el: Element | null): string[] => {
+      const out: string[] = []
+      for (let p = el?.parentElement ?? null; p && out.length < 12; p = p.parentElement) {
+        const cs = getComputedStyle(p)
+        out.push(`${sel(p)}  {${cs.position} overflow:${cs.overflow} z:${cs.zIndex}}`)
+      }
+      return out
+    }
+    return {
+      currentBoxOutline: outline(box, 7, 80),
+      currentBoxAncestors: ancestors(box),
+      path: location.pathname.replace(/^\/[^/]+\/[^/]+/, '/owner/repo').replace(/\/pull\/\d+/, '/pull/N'),
+      files: listing?.files.length ?? null,
+      viewed: listing?.files.filter((f) => f.viewed).length ?? null,
+      cursor: cursor ? { index: cursor.index, total: cursor.total, viewed: cursor.viewed } : noCursorReason,
+      containers: document.querySelectorAll('[id^="diff-"]').length,
+      headerWrappers: document.querySelectorAll('[data-diff-header-wrapper="true"]').length,
+      highlighted: document.querySelector(`.${HIGHLIGHT_CLASS}`) !== null,
+      firstBoxChain: chain(first ? boxOf(first.id) : null),
+      bodyClasses: Array.from(document.body.classList).slice(0, 10),
+      scrollY: Math.round(window.scrollY), innerHeight: window.innerHeight, documentHeight: document.documentElement.scrollHeight,
+    }
+  }
+
   const api = {
     context,
     setSettings: (s: Partial<Settings>) => {
@@ -324,7 +471,10 @@ export function install(deps: Deps) {
       for (const ms of [600, 1500, 3000]) setTimeout(() => { invalidateListing(); void postCursor() }, ms)
     },
     counts, mark, undo, unmarkAll, scrollToUnviewed: (direction: 'next' | 'previous') => scrollToUnviewed(direction),
-    currentFile, stepFile, markCurrentAndNext, setCurrentViewed,
+    /** The first unviewed file from the top of the page, wherever the reader is: where a review request starts. */
+    firstUnviewed: () => scrollToUnviewed('next', -1),
+    stepAmong,
+    currentFile, stepFile, markCurrentAndNext, setCurrentViewed, inspect,
     flush: () => adapter.flushMemory(),
   }
   return api

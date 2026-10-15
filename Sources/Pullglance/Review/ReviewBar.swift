@@ -16,6 +16,7 @@ struct ReviewBarActions {
 
 /// One line under the address bar: context on the left, progress and actions on the right.
 struct ReviewBar: View {
+    @Environment(\.openSettings) private var openSettings
     let session: ReviewSession
     let actions: ReviewBarActions
 
@@ -51,16 +52,25 @@ struct ReviewBar: View {
         }
     }
 
-    /// Right zone: one primary action for the pull request's state, with the rest in its attached menu.
-    /// The same button-plus-menu as the pill's "Mark tests". File work lives in the pill.
+    /// Right zone: on pages with files, the tests combo (marking in bulk is decided here, next to the
+    /// progress); then one primary action for the pull request's state, with the rest in its attached
+    /// menu. Navigating and marking one file live in the small pill over the page.
     @ViewBuilder private var trailing: some View {
+        if session.currentFile != nil {
+            TestsComboButton(session: session) {
+                SettingsSelection.shared.tab = .review
+                SettingsOpener.activate()
+                openSettings()
+            }
+            .fixedSize()
+        }
         if case .pullRequest(_, _, let tab) = session.page {
             if tab != .files {
                 Button { actions.reviewFiles() } label: {
                     Label { Text("Review files", bundle: .app) } icon: { Image(systemName: "arrow.right") }.labelStyle(.titleAndIcon)
                 }
             }
-            PRActionsComboButton(session: session, actions: actions, primary: showsMerge ? .merge : .approve).fixedSize()
+            PRActionsComboButton(session: session, actions: actions, primary: showsMerge ? .merge : isOwn ? .comment : .approve, canReview: !isOwn).fixedSize()
         } else {
             moreMenu
         }
@@ -86,6 +96,8 @@ struct ReviewBar: View {
             Text("\(count) unmarked", bundle: .app).font(.system(size: 11)).foregroundStyle(.secondary)
         case .error(let message):
             Label { Text(verbatim: message) } icon: { Image(systemName: "exclamationmark.triangle.fill") }.font(.system(size: 11)).foregroundStyle(.orange).lineLimit(1)
+        case .info(let message):
+            Label { Text(verbatim: message) } icon: { Image(systemName: "text.bubble") }.font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
         case nil:
             if let counts = session.fileCounts {
                 counter(viewed: counts.viewed, total: counts.total)
@@ -112,6 +124,12 @@ struct ReviewBar: View {
     private var isDormant: Bool {
         guard let pr = session.pullRequest else { return false }
         return session.store.isDormant(pr)
+    }
+
+    /// The viewer's own pull request: GitHub refuses an approval or a change request from its author.
+    private var isOwn: Bool {
+        guard let pr = session.pullRequest, let viewer = session.store.viewerLogin else { return false }
+        return pr.author == viewer
     }
 
     private var moreMenu: some View {

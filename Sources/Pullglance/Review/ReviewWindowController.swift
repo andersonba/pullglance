@@ -85,8 +85,15 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     /// Opens a pull request. The popover is dismissed, the app activated (a menu bar app gets no keyboard
     /// otherwise), the extension loaded on first use, and the page loaded or re-used when already shown.
-    func open(_ pr: PullRequest, landing: ReviewAddress.Landing) {
-        open(url: ReviewAddress.url(for: pr, landing: landing))
+    /// `firstUnviewed`: a review request lands on the first file still to be viewed, not the top of the page.
+    func open(_ pr: PullRequest, landing: ReviewAddress.Landing, firstUnviewed: Bool = false) {
+        let url = ReviewAddress.url(for: pr, landing: landing)
+        let alreadyHere = ReviewPage.classify(host.webView.url).isSamePullRequest(as: ReviewPage.classify(url))
+        if firstUnviewed, landing == .files {
+            session.landOnFirstUnviewed = "/\(pr.repo)/pull/\(pr.number)"
+            if alreadyHere { Task { await session.landIfPending() } }
+        }
+        open(url: url)
     }
 
     func open(url: URL) {
@@ -137,6 +144,63 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     /// A `WKWebView` with focus swallows ⌘ shortcuts the page did not even ask for; handle the browser ones
     /// here when our window is key, and Esc in one place: find bar first, then the address bar's own Esc.
+    /// A picture of the page and a structural summary of its DOM, into the log folder, for looking at what
+    /// the window shows when it cannot be seen first-hand. The summary has counts and selectors, never a
+    /// title, a path or a URL; the picture is whatever the page shows and stays on this Mac.
+    func capture() {
+        let folder = AppLog.defaultDirectory.appending(path: "captures", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let stamp = formatter.string(from: Date())
+        let picture = folder.appending(path: "review-\(stamp).png")
+        let summary = folder.appending(path: "review-\(stamp).json")
+        flash()
+        host.webView.takeSnapshot(with: nil) { image, error in
+            guard let image, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff), let png = rep.representation(using: .png, properties: [:]) else {
+                AppLog.shared.info("capture: no picture (\(error.map { String(describing: type(of: $0)) } ?? "nil image"))")
+                return
+            }
+            try? png.write(to: picture)
+            AppLog.shared.info("capture: \(picture.path)")
+        }
+        let bridge = host.bridge
+        Task {
+            let info = (try? await bridge.call("inspect", ["args": []])) ?? ["error": "inspect failed"]
+            if let data = try? JSONSerialization.data(withJSONObject: info, options: [.prettyPrinted, .sortedKeys]) {
+                try? data.write(to: summary)
+                AppLog.shared.info("capture: \(summary.path)")
+            }
+        }
+    }
+
+    /// The camera's feedback: a white flash over the page and an accent glow along the window's edge, gone
+    /// in half a second.
+    private func flash() {
+        guard let content = window?.contentView else { return }
+        let flash = NSView(frame: content.bounds)
+        flash.autoresizingMask = [.width, .height]
+        flash.wantsLayer = true
+        flash.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.55).cgColor
+        flash.layer?.borderColor = NSColor.controlAccentColor.cgColor
+        flash.layer?.borderWidth = 6
+        flash.layer?.shadowColor = NSColor.controlAccentColor.cgColor
+        flash.layer?.shadowOpacity = 1
+        flash.layer?.shadowRadius = 18
+        content.addSubview(flash, positioned: .above, relativeTo: nil)
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.5
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            flash.animator().alphaValue = 0
+        }, completionHandler: { flash.removeFromSuperview() })
+    }
+
+    static func captureIfOpen() -> Bool {
+        guard let shared, shared.window?.isVisible == true else { return false }
+        shared.capture()
+        return true
+    }
+
     private func installKeyMonitor() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, let window = self.window, NSApp.keyWindow === window else { return event }
@@ -161,6 +225,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
             case (.command, "-"): self.zoomOut()
             case (.command, "0"): self.zoomReset()
             case ([.command, .shift], "O"), ([.command, .shift], "o"): self.openInBrowser()
+            case ([.command, .shift], "P"), ([.command, .shift], "p"): self.capture()
             // Review keys act only when the page has focus and no modal is up (text fields keep ⌘↓ etc.), and only
             // on review pages; elsewhere the page keeps them (⌘↓ scrolls to the end, etc.).
             case ([.command, .shift], "V"), ([.command, .shift], "v"):
@@ -209,7 +274,8 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         case #selector(stop): return activeWebView.isLoading
         case #selector(markTests), #selector(undoMarking), #selector(nextUnviewed), #selector(previousUnviewed), #selector(refreshReview):
             return session.page.showsBar
-        case #selector(approvePR), #selector(commentPR), #selector(mergePR), #selector(snoozePR):
+        case #selector(approvePR): return session.pullRequest != nil && !viewerAuthoredCurrent
+        case #selector(commentPR), #selector(mergePR), #selector(snoozePR):
             return session.pullRequest != nil
         case #selector(toggleReviewBar): return session.page.showsBar
         default: return true
@@ -534,8 +600,15 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     @objc func refreshReview() { if session.page.showsBar { Task { await session.refresh() } } }
     @objc func toggleReviewBar() { session.isBarHidden.toggle() }
 
+    /// The viewer's own pull request: GitHub takes no approval from its author, so ⇧⌘A and the menu item
+    /// stay off (the bar offers Comment instead).
+    private var viewerAuthoredCurrent: Bool {
+        guard let pr = session.pullRequest, let viewer = store.viewerLogin else { return false }
+        return pr.author == viewer
+    }
+
     @objc func approvePR() {
-        guard modalHost == nil else { return }   // no stacked modals from the menu
+        guard modalHost == nil, !viewerAuthoredCurrent else { return }   // no stacked modals from the menu
         presentModal { pr, store, done in
             // The result refreshes the review state, which moves the decision chip; a failure shows in the bar.
             AnyView(ApproveView(pr: pr, store: store, onDone: { [weak self] result in

@@ -52,7 +52,8 @@ function ensureButton(header: Element): HTMLButtonElement | null {
 export const viewedControlClassicButton: Strategy<ViewedControlLocator> = {
   id: 'viewed-control/classic-viewed-button',
   priority: 25,   // acima do chevron (classic-collapse), abaixo do Viewed nativo do PR (aria)
-  probe: (doc) => doc.querySelector(`.file-header[data-path] ${ACTIONS}`) !== null,
+  // Só onde o GitHub não oferece Viewed (compare): na aba de arquivos do PR o checkbox nativo manda.
+  probe: (doc) => doc.querySelector(`.file-header[data-path] ${ACTIONS}`) !== null && doc.querySelector('.file-header input.js-reviewed-checkbox') === null,
   create: () => ({
     inHeader: (header): ViewedControl | null => {
       const el = ensureButton(header)

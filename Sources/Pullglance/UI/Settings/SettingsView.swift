@@ -728,6 +728,14 @@ struct AdvancedSettingsView: View {
                 } label: {
                     Text("Log file", bundle: .app)
                 }
+                LabeledContent {
+                    Button { _ = ReviewWindowController.captureIfOpen() } label: { Text("Capture now", bundle: .app) }
+                        .controlSize(.small)
+                        .disabled(ReviewWindowController.shared?.window?.isVisible != true)
+                } label: {
+                    Text("Review window picture", bundle: .app)
+                    Text("A picture of the page and a summary of its structure, into the log folder. Also ⇧⌘P in the window.", bundle: .app).font(.caption2).foregroundStyle(.tertiary)
+                }
             } header: {
                 Text("Diagnostics", bundle: .app)
             }

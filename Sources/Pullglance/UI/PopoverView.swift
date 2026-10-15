@@ -354,7 +354,8 @@ struct PopoverView: View {
     /// Same destination as a click on the row.
     private func openReview(_ pr: PullRequest, section: Section) {
         if ReviewSettingsStore.shared.settings.windowEnabled, let review = ReviewWindowController.shared {
-            review.open(pr, landing: section.tab == .review ? .files : .conversation)
+            // A review request: straight to the first file that still needs eyes.
+            review.open(pr, landing: section.tab == .review ? .files : .conversation, firstUnviewed: section.tab == .review)
         } else {
             PopoverDismissal.open(pr.url)
         }

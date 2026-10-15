@@ -20,6 +20,8 @@ import Testing
         #expect(pr.reviewDecision == .changesRequested)
         #expect(pr.ciState == .failure)
         #expect(pr.unresolvedThreads == 2)
+        // The files the open threads sit on, each once; resolved ones do not count.
+        #expect(pr.unresolvedThreadPaths == ["src/api/upload.ts"])
         #expect(pr.requestedTeams.isEmpty)
     }
 

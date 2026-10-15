@@ -24,6 +24,8 @@ struct PullRequest: Sendable, Equatable, Identifiable {
     let reviewDecision: ReviewDecision?
     let ciState: CIState
     let unresolvedThreads: Int
+    /// The files the unresolved threads sit on, each once, in the order GitHub lists the threads.
+    let unresolvedThreadPaths: [String]
     let requestedTeams: [String]
     /// `mergeable == CONFLICTING`
     let hasConflicts: Bool
