@@ -33,6 +33,9 @@ struct PopoverView: View {
     @State private var hoveredRow: PullRequest.ID? = nil
     /// A row that just answered a key (copied its link, opened): a brief glow says which one.
     @State private var glowingRow: PullRequest.ID? = nil
+    /// The row whose snooze length the ⇧S card is asking about, and the highlighted choice.
+    @State private var snoozing: PullRequest? = nil
+    @State private var snoozeChoice = 0
     @State private var glowTask: Task<Void, Never>? = nil
     /// The shortcuts card (⌘/ or the ⋯ menu).
     @State private var showingShortcuts = false
@@ -81,8 +84,8 @@ struct PopoverView: View {
 
             ZStack(alignment: .top) {
                 content
-                    .opacity(store.isApplyingSettingsChange || merging != nil || commenting != nil || showingShortcuts ? 0.45 : 1)
-                    .allowsHitTesting(!store.isApplyingSettingsChange && merging == nil && commenting == nil && !showingShortcuts)
+                    .opacity(store.isApplyingSettingsChange || merging != nil || commenting != nil || showingShortcuts || snoozing != nil ? 0.45 : 1)
+                    .allowsHitTesting(!store.isApplyingSettingsChange && merging == nil && commenting == nil && !showingShortcuts && snoozing == nil)
                 if store.isApplyingSettingsChange {
                     ProgressView().progressViewStyle(.linear).controlSize(.mini).padding(.horizontal, 12)
                 }
@@ -92,6 +95,15 @@ struct PopoverView: View {
                     ShortcutsCard { showingShortcuts = false }
                         .padding(.top, 24)
                         .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                }
+                if let pr = snoozing {
+                    Color.clear.contentShape(Rectangle()).onTapGesture { snoozing = nil }
+                    SnoozeCard(pr: pr, choice: $snoozeChoice, pick: { duration in
+                        snoozing = nil
+                        snooze(pr, for: duration)
+                    }, close: { snoozing = nil })
+                    .padding(.top, 24)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
                 }
                 if let pr = merging {
                     MergeConfirmView(pr: pr, store: store, previousFailure: previousFailure(of: pr)) { options in
@@ -125,6 +137,7 @@ struct PopoverView: View {
             .animation(.easeInOut(duration: 0.18), value: merging?.id)
             .animation(.easeInOut(duration: 0.18), value: commenting?.id)
             .animation(.easeInOut(duration: 0.18), value: showingShortcuts)
+            .animation(.easeInOut(duration: 0.18), value: snoozing?.id)
             .animation(.easeInOut(duration: 0.2), value: toast)
 
             if reordering {
@@ -144,9 +157,11 @@ struct PopoverView: View {
         .onAppear {
             SettingsOpener.bringSettingsForwardIfOpen()
             store.startCIPolling()
+            store.popoverDidOpen()
         }
         .onDisappear {
             store.stopCIPolling()
+            store.popoverDidClose()
             mineFilter = nil
             reviewFilter = nil
             openRow = nil
@@ -235,6 +250,18 @@ struct PopoverView: View {
         // The card answers to its own two keys and swallows the rest while it is up.
         if key == .shortcuts { showingShortcuts.toggle(); return true }
         if showingShortcuts { if key == .escape { showingShortcuts = false }; return true }
+        if let pr = snoozing {
+            switch key {
+            case .escape: snoozing = nil
+            case .up: snoozeChoice = max(0, snoozeChoice - 1)
+            case .down: snoozeChoice = min(SnoozeCard.choices.count - 1, snoozeChoice + 1)
+            case .review, .space:
+                snoozing = nil
+                snooze(pr, for: SnoozeCard.choices[snoozeChoice])
+            default: break
+            }
+            return true
+        }
         guard store.hasAnyData, store.blockingError == nil else { return false }
         let rows = triageRows
         let ids = rows.map(\.pr.id)
@@ -269,6 +296,15 @@ struct PopoverView: View {
             return true
         case .shortcuts:
             return true   // handled above
+        case .snoozeFor:
+            // The row under the pointer, else the focused one; the card keeps the row's current length highlighted.
+            guard let pr = hovered?.pr ?? focusedPR else { return false }
+            openRow = nil
+            // On a timed row, the shortest length that still covers what is left.
+            let current = store.dormantMark(for: pr)?.nearestLength().flatMap { SnoozeDuration.allCases.firstIndex(of: $0) }
+            snoozeChoice = current.map { $0 + 1 } ?? 0
+            snoozing = pr
+            return true
         case .pin, .snooze, .open, .review, .refresh, .comment, .merge, .copyLink:
             if let hovered, key == .review { glow(hovered.pr.id); openReview(hovered.pr, section: hovered.section); return true }
             if let hovered, key == .copyLink { glow(hovered.pr.id); handle(.copyLink, for: hovered.pr); return true }
@@ -400,6 +436,14 @@ struct PopoverView: View {
         return nil
     }
 
+    /// A snooze with a length from the menu or the ⇧S card; nil is the plain one, until activity.
+    private func snooze(_ pr: PullRequest, for duration: SnoozeDuration?) {
+        openRow = nil
+        let next = focus.id == pr.id ? TriageFocus.successor(of: pr.id, in: triageRows.map(\.pr.id)) : focus.id
+        withAnimation(.easeInOut(duration: 0.3)) { store.snooze(pr, for: duration) }
+        if focus.id != nil { focus.set(next) }
+    }
+
     private func handle(_ action: PRAction, for pr: PullRequest) {
         // Any action, from a tile, the "more" tile or the context menu, puts a revealed row away.
         openRow = nil
@@ -448,11 +492,13 @@ struct PopoverView: View {
         let lifted = rowDrag?.id == pr.id
         let focused = focus.id == pr.id
         let glowing = glowingRow == pr.id
+        let woke = store.woke.contains(pr.id)
         return rowView(pr, section: section, showAuthor: showAuthor, teamLabel: teamLabel, dormant: dormant, pinned: pinnedRow, reorderable: reorderable, among: among)
             .onHover { inside in
                 if inside { hoveredRow = pr.id } else if hoveredRow == pr.id { hoveredRow = nil }
             }
-            .background(glowing ? Color.accentColor.opacity(0.22) : focused ? Color.accentColor.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 8))
+            // Back from a timed snooze: the whole row is tinted until the popover has been opened and closed.
+            .background(glowing ? Color.accentColor.opacity(0.22) : focused ? Color.accentColor.opacity(0.08) : woke ? Color.orange.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 8))
             .overlay {
                 if focused {
                     RoundedRectangle(cornerRadius: 8).strokeBorder(Color.accentColor, lineWidth: 2).padding(1.5).allowsHitTesting(false)
@@ -543,6 +589,8 @@ struct PopoverView: View {
         let actionSection = dormant || pinned ? store.originSection(of: pr) : section
         let actionState = store.actionState(for: pr)
         let running: Bool = { if case .running = actionState { return true }; return false }()
+        let snoozeLength = dormant ? store.dormantMark(for: pr)?.nearestLength() : nil
+        let isWoke = store.woke.contains(pr.id)
         return SwipeActionsRow(
             id: pr.id,
             actions: quickActions(for: actionSection, dormant: dormant),
@@ -552,7 +600,7 @@ struct PopoverView: View {
             isRunning: running,
             isLocked: reordering,
             onAction: { handle($0, for: pr) },
-            menu: { PRRowMenu(section: actionSection, isDormant: dormant, isPinned: pinned, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, onAction: { handle($0, for: pr) }) }
+            menu: { PRRowMenu(section: actionSection, isDormant: dormant, isPinned: pinned, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, snoozeLength: snoozeLength, onAction: { handle($0, for: pr) }, onSnoozeFor: { snooze(pr, for: $0) }) }
         ) {
             PRRow(
                 pr: pr,
@@ -560,10 +608,13 @@ struct PopoverView: View {
                 showAuthor: showAuthor,
                 teamLabel: teamLabel,
                 isDormant: dormant,
-                originSection: dormant ? store.originSection(of: pr) : nil,
+                snoozedUntil: dormant ? store.dormantMark(for: pr)?.until : nil,
+                isWoke: isWoke,
+                snoozeLength: snoozeLength,
                 isPinned: pinned,
                 actionState: actionState,
                 onAction: { handle($0, for: pr) },
+                onSnoozeFor: { snooze(pr, for: $0) },
                 handlesTap: !reordering,
                 showsGrip: reordering && reorderable,
                 onAuthorTap: reordering ? nil : { withAnimation(.easeInOut(duration: 0.2)) { store.toggleQuickAuthor(pr.author) } },

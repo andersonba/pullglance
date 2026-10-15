@@ -110,6 +110,13 @@ struct GeneralSettingsView: View {
                 } label: {
                     Text("Roll the number when it changes", bundle: .app)
                 }
+                Toggle(isOn: $store.notifiesSnoozeEnd) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Notify when a snooze ends", bundle: .app)
+                        Text("Only for snoozes with a length; the ones ended by activity stay quiet.", bundle: .app)
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
+                }
             }
             SwiftUI.Section {
                 LabeledContent {

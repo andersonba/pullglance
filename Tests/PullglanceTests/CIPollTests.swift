@@ -3,13 +3,6 @@ import Testing
 @testable import Pullglance
 
 /// A clock the tests can move.
-private final class Clock: @unchecked Sendable {
-    private let lock = NSLock()
-    private var date = Date(timeIntervalSince1970: 1_000_000)
-    var now: Date { lock.withLock { date } }
-    func advance(_ seconds: TimeInterval) { lock.withLock { date = date.addingTimeInterval(seconds) } }
-}
-
 @MainActor
 @Suite struct CIPollTests {
     /// Fixtures: #104 (mine, draft) and #203 (direct) have CI pending; the others are settled.

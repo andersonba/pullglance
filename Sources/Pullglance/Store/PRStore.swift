@@ -74,6 +74,7 @@ final class PRStore {
     static let manualOrdersKey = "manualOrders"
     static let sectionSortsKey = "sectionSorts"
     static let verboseLoggingKey = "verboseLogging"
+    static let notifySnoozeEndKey = "notifySnoozeEnd"
     static let hiddenSectionsKey = "hiddenSections"
     static let badgeSectionsKey = "badgeSections"
     static let dualBadgeFirstKey = "dualBadgeFirst"
@@ -104,6 +105,11 @@ final class PRStore {
     /// Whether the menu bar number rolls when it changes. Stored; on by default.
     var rollsBadge: Bool {
         didSet { defaults.set(rollsBadge, forKey: Self.badgeRollKey) }
+    }
+
+    /// A macOS notification when a timed snooze ends (never for the ones ended by activity).
+    var notifiesSnoozeEnd: Bool {
+        didSet { defaults.set(notifiesSnoozeEnd, forKey: Self.notifySnoozeEndKey) }
     }
 
     /// What the menu bar shows next to the icon, once there is data.
@@ -154,11 +160,19 @@ final class PRStore {
         }
     }
 
+    /// PRs back from a timed snooze, marked "Woke" on their rows through one opening of the popover: the
+    /// opening shows them, the one after that drops them (`markWokeSeen`).
+    private(set) var woke: Set<String> = []
+    private var seenWoke: Set<String> = []
+    /// A timed snooze ended since the popover was last opened: the dot on the menu bar icon.
+    private(set) var hasUnseenWoke = false
+    private var wakeTask: Task<Void, Never>?
     private(set) var dormant: [String: DormantMark] {
         didSet {
             guard dormant != oldValue else { return }
             defaults.set(try? JSONEncoder().encode(dormant), forKey: Self.dormantKey)
             recomputeBadge(source: .data)
+            scheduleWake()
         }
     }
     private var dormantIDs: Set<String> { Set(dormant.keys) }
@@ -396,15 +410,18 @@ final class PRStore {
     }
     private let defaults: UserDefaults
     private let now: @Sendable () -> Date
+    private let notifier: (any SnoozeNotifying)?
     private let logger = Logger(subsystem: AppInfo.bundleID, category: "store")
     private var inFlight = false
     /// A refresh asked for while a cycle runs (manual, timer or a filter change) runs once the cycle ends.
     private var pendingRefresh = false
     private var timerTask: Task<Void, Never>?
 
-    init(client: any GHRunning, defaults: UserDefaults = .standard, now: @escaping @Sendable () -> Date = { Date() }, successLinger: Duration = .seconds(1), log: AppLog = .shared, ciPollInterval: Duration = .seconds(20), badgeRollDuration: Duration = .milliseconds(360)) {
+    init(client: any GHRunning, defaults: UserDefaults = .standard, now: @escaping @Sendable () -> Date = { Date() }, successLinger: Duration = .seconds(1), log: AppLog = .shared, ciPollInterval: Duration = .seconds(20), badgeRollDuration: Duration = .milliseconds(360), notifier: (any SnoozeNotifying)? = nil) {
         self.badgeRollDuration = badgeRollDuration
         self.rollsBadge = defaults.object(forKey: Self.badgeRollKey) as? Bool ?? true
+        self.notifiesSnoozeEnd = defaults.bool(forKey: Self.notifySnoozeEndKey)
+        self.notifier = notifier
         self.client = client
         self.defaults = defaults
         self.now = now
@@ -584,12 +601,62 @@ final class PRStore {
 
     // `dormant` is replaced wholesale rather than mutated in place: its didSet reads it back (badge), and an
     // in-place subscript write would overlap that read in an exclusivity violation.
-    func snooze(_ pr: PullRequest) {
-        appLog.info("snooze \(pr.id)")
+    func snooze(_ pr: PullRequest, for duration: SnoozeDuration? = nil) {
+        appLog.info("snooze \(pr.id)\(duration.map { " for \($0.rawValue)" } ?? "")")
         unpin(pr)   // one special state at a time
         var marks = dormant
-        marks[pr.id] = DormantMark(pr)
+        marks[pr.id] = DormantMark(pr, until: duration.map { now().addingTimeInterval($0.interval) })
         dormant = marks
+    }
+
+    func dormantMark(for pr: PullRequest) -> DormantMark? { dormant[pr.id] }
+
+    /// When the next timed snooze ends; nil while none has a length.
+    var nextWakeDate: Date? { dormant.values.compactMap(\.until).min() }
+
+    /// The popover closed: whatever "Woke" it showed has been seen, and goes at the next opening. Split in
+    /// two so that a second appear or disappear in a row (MenuBarExtra sends them) changes nothing.
+    func popoverDidClose() { seenWoke = woke }
+
+    func popoverDidOpen() {
+        woke.subtract(seenWoke)
+        seenWoke = []
+        hasUnseenWoke = false
+    }
+
+    /// Timed snoozes whose hour has come end now, refresh or not. Rows go back where they belong with
+    /// their last known state; the next refresh brings the rest.
+    func wakeDue() {
+        let at = now()
+        var marks = dormant
+        var ended: Set<String> = []
+        for (id, mark) in marks where mark.remaining(now: at) == .zero {
+            marks[id] = nil
+            ended.insert(id)
+        }
+        guard !ended.isEmpty else { return }
+        dormant = marks
+        didEndTimedSnoozes(ended)
+    }
+
+    private func didEndTimedSnoozes(_ ids: Set<String>) {
+        appLog.info("snooze ended for \(ids.count)")
+        woke.formUnion(ids)
+        hasUnseenWoke = true
+        if notifiesSnoozeEnd { notifier?.snoozeEnded(count: ids.count) }
+    }
+
+    /// One sleeping task for the earliest hour; every change to the marks reschedules it. A Mac asleep
+    /// past the hour is covered by `wakeChanged` at the next refresh.
+    private func scheduleWake() {
+        wakeTask?.cancel()
+        guard let next = nextWakeDate else { wakeTask = nil; return }
+        let delay = max(0, next.timeIntervalSince(now()))
+        wakeTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled, let self else { return }
+            self.wakeDue()
+        }
     }
 
     /// What the keyboard walks: exactly the rows on screen for a tab and quick filter, in display order
@@ -644,11 +711,18 @@ final class PRStore {
         dormant = marks
     }
 
-    /// Called after every successful search: a snoozed PR with new activity wakes up by itself.
+    /// Called after every successful search: a snoozed PR with new activity, or whose hour has come and
+    /// gone unnoticed, wakes up by itself. Only the timed ones count as "Woke".
     private func wakeChanged(in prs: [PullRequest]) {
         var marks = dormant
-        for pr in prs where marks[pr.id]?.shouldWake(for: pr) == true { marks[pr.id] = nil }
+        let at = now()
+        var ended: Set<String> = []
+        for pr in prs where marks[pr.id]?.shouldWake(for: pr, now: at) == true {
+            if marks[pr.id]?.remaining(now: at) == .zero { ended.insert(pr.id) }
+            marks[pr.id] = nil
+        }
         dormant = marks
+        if !ended.isEmpty { didEndTimedSnoozes(ended) }
     }
 
     // MARK: Actions
@@ -1032,7 +1106,10 @@ final class PRStore {
         return checked
     }
 
-    func start() { restartTimer() }
+    func start() {
+        restartTimer()
+        scheduleWake()   // marks loaded at init have no didSet
+    }
 
     private func restartTimer() {
         timerTask?.cancel()

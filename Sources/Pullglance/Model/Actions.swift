@@ -180,18 +180,63 @@ struct DormantMark: Equatable, Sendable, Codable {
     let headRefOid: String
     let reviewDecision: ReviewDecision?
     let ciState: CIState
+    /// When the snooze ends by itself; nil sleeps until activity alone.
+    let until: Date?
 
-    init(headRefOid: String, reviewDecision: ReviewDecision?, ciState: CIState) {
+    init(headRefOid: String, reviewDecision: ReviewDecision?, ciState: CIState, until: Date? = nil) {
         self.headRefOid = headRefOid
         self.reviewDecision = reviewDecision
         self.ciState = ciState
+        self.until = until
     }
 
-    init(_ pr: PullRequest) {
-        self.init(headRefOid: pr.headRefOid, reviewDecision: pr.reviewDecision, ciState: pr.ciState)
+    init(_ pr: PullRequest, until: Date? = nil) {
+        self.init(headRefOid: pr.headRefOid, reviewDecision: pr.reviewDecision, ciState: pr.ciState, until: until)
     }
 
-    func shouldWake(for pr: PullRequest) -> Bool {
-        pr.headRefOid != headRefOid || pr.reviewDecision != reviewDecision || pr.ciState != ciState
+    // Marks saved before timed snoozes have no `until`.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        headRefOid = try container.decode(String.self, forKey: .headRefOid)
+        reviewDecision = try container.decodeIfPresent(ReviewDecision.self, forKey: .reviewDecision)
+        ciState = try container.decode(CIState.self, forKey: .ciState)
+        until = try container.decodeIfPresent(Date.self, forKey: .until)
+    }
+
+    /// Activity on the PR, or the hour come: either ends the snooze.
+    func shouldWake(for pr: PullRequest, now: Date = Date()) -> Bool {
+        pr.headRefOid != headRefOid || pr.reviewDecision != reviewDecision || pr.ciState != ciState || until.map { now >= $0 } == true
+    }
+
+    /// Time left on a timed snooze, never negative; nil for one that waits on activity.
+    func remaining(now: Date = Date()) -> Duration? {
+        until.map { .seconds(max(0, $0.timeIntervalSince(now))) }
+    }
+
+    /// The menu item that stands for this snooze: the shortest length still covering what is left, nil for
+    /// one that waits on activity.
+    func nearestLength(now: Date = Date()) -> SnoozeDuration? {
+        guard let left = remaining(now: now) else { return nil }
+        return SnoozeDuration.allCases.first { .seconds($0.interval) >= left } ?? .oneWeek
+    }
+}
+
+/// Told when timed snoozes end, so the user can hear about it away from the popover.
+protocol SnoozeNotifying: Sendable {
+    func snoozeEnded(count: Int)
+}
+
+/// How long a timed snooze lasts, in the order the menu offers them.
+enum SnoozeDuration: String, CaseIterable, Sendable {
+    case thirtyMinutes, oneHour, threeHours, oneDay, oneWeek
+
+    var interval: TimeInterval {
+        switch self {
+        case .thirtyMinutes: 30 * 60
+        case .oneHour: 3_600
+        case .threeHours: 3 * 3_600
+        case .oneDay: 24 * 3_600
+        case .oneWeek: 7 * 24 * 3_600
+        }
     }
 }

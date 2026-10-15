@@ -39,6 +39,8 @@ import Testing
         #expect(TriageKey(characters: "p", keyCode: 35, modifiers: []) == .pin)
         #expect(TriageKey(characters: "P", keyCode: 35, modifiers: [.shift]) == .pin)
         #expect(TriageKey(characters: "s", keyCode: 1, modifiers: []) == .snooze)
+        // ⇧S asks for how long; ⇧P is still just a pin.
+        #expect(TriageKey(characters: "S", keyCode: 1, modifiers: [.shift]) == .snoozeFor)
         #expect(TriageKey(characters: "o", keyCode: 31, modifiers: []) == .open)
         #expect(TriageKey(characters: "\r", keyCode: 36, modifiers: []) == .review)
         #expect(TriageKey(characters: nil, keyCode: 125, modifiers: []) == .down)

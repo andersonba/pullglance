@@ -8,12 +8,18 @@ struct PRRow: View {
     var showAuthor = false
     var teamLabel: String? = nil
     var isDormant = false
-    /// Where a snoozed PR came from; shown in its metadata.
-    var originSection: Section? = nil
+    /// A timed snooze's end, shown as what is left; nil on rows asleep until activity.
+    var snoozedUntil: Date? = nil
+    /// Back from a timed snooze since the last refresh.
+    var isWoke = false
+    /// For the menu: the length a snoozed row sleeps for.
+    var snoozeLength: SnoozeDuration? = nil
     /// Pinned rows carry a small pin before the title: the section says it, the mark travels with the row.
     var isPinned = false
     var actionState: ActionState? = nil
     var onAction: (PRAction) -> Void = { _ in }
+    /// nil is "until activity": the way to drop a length.
+    var onSnoozeFor: (SnoozeDuration?) -> Void = { _ in }
     /// Reorder mode has no clicks; the row's tap stays off there.
     var handlesTap = true
     /// Reorder mode: a grip on the trailing edge, the content sliding over to make room.
@@ -63,7 +69,7 @@ struct PRRow: View {
                 .lineLimit(1)
                 // Review rows lead with why they are where they are (see `reviewSignal`).
                 let reason: [Pill] = section.tab == .review ? reviewSignal(for: pr, now: Date()).map { [.reason($0)] } ?? [] : []
-                let rowPills = reason + pills(for: pr)
+                let rowPills = (isWoke ? [Pill.woke] : []) + reason + pills(for: pr)
                 // Kept in place while an action runs or has failed, only dimmed: dropping them changed the
                 // row's height and shifted everything below for the duration of a refresh.
                 if !rowPills.isEmpty, !isDormant {
@@ -72,6 +78,8 @@ struct PRRow: View {
                         ForEach(rowPills, id: \.self) { PillView(pill: $0).fixedSize() }
                     }
                     .opacity(actionState == nil ? 1 : 0.35)
+                } else if isDormant, let snoozedUntil {
+                    SnoozeLeftPill(until: snoozedUntil).fixedSize()
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -107,7 +115,7 @@ struct PRRow: View {
                 PopoverDismissal.open(pr.url)
             }
         }
-        .contextMenu { PRRowMenu(section: section, isDormant: isDormant, isPinned: isPinned, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, onAction: onAction) }
+        .contextMenu { PRRowMenu(section: section, isDormant: isDormant, isPinned: isPinned, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, snoozeLength: snoozeLength, onAction: onAction, onSnoozeFor: onSnoozeFor) }
     }
 
     /// Left column: CI dot normally; spinner, merged check or failure mark while an action is in play;
@@ -174,7 +182,10 @@ struct PRRowMenu: View {
     var offersMerge = false
     var autoMergeOn = false
     var actionState: ActionState? = nil
+    /// On a snoozed row, which length it sleeps for (nil: until activity); the submenu checks it.
+    var snoozeLength: SnoozeDuration? = nil
     var onAction: (PRAction) -> Void = { _ in }
+    var onSnoozeFor: (SnoozeDuration?) -> Void = { _ in }
 
     private var isRunning: Bool { if case .running = actionState { return true }; return false }
 
@@ -194,6 +205,27 @@ struct PRRowMenu: View {
                 }
             }
             .disabled(isRunning && (action == .merge || action == .comment || action == .refresh || action == .disableAutoMerge))
+            if action == .snooze {
+                // Right under Snooze: the timed ones. Under Wake it reads as "change the snooze", so it also
+                // offers the plain kind, and checks what the row has now.
+                Menu {
+                    if isDormant {
+                        snoozeItem(nil, checked: snoozeLength == nil)
+                        Divider()
+                    }
+                    ForEach(SnoozeDuration.allCases, id: \.self) { duration in
+                        snoozeItem(duration, checked: isDormant && snoozeLength == duration)
+                    }
+                } label: {
+                    Label { Text("Snooze for…", bundle: .app) } icon: { Image(systemName: "clock") }
+                }
+            }
+        }
+    }
+
+    private func snoozeItem(_ duration: SnoozeDuration?, checked: Bool) -> some View {
+        Toggle(isOn: Binding(get: { checked }, set: { _ in onSnoozeFor(duration) })) {
+            if let duration { Text(verbatim: duration.label) } else { Text("Until activity", bundle: .app) }
         }
     }
 }
@@ -422,6 +454,7 @@ struct PillView: View {
         case .conflicts: String(localized: "Conflicts", bundle: .app)
         case .behindBase: String(localized: "Behind base", bundle: .app)
         case .openThreads(let count): String(localized: "\(count) open threads", bundle: .app)
+        case .woke: String(localized: "Woke", bundle: .app)
         }
     }
 
@@ -431,9 +464,40 @@ struct PillView: View {
         case .ciFailed, .changesRequested, .conflicts: .red
         case .ciRunning: .yellow
         case .approved, .readyToMerge: .green
+        case .woke: .orange
         case .inMergeQueue, .autoMerge: .purple
         case .awaitingReview: .orange
         case .behindBase, .openThreads: .gray
         }
+    }
+}
+
+extension SnoozeDuration {
+    var label: String {
+        switch self {
+        case .thirtyMinutes: String(localized: "30 min", bundle: .app)
+        case .oneHour: String(localized: "1 hour", bundle: .app)
+        case .threeHours: String(localized: "3 hours", bundle: .app)
+        case .oneDay: String(localized: "1 day", bundle: .app)
+        case .oneWeek: String(localized: "1 week", bundle: .app)
+        }
+    }
+}
+
+/// "25 min left" on a snoozed row, in the pills' place. Counts from the moment the row is drawn; the next
+/// refresh redraws it.
+struct SnoozeLeftPill: View {
+    let until: Date
+
+    var body: some View {
+        let left = Duration.seconds(max(60, until.timeIntervalSinceNow))
+            .formatted(.units(allowed: [.weeks, .days, .hours, .minutes], width: .abbreviated, maximumUnitCount: 1))
+        Text("\(left) left", bundle: .app)
+            .font(.system(size: 10.5))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1.5)
+            .foregroundStyle(Color.orange.mix(with: .primary, by: 0.45))
+            .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
+            .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color.orange.opacity(0.35), lineWidth: 0.5))
     }
 }

@@ -12,9 +12,11 @@ struct MenuBarLabel: View {
     let isError: Bool
     /// The roll in flight, if any.
     var roll: BadgeRoll? = nil
+    /// A timed snooze ended while the popover was closed: an orange dot on the icon until it is opened.
+    var showsWokeDot = false
 
     var body: some View {
-        Image(nsImage: Self.render(text: shown, isError: isError, roll: text == nil ? nil : roll))
+        Image(nsImage: Self.render(text: shown, isError: isError, roll: text == nil ? nil : roll, dot: showsWokeDot))
     }
 
     private var shown: String? {
@@ -27,18 +29,23 @@ struct MenuBarLabel: View {
     private static let font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
     private static let gap: CGFloat = 3
 
-    private static func symbol(isError: Bool) -> NSImage {
-        NSImage(systemSymbolName: isError ? "exclamationmark.triangle" : "arrow.triangle.pull", accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: 14, weight: .medium)) ?? NSImage()
+    private static func symbol(isError: Bool, tinted: Bool) -> NSImage {
+        var configuration = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+        if tinted { configuration = configuration.applying(.init(paletteColors: [.labelColor])) }
+        return NSImage(systemSymbolName: isError ? "exclamationmark.triangle" : "arrow.triangle.pull", accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration) ?? NSImage()
     }
 
     /// Icon, then the count. During a roll the characters that differ (right-aligned) slide, the old one out
     /// through the top and the new one in from below, the other way when the count fell; the rest stand still.
     /// Texts of different lengths roll as a whole.
-    static func render(text: String?, isError: Bool, roll: BadgeRoll? = nil) -> NSImage {
-        let symbol = symbol(isError: isError)
+    /// With `dot`, the image stops being a template (a template cannot carry color): the glyph and the
+    /// count are drawn in the label color instead, which the handler resolves for the menu bar's appearance
+    /// each time it draws, and an orange dot sits on the icon's top-right corner.
+    static func render(text: String?, isError: Bool, roll: BadgeRoll? = nil, dot: Bool = false) -> NSImage {
+        let symbol = symbol(isError: isError, tinted: dot)
         let iconSize = symbol.size
-        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: dot ? NSColor.labelColor : NSColor.black]
         let resting = roll?.to ?? text
         let columns: [(old: String, new: String)]
         if let roll {
@@ -71,9 +78,14 @@ struct MenuBarLabel: View {
                 x += width
             }
             NSGraphicsContext.restoreGraphicsState()
+            if dot {
+                let dotRect = NSRect(x: iconSize.width - 5, y: rect.height - 7, width: 6, height: 6)
+                NSColor.systemOrange.setFill()
+                NSBezierPath(ovalIn: dotRect).fill()
+            }
             return true
         }
-        image.isTemplate = true
+        image.isTemplate = !dot
         image.accessibilityDescription = resting
         return image
     }

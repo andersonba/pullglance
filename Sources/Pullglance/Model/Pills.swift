@@ -14,6 +14,8 @@ enum Pill: Hashable, Sendable {
     case conflicts
     case behindBase
     case openThreads(Int)
+    /// A timed snooze ended at the last refresh; the row is back where it belongs.
+    case woke
 }
 
 /// Ordered left to right as they appear in a row.

@@ -32,7 +32,7 @@ struct TriageFocus: Equatable {
 /// The keys triage answers to: plain keys, plus ⌘C (copy link) and ⌘/ (the shortcuts card), the two whose
 /// plain letters are taken. Anything else with ⌘, ⌥ or ⌃ belongs to the menus.
 enum TriageKey: Equatable {
-    case up, down, left, right, space, pin, snooze, open, review, refresh, comment, merge, copyLink, shortcuts, escape
+    case up, down, left, right, space, pin, snooze, snoozeFor, open, review, refresh, comment, merge, copyLink, shortcuts, escape
 
     init?(characters: String?, keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
         let held = modifiers.intersection([.command, .option, .control])
@@ -45,6 +45,8 @@ enum TriageKey: Equatable {
             return
         }
         if !held.isEmpty { return nil }
+        // ⇧S asks for how long; the other letters ignore shift.
+        if modifiers.contains(.shift), characters?.lowercased() == "s" { self = .snoozeFor; return }
         switch keyCode {
         case 125: self = .down; return
         case 126: self = .up; return
@@ -135,12 +137,14 @@ struct ShortcutsCard: View {
             }
             group(Text("Row under the pointer", bundle: .app)) {
                 line(Text("Open review · Copy link", bundle: .app), ["↩", "⌘C"])
+                line(Text("Snooze for…", bundle: .app), ["⇧S"])
                 line(Text("Keyboard from here", bundle: .app), ["space"])
             }
             group(Text("Focused row", bundle: .app)) {
                 line(Text("Start", bundle: .app), ["↓"])
                 line(Text("Open review", bundle: .app), ["↩"])
                 line(Text("Pin · Snooze · Refresh", bundle: .app), ["P", "S", "R"])
+                line(Text("Snooze for…", bundle: .app), ["⇧S"])
                 line(Text("Comment · Merge", bundle: .app), ["C", "M"])
                 line(Text("Open on GitHub · Copy link", bundle: .app), ["O", "⌘C"])
                 line(Text("Exit", bundle: .app), ["esc"])
@@ -186,5 +190,57 @@ struct ShortcutsCard: View {
                 }
             }
         }
+    }
+}
+
+/// The ⇧S card: how long to snooze this row. "Until activity" first, then the timed ones; ↑↓ move, ↩ picks,
+/// esc leaves. The current choice is highlighted the way a focused row is.
+struct SnoozeCard: View {
+    let pr: PullRequest
+    @Binding var choice: Int
+    let pick: (SnoozeDuration?) -> Void
+    let close: () -> Void
+
+    /// nil is "until activity".
+    static let choices: [SnoozeDuration?] = [nil] + SnoozeDuration.allCases
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Snooze for…", bundle: .app).font(.headline)
+                    Text(verbatim: pr.title).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer()
+                Button(action: close) { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut(.cancelAction)
+                    .help(Text("Exit", bundle: .app))
+            }
+            VStack(spacing: 2) {
+                ForEach(Array(Self.choices.enumerated()), id: \.offset) { index, duration in
+                    Button { pick(duration) } label: {
+                        HStack {
+                            Image(systemName: duration == nil ? "bolt" : "clock").frame(width: 14)
+                            Text(verbatim: duration?.label ?? String(localized: "Until activity", bundle: .app))
+                            Spacer()
+                        }
+                        .font(.system(size: 12))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(index == choice ? Color.accentColor.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { if $0 { choice = index } }
+                }
+            }
+            Text("Until activity: a new commit, review decision or CI result", bundle: .app)
+                .font(.caption2).foregroundStyle(.tertiary)
+        }
+        .padding(16)
+        .frame(width: 280)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.25), radius: 14, y: 6)
     }
 }

@@ -20,9 +20,10 @@ struct PullglanceApp: App {
             // Fictional data in a throwaway defaults suite: nothing of the user's is read or written.
             let demoDefaults = UserDefaults(suiteName: "pullglance.demo")!
             demoDefaults.removePersistentDomain(forName: "pullglance.demo")
-            store = PRStore(client: DemoGH(), defaults: demoDefaults)
+            // Its own log too: the demo's pins and snoozes must not land in the user's file.
+            store = PRStore(client: DemoGH(), defaults: demoDefaults, log: AppLog(directory: FileManager.default.temporaryDirectory.appending(path: "pullglance-demo")))
         } else {
-            store = PRStore(client: GHClient())
+            store = PRStore(client: GHClient(), notifier: Bundle.main.bundleIdentifier == nil ? nil : SnoozeNotifier())
         }
         _store = State(initialValue: store)
         if let snapshot {
@@ -43,7 +44,7 @@ struct PullglanceApp: App {
         MenuBarExtra(isInserted: .constant(snapshot == nil)) {
             PopoverView(store: store)
         } label: {
-            MenuBarLabel(text: store.badgeText, hasData: store.badgeCount != nil, isError: store.lastError != nil, roll: store.badgeRoll)
+            MenuBarLabel(text: store.badgeText, hasData: store.badgeCount != nil, isError: store.lastError != nil, roll: store.badgeRoll, showsWokeDot: store.hasUnseenWoke)
                 .help(Text(verbatim: store.badgeDescription ?? ""))
         }
         .menuBarExtraStyle(.window)

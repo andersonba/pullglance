@@ -175,6 +175,34 @@ import Testing
         let mark = DormantMark(headRefOid: "a", reviewDecision: .approved, ciState: .success)
         #expect(mark.shouldWake(for: makePR(reviewDecision: .approved, ciState: .success, unresolvedThreads: 12, headRefOid: "a")) == false)
     }
+
+    /// A timed snooze ends at its hour; activity still ends it earlier.
+    @Test func timedSnoozeWakesAtItsHourOrOnActivity() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let mark = DormantMark(headRefOid: "a", reviewDecision: .approved, ciState: .success, until: start.addingTimeInterval(3_600))
+        let quiet = makePR(reviewDecision: .approved, ciState: .success, headRefOid: "a")
+        #expect(mark.shouldWake(for: quiet, now: start.addingTimeInterval(3_599)) == false)
+        #expect(mark.shouldWake(for: quiet, now: start.addingTimeInterval(3_600)) == true)
+        #expect(mark.shouldWake(for: makePR(reviewDecision: .approved, ciState: .success, headRefOid: "b"), now: start) == true)
+        #expect(mark.remaining(now: start.addingTimeInterval(2_100)) == .seconds(1_500))
+        #expect(mark.remaining(now: start.addingTimeInterval(5_000)) == .zero)
+        #expect(mark.nearestLength(now: start) == .oneHour)
+        #expect(mark.nearestLength(now: start.addingTimeInterval(2_000)) == .thirtyMinutes)
+        #expect(DormantMark(headRefOid: "a", reviewDecision: nil, ciState: .none).nearestLength(now: start) == nil)
+        #expect(DormantMark(headRefOid: "a", reviewDecision: nil, ciState: .none).remaining(now: start) == nil)
+    }
+
+    /// Marks saved before timed snoozes existed decode as "until activity".
+    @Test func marksWithoutAnHourStillDecode() throws {
+        let legacy = Data(#"{"headRefOid":"a","reviewDecision":"APPROVED","ciState":"success"}"#.utf8)
+        let mark = try JSONDecoder().decode(DormantMark.self, from: legacy)
+        #expect(mark.until == nil)
+        #expect(mark.shouldWake(for: makePR(reviewDecision: .approved, ciState: .success, headRefOid: "a"), now: .distantFuture) == false)
+    }
+
+    @Test func snoozeDurationsAreTheFiveOffered() {
+        #expect(SnoozeDuration.allCases.map(\.interval) == [1_800.0, 3_600.0, 10_800.0, 86_400.0, 604_800.0])
+    }
 }
 
 @MainActor
@@ -200,6 +228,73 @@ import Testing
         store.wake(ready[0])
         #expect(store.isDormant(ready[0]) == false)
         #expect(store.badgeCount == 6)
+    }
+
+    /// A snooze with a length ends at its hour, refresh or not; the row then carries "Woke" until the popover
+    /// has been closed, however many refreshes happen in between.
+    @Test func timedSnoozeEndsAtItsHour() async throws {
+        let clock = Clock(start: Date(timeIntervalSince1970: 1_000))
+        let notifier = FakeSnoozeNotifier()
+        let store = PRStore(client: try await gh(), defaults: testDefaults(), now: { clock.now }, notifier: notifier)
+        store.notifiesSnoozeEnd = true
+        await store.refresh()
+        let ready = store.mineGroups.readyToMerge
+        store.snooze(ready[0], for: .oneHour)
+        #expect(store.dormantMark(for: ready[0])?.until == clock.now.addingTimeInterval(3_600))
+        #expect(store.nextWakeDate == clock.now.addingTimeInterval(3_600))
+        clock.advance(3_000)
+        store.wakeDue()
+        #expect(store.isDormant(ready[0]))
+        #expect(store.woke.isEmpty)
+        clock.advance(700)
+        store.wakeDue()
+        #expect(store.isDormant(ready[0]) == false)
+        #expect(store.woke == [ready[0].id])
+        #expect(store.nextWakeDate == nil)
+        #expect(notifier.counts == [1])
+        #expect(store.hasUnseenWoke)
+        await store.refresh()
+        #expect(store.woke == [ready[0].id])
+        // The opening that shows the mark keeps it; closing marks it seen; the next opening drops it.
+        store.popoverDidOpen()
+        store.popoverDidOpen()
+        #expect(store.woke == [ready[0].id])
+        #expect(store.hasUnseenWoke == false)
+        store.popoverDidClose()
+        #expect(store.woke == [ready[0].id])
+        store.popoverDidOpen()
+        #expect(store.woke.isEmpty)
+        #expect(notifier.counts == [1])
+    }
+
+    /// The timer slept through the hour (the Mac did): the next refresh ends the snooze instead.
+    @Test func aDueSnoozeAlsoEndsAtRefresh() async throws {
+        let clock = Clock(start: Date(timeIntervalSince1970: 1_000))
+        let notifier = FakeSnoozeNotifier()
+        let store = PRStore(client: try await gh(), defaults: testDefaults(), now: { clock.now }, notifier: notifier)
+        store.notifiesSnoozeEnd = true
+        await store.refresh()
+        let ready = store.mineGroups.readyToMerge
+        store.snooze(ready[0], for: .thirtyMinutes)
+        clock.advance(3_600)
+        await store.refresh()
+        #expect(store.isDormant(ready[0]) == false)
+        #expect(store.woke == [ready[0].id])
+        #expect(notifier.counts == [1])
+    }
+
+    /// Waking by activity is silent and unmarked, and nothing notifies while the setting is off.
+    @Test func onlyTimedWakeUpsNotifyAndOnlyWhenAsked() async throws {
+        let clock = Clock(start: Date(timeIntervalSince1970: 1_000))
+        let notifier = FakeSnoozeNotifier()
+        let store = PRStore(client: try await gh(), defaults: testDefaults(), now: { clock.now }, notifier: notifier)
+        await store.refresh()
+        let ready = store.mineGroups.readyToMerge
+        store.snooze(ready[0], for: .thirtyMinutes)
+        clock.advance(3_600)
+        store.wakeDue()
+        #expect(store.woke == [ready[0].id])
+        #expect(notifier.counts.isEmpty)
     }
 
     /// Pinned rows lead their tab, keep counting where they came from, and survive a relaunch.
