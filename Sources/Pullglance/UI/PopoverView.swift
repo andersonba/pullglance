@@ -244,6 +244,8 @@ struct PopoverView: View {
     /// Plain keys while the popover is up and nothing else wants them: no field being edited, no modal,
     /// no reorder mode. ↓ starts; from then on the letters act on the focused row and Esc ends it.
     private func handleKey(_ event: NSEvent) -> Bool {
+        // The Esc that closes the popover (see `PopoverDismissal`) is for the extra, not for the triage.
+        if PopoverDismissal.isDismissal(event) { return false }
         guard !reordering, merging == nil, commenting == nil else { return false }
         if event.window?.firstResponder is NSTextView { return false }
         guard let key = TriageKey(characters: event.charactersIgnoringModifiers, keyCode: event.keyCode, modifiers: event.modifierFlags.intersection(.deviceIndependentFlagsMask)) else { return false }
