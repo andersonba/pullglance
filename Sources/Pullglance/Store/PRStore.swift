@@ -624,6 +624,9 @@ final class PRStore {
         hasUnseenWoke = false
     }
 
+    /// The welcome window's last step: a dot on the icon so a new user finds it; the first opening clears it.
+    func showIconDot() { hasUnseenWoke = true }
+
     /// Timed snoozes whose hour has come end now, refresh or not. Rows go back where they belong with
     /// their last known state; the next refresh brings the rest.
     func wakeDue() {

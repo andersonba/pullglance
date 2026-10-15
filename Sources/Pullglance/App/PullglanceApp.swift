@@ -37,6 +37,9 @@ struct PullglanceApp: App {
         } else {
             store.start()
             ReviewWindowController.configure(store: store)
+            OnboardingWindowController.configure(store: store)
+            // After the menu bar item exists, so the window can be placed and the dot has an icon to land on.
+            DispatchQueue.main.async { OnboardingWindowController.showIfDue() }
             _statusItemMenu = State(initialValue: StatusItemMenu(store: store))
         }
         Task { await AvatarCache.shared.pruneDisk() }

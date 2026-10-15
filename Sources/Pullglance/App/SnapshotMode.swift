@@ -116,7 +116,7 @@ enum SnapshotRunner {
             await checker.checkOnce()
             for index in OnboardingStep.all.indices {
                 await write("onboarding-\(index + 1)") {
-                    try await ViewSnapshot.png(OnboardingView(store: store, checker: checker, step: .constant(index), finish: {}, quit: {}), width: 560, appearance: .aqua, settle: .milliseconds(600))
+                    try await ViewSnapshot.png(OnboardingView(store: store, checker: checker, model: OnboardingModel(step: index), finish: {}, quit: {}), width: 560, appearance: .aqua, settle: .milliseconds(600))
                 }
             }
         }

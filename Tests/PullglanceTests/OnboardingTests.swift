@@ -114,3 +114,15 @@ final class Counter: @unchecked Sendable {
         #expect(OnboardingProgress.shouldMarkCompleted(onClose: false) == false)
     }
 }
+
+@MainActor
+@Suite struct OnboardingHandoffTests {
+    @Test func finishingLeavesADotOnTheIcon() async throws {
+        let store = PRStore(client: FakeGH(), defaults: testDefaults())
+        #expect(store.hasUnseenWoke == false)
+        store.showIconDot()
+        #expect(store.hasUnseenWoke)
+        store.popoverDidOpen()
+        #expect(store.hasUnseenWoke == false)
+    }
+}

@@ -47,6 +47,7 @@ final class StatusItemMenu: NSObject {
         add(String(localized: "My PRs on GitHub", bundle: .app), #selector(openMine))
         add(String(localized: "Review requests on GitHub", bundle: .app), #selector(openReviews))
         menu.addItem(.separator())
+        add(String(localized: "Welcome…", bundle: .app), #selector(welcome))
         add(String(localized: "Settings…", bundle: .app), #selector(openSettings), key: ",")
         menu.addItem(.separator())
         let version = NSMenuItem(title: String(format: String(localized: "Version %@", bundle: .app), AppInfo.version), action: nil, keyEquivalent: "")
@@ -66,6 +67,7 @@ final class StatusItemMenu: NSObject {
         SettingsOpener.activate()
         NotificationCenter.default.post(name: .openSettingsRequested, object: nil)
     }
+    @objc private func welcome() { OnboardingWindowController.show() }
     @objc private func quit() { NSApp.terminate(nil) }
 }
 

@@ -1,54 +1,104 @@
 import AppKit
 import SwiftUI
 
+/// Which step is showing. Owned by the window controller so ← → and Esc can drive it from AppKit; the
+/// view animates every change of `step`.
+@MainActor
+@Observable
+final class OnboardingModel {
+    var step: Int
+
+    init(step: Int = 0) { self.step = step }
+
+    func go(to index: Int) {
+        guard OnboardingStep.all.indices.contains(index), index != step else { return }
+        withAnimation(.spring(duration: 0.5, bounce: 0.18)) { step = index }
+    }
+}
+
 /// The welcome window's content: the flea, a title, a text, the step's content, and a footer with Back,
-/// the progress dots and the primary button. `step` is owned by the window controller so ← → and Esc
-/// can drive it from AppKit.
+/// the progress dots and the primary button. Every step stays in the tree; each one is offset and faded
+/// by its distance to the current step, so going forward and back are mirror images of each other and
+/// nothing is inserted or removed mid-animation. The flea hops on every change.
 struct OnboardingView: View {
     @Bindable var store: PRStore
     let checker: RequirementChecker
-    @Binding var step: Int
+    @Bindable var model: OnboardingModel
     let finish: () -> Void
     let quit: () -> Void
 
+    @State private var hop = false
+
+    private var step: Int { model.step }
     private var current: OnboardingStep { OnboardingStep.all[step] }
     private var isGhStep: Bool { current.content == .requirements }
     private var canContinue: Bool { !isGhStep || checker.allPassed }
+    private var pose: MascotPose { isGhStep && checker.allPassed ? .celebrating : current.pose }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .top, spacing: 20) {
-                MascotImage(isGhStep && checker.allPassed ? .celebrating : current.pose, size: 84)
-                    .padding(.top, 6)
-                    .transition(.scale(scale: 0.8).combined(with: .opacity))
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(LocalizedStringKey(current.title), bundle: .app).font(.system(size: 21, weight: .bold))
-                    Text(LocalizedStringKey(current.text), bundle: .app).font(.system(size: 12.5)).foregroundStyle(.secondary).lineSpacing(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                    content.padding(.top, 4)
+                mascot
+                ZStack(alignment: .topLeading) {
+                    ForEach(Array(OnboardingStep.all.enumerated()), id: \.element.id) { index, item in
+                        column(for: item, active: index == step)
+                            .offset(x: CGFloat(index - step) * 56)
+                            .opacity(index == step ? 1 : 0)
+                            .scaleEffect(index == step ? 1 : 0.96, anchor: .leading)
+                            .allowsHitTesting(index == step)
+                            .accessibilityHidden(index != step)
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .clipped()
             }
             .padding(EdgeInsets(top: 44, leading: 30, bottom: 16, trailing: 30))
             .frame(maxHeight: .infinity, alignment: .top)
-            .id(step)
-            .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .move(edge: .leading).combined(with: .opacity)))
             footer
         }
         .frame(width: 560, height: 400)
         .background(.windowBackground)
-        .animation(.easeOut(duration: 0.3), value: step)
         .onChange(of: step, initial: true) { _, _ in
             if isGhStep { checker.start() } else { checker.stop() }
         }
+        .onChange(of: step) { _, _ in
+            withAnimation(.spring(duration: 0.3, bounce: 0.55)) { hop = true }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(160))
+                withAnimation(.spring(duration: 0.4, bounce: 0.35)) { hop = false }
+            }
+        }
     }
 
-    @ViewBuilder private var content: some View {
-        switch current.content {
+    /// The pose crossfades; the whole flea hops up a little and lands on each step change.
+    private var mascot: some View {
+        ZStack {
+            MascotImage(pose, size: 84)
+                .id(pose)
+                .transition(.opacity)
+        }
+        .animation(.easeInOut(duration: 0.25), value: pose)
+        .scaleEffect(hop ? 1.08 : 1, anchor: .bottom)
+        .offset(y: hop ? -10 : 0)
+        .padding(.top, 6)
+    }
+
+    private func column(for item: OnboardingStep, active: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(LocalizedStringKey(item.title), bundle: .app).font(.system(size: 21, weight: .bold))
+            Text(LocalizedStringKey(item.text), bundle: .app).font(.system(size: 12.5)).foregroundStyle(.secondary).lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+            content(for: item, active: active).padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder private func content(for item: OnboardingStep, active: Bool) -> some View {
+        switch item.content {
         case .none: EmptyView()
         case .requirements: requirements
-        case .badgeAndTabs: BadgeAndTabsAnimation().frame(height: 120)
-        case .rowActions: RowActionsAnimation().frame(height: 120)
+        case .badgeAndTabs: if active { BadgeAndTabsAnimation().frame(height: 120) } else { Color.clear.frame(height: 120) }
+        case .rowActions: if active { RowActionsAnimation().frame(height: 120) } else { Color.clear.frame(height: 120) }
         case .notifications:
             requirementRow(symbol: "bell.badge", tint: .orange, title: Text("Notify when a snooze ends", bundle: .app),
                            detail: Text("Optional. macOS asks once; you can change it in Settings later.", bundle: .app)) {
@@ -127,7 +177,7 @@ struct OnboardingView: View {
             } else if isGhStep, checker.installed == .missing {
                 Button(action: quit) { Text("Quit", bundle: .app) }.buttonStyle(.plain).foregroundStyle(.red)
             } else {
-                Button { step -= 1 } label: { Text("Back", bundle: .app) }.buttonStyle(.plain).foregroundStyle(.secondary)
+                Button { model.go(to: step - 1) } label: { Text("Back", bundle: .app) }.buttonStyle(.plain).foregroundStyle(.secondary)
             }
             Spacer()
             HStack(spacing: 6) {
@@ -139,7 +189,7 @@ struct OnboardingView: View {
             .animation(.easeInOut(duration: 0.25), value: step)
             Spacer()
             Button {
-                if step == OnboardingStep.all.count - 1 { finish() } else { step += 1 }
+                if step == OnboardingStep.all.count - 1 { finish() } else { model.go(to: step + 1) }
             } label: {
                 Text(LocalizedStringKey(current.button), bundle: .app).frame(minWidth: 72)
             }
