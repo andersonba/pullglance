@@ -26,8 +26,10 @@ Everything reaches GitHub through the user's own `gh`. `docs/how-it-works.md` ex
 
 ## Checks before claiming anything works
 
-- `swift test` must pass (352 tests, ~3 s). `Scripts/release.sh X.Y.Z` runs them, builds, tags, pushes and
+- `swift test` must pass (347 tests, ~3 s). `Scripts/release.sh X.Y.Z` runs them, builds, tags, pushes and
   publishes the GitHub Release plus the cask, and refuses a binary whose `LC_BUILD_VERSION` sdk is below 26.
+- After `Scripts/make-app.sh`, run `python3 -B -m unittest discover -s Scripts/tests -v` for the signed-feed,
+  strict appcast and release-key guards. CI and `release.sh` run these too; only disposable keys are used.
 - `otool -l .build/debug/Pullglance | grep -A4 LC_BUILD_VERSION` must say `sdk 27.0` (or the current SDK).
   SwiftPM 6.4's default build system stamps `sdk 15.0` otherwise, and SwiftUI then runs the app in macOS 15
   compatibility: taps inside the swipe rows stop firing and the popover never shrinks. `Package.swift` passes

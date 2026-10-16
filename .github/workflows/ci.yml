@@ -48,6 +48,9 @@ jobs:
           Scripts/make-app.sh
           ditto -c -k --keepParent build/Pullglance.app build/Pullglance.zip
 
+      - name: Update security (disposable signing keys)
+        run: python3 -B -m unittest discover -s Scripts/tests -v
+
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

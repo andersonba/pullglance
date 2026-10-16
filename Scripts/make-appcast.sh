@@ -8,6 +8,8 @@
 # in plaintext. --key-file takes a plaintext key instead, for a rehearsal with a throwaway pair, and
 # --download-url-prefix points the rehearsal at a local server instead of the release's assets on GitHub.
 # The appcast holds one item, this release, with the notes embedded; the app reads the one on the latest release.
+# generate_appcast reads SURequireSignedFeed from the archived app and signs the feed, including its notes.
+# Its trailing <!-- sparkle-signatures: block signs all bytes before it; do not edit after generation.
 # Sparkle's tools come from the distribution archive of the version Package.resolved pins, cached under build/.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -72,4 +74,4 @@ private_key | "$tools/bin/generate_appcast" --ed-key-file - \
   --embed-release-notes -o "$out" "$stage"
 
 # The key that signed must be the key the app carries, or every installed copy refuses the update.
-swift Scripts/verify-appcast.swift "$out" "$zip" "$public_key"
+swift Scripts/verify-appcast.swift "$out" "$zip" "$public_key" "$version" --download-url-prefix "$prefix"

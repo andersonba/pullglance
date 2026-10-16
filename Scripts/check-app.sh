@@ -23,5 +23,8 @@ expect CFBundleShortVersionString "$version"
 expect CFBundleVersion "$version"
 expect SUFeedURL "https://github.com/andersonba/pullglance/releases/latest/download/appcast.xml"
 expect SUPublicEDKey "$public_key"
+expect SURequireSignedFeed true
+expect SUVerifyUpdateBeforeExtraction true
+expect SUSignedFeedFailureExpirationInterval 0
 [[ -z "$(value NSAppTransportSecurity)" ]] || die "NSAppTransportSecurity is set: this is a rehearsal build"
 echo "check-app: $app is the production bundle, v$version"

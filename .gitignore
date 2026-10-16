@@ -5,3 +5,4 @@
 .swiftpm/
 build/
 Web/node_modules/
+__pycache__/

@@ -63,6 +63,10 @@ cat > "$OUT/Contents/Info.plist" <<PLIST
   <key>NSHumanReadableCopyright</key><string>© 2026 andersonba</string>
   <key>SUFeedURL</key><string>$SPARKLE_FEED_URL</string>
   <key>SUPublicEDKey</key><string>$SPARKLE_PUBLIC_KEY</string>
+  <key>SURequireSignedFeed</key><true/>
+  <key>SUVerifyUpdateBeforeExtraction</key><true/>
+  <!-- Never fall back to unsigned offers after Sparkle's default 20-day signing failure window. -->
+  <key>SUSignedFeedFailureExpirationInterval</key><integer>0</integer>
   <key>SUEnableAutomaticChecks</key><true/>
   <key>SUScheduledCheckInterval</key><integer>86400</integer>
   <key>SUAutomaticallyUpdate</key><false/>

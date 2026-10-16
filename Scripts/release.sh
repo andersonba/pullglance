@@ -1,5 +1,5 @@
 #!/bin/bash
-# Cuts a release from main: Scripts/release.sh X.Y.Z
+# Cuts a release from main: Scripts/release.sh X.Y.Z [--allow-key-rotation]
 #
 # Runs the tests and the Web build, writes the version into version.env, moves CHANGELOG's Unreleased into
 # the version, builds and zips the app, writes the zip's sha256 into the cask, signs the zip into an appcast
@@ -17,7 +17,11 @@ cd "$(dirname "$0")/.."
 die() { echo "release: $*" >&2; exit 1; }
 
 NEW="${1:-}"
-[[ "$NEW" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "usage: Scripts/release.sh X.Y.Z" >&2; exit 2; }
+allow_key_rotation=false
+[[ $# == 2 && "${2:-}" == "--allow-key-rotation" ]] && allow_key_rotation=true
+[[ "$NEW" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && ( $# == 1 || "$allow_key_rotation" == true ) ]] || {
+  echo "usage: Scripts/release.sh X.Y.Z [--allow-key-rotation]" >&2; exit 2;
+}
 TAG="v$NEW"
 # make-app.sh honours these; a release built with one would strand every copy that installs it (check-app.sh).
 for v in $(compgen -v PULLGLANCE_REHEARSAL_ 2>/dev/null); do die "$v is set: unset the PULLGLANCE_REHEARSAL_* variables before cutting a release"; done
@@ -31,10 +35,27 @@ pub="$(sed -n 's/^SPARKLE_PUBLIC_KEY="\([A-Za-z0-9+\/]\{43\}=\)"$/\1/p' Scripts/
 # shellcheck disable=SC1091
 source version.env
 
+check_previous_key() {
+  # Exclude this release when resuming after its local commit/tag. Only reachable release tags count;
+  # version.env already names NEW then, so it cannot identify the last installed release's trust root.
+  local previous_tag previous_pub
+  previous_tag="$(git tag --merged HEAD --sort=-version:refname --list 'v*' | awk -v target="$TAG" '$0 != target && /^v[0-9]+\.[0-9]+\.[0-9]+$/ && !found {print; found=1}')"
+  [[ -n "$previous_tag" ]] || die "cannot find the previous release tag; fetch the release tags before proceeding"
+  previous_pub="$(git show "$previous_tag:Scripts/make-app.sh" | sed -n 's/^SPARKLE_PUBLIC_KEY="\([A-Za-z0-9+\/]\{43\}=\)"$/\1/p')" || die "cannot read Scripts/make-app.sh from $previous_tag"
+  [[ "$previous_pub" =~ ^[A-Za-z0-9+/]{43}=$ ]] || die "cannot read one SPARKLE_PUBLIC_KEY from $previous_tag:Scripts/make-app.sh"
+  if [[ "$pub" != "$previous_pub" ]]; then
+    [[ "$allow_key_rotation" == true ]] || die "SPARKLE_PUBLIC_KEY changed since $previous_tag; installed copies trust the old key. Plan a migration signed by the old key, then explicitly pass --allow-key-rotation"
+    echo "release: explicit key rotation from $previous_tag; this flag does not migrate installed copies or sign with the old key" >&2
+  fi
+}
+
 [[ "$(git branch --show-current)" == "main" ]] || die "not on main"
+# Fail locally before gh/GPG/builds. Recheck after fetching in case origin has newer release tags.
+check_previous_key
 [[ -z "$(git status --porcelain)" ]] || die "the working tree is not clean"
 gh auth status >/dev/null 2>&1 || die "gh is not logged in"
-git fetch -q origin main
+git fetch -q origin main --tags
+check_previous_key
 remote_tag="$(git ls-remote --tags origin "refs/tags/$TAG" | cut -f1)"
 
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
@@ -44,7 +65,7 @@ if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
   cask_sha="$(sed -n 's/^  sha256 "\(.*\)"/\1/p' "$CASK")"
   [[ "$(shasum -a 256 "$ZIP" | cut -d' ' -f1)" == "$cask_sha" ]] || die "$ZIP does not match the sha256 in $CASK; see the note above about starting over"
   [[ -f "$APPCAST" ]] || die "tag $TAG exists but $APPCAST is gone; see the note above about starting over"
-  swift Scripts/verify-appcast.swift "$APPCAST" "$ZIP" "$pub" >/dev/null || die "$APPCAST does not verify against the key in Scripts/make-app.sh"
+  swift Scripts/verify-appcast.swift "$APPCAST" "$ZIP" "$pub" "$NEW" >/dev/null || die "$APPCAST does not match v$NEW or verify against the key in Scripts/make-app.sh"
   [[ -z "$remote_tag" || "$remote_tag" == "$(git rev-parse "$TAG")" ]] || die "origin already has a different $TAG"
   echo "==> resuming $TAG"
 else
@@ -71,6 +92,7 @@ else
   echo "==> app"
   Scripts/make-app.sh
   Scripts/check-app.sh build/Pullglance.app "$NEW" "$pub"
+  python3 -B -m unittest discover -s Scripts/tests -v
   lipo -archs build/Pullglance.app/Contents/MacOS/Pullglance | grep -q arm64 || die "the binary is not arm64, which is what the cask promises"
   # The SDK stamp SwiftUI reads: 15.0 here means the compatibility paths that break the popover (Package.swift).
   sdk="$(otool -l build/Pullglance.app/Contents/MacOS/Pullglance | awk '/LC_BUILD_VERSION/{f=1} f && /sdk/{print $2; exit}')"

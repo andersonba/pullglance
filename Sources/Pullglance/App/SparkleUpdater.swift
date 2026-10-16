@@ -47,6 +47,7 @@ final class SparkleUpdater: NSObject, SPUUpdaterDelegate, SPUStandardUserDriverD
     // MARK: SPUUpdaterDelegate
 
     nonisolated func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
-        AppLog.shared.info("update: \(error.localizedDescription)")
+        let error = error as NSError
+        AppLog.shared.info("update: session ended, domain=\(error.domain) code=\(error.code)")
     }
 }

@@ -6,6 +6,9 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+### Security
+- Update offers and their release notes must now carry a valid EdDSA signature, and downloaded updates are verified before extraction. Release checks also reject incorrect update metadata and accidental signing-key changes.
+
 ## [0.2.0] - 2026-10-16
 
 ### Added
