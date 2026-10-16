@@ -34,10 +34,12 @@ final class SparkleUpdater: NSObject, SPUUpdaterDelegate, SPUStandardUserDriverD
 
     nonisolated func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool, forUpdate update: SUAppcastItem, state: SPUUserUpdateState) {
         let version = update.displayVersionString
+        AppLog.shared.info("update: \(version) found, \(handleShowingUpdate ? "Sparkle shows it" : "offered in the menus")")
         MainActor.assumeIsolated { updater.scheduledUpdateFound(version: version, shownBySparkle: handleShowingUpdate) }
     }
 
     nonisolated func standardUserDriverWillFinishUpdateSession() {
+        AppLog.shared.info("update: session finished")
         MainActor.assumeIsolated { updater.updateSessionFinished() }
     }
 
