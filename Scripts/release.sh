@@ -19,6 +19,8 @@ die() { echo "release: $*" >&2; exit 1; }
 NEW="${1:-}"
 [[ "$NEW" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "usage: Scripts/release.sh X.Y.Z" >&2; exit 2; }
 TAG="v$NEW"
+# make-app.sh honours these; a release built with one would strand every copy that installs it (check-app.sh).
+for v in $(compgen -v PULLGLANCE_REHEARSAL_ 2>/dev/null); do die "$v is set: unset the PULLGLANCE_REHEARSAL_* variables before cutting a release"; done
 ZIP="build/Pullglance.zip"
 CASK="Casks/pullglance.rb"
 APPCAST="build/appcast.xml"
@@ -66,6 +68,7 @@ else
 
   echo "==> app"
   Scripts/make-app.sh
+  Scripts/check-app.sh build/Pullglance.app "$NEW" "$pub"
   lipo -archs build/Pullglance.app/Contents/MacOS/Pullglance | grep -q arm64 || die "the binary is not arm64, which is what the cask promises"
   # The SDK stamp SwiftUI reads: 15.0 here means the compatibility paths that break the popover (Package.swift).
   sdk="$(otool -l build/Pullglance.app/Contents/MacOS/Pullglance | awk '/LC_BUILD_VERSION/{f=1} f && /sdk/{print $2; exit}')"
