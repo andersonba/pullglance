@@ -45,6 +45,13 @@ import Testing
         #expect(TriageKey(characters: "j", keyCode: 38, modifiers: [.command]) == nil)
     }
 
+    /// F opens the repository/author filter; ⌘F stays the review window's Find.
+    @Test func fIsTheFilter() {
+        #expect(TriageKey(characters: "f", keyCode: 3, modifiers: []) == .filter)
+        #expect(TriageKey(characters: "F", keyCode: 3, modifiers: [.shift]) == .filter)
+        #expect(TriageKey(characters: "f", keyCode: 3, modifiers: [.command]) == nil)
+    }
+
     @Test func keysMapOnlyWithoutModifiers() {
         #expect(TriageKey(characters: "p", keyCode: 35, modifiers: []) == .pin)
         #expect(TriageKey(characters: "P", keyCode: 35, modifiers: [.shift]) == .pin)

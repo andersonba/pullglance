@@ -39,6 +39,8 @@ struct PopoverView: View {
     @State private var glowTask: Task<Void, Never>? = nil
     /// The shortcuts card (⌘/ or the ⋯ menu).
     @State private var showingShortcuts = false
+    /// The repository/author filter popover: the funnel's click or F.
+    @State private var showingFilter = false
     private static let listSpace = "list"
     static let holdToReorder: Double = 0.5
 
@@ -62,7 +64,7 @@ struct PopoverView: View {
             HStack(spacing: 6) {
                 TabPicker(selection: $tab, mineCount: store.mineTabCount, reviewCount: store.reviewTabCount)
                 if store.hasAnyData, store.blockingError == nil {
-                    RepoFilterButton(store: store)
+                    RepoFilterButton(store: store, isPresented: $showingFilter)
                 }
             }
             .padding(.horizontal, 12)
@@ -302,6 +304,9 @@ struct PopoverView: View {
             return true
         case .shortcuts:
             return true   // handled above
+        case .filter:
+            showingFilter.toggle()
+            return true
         case .snoozeFor:
             // The row under the pointer, else the focused one; the card keeps the row's current length highlighted.
             guard let pr = hovered?.pr ?? focusedPR else { return false }

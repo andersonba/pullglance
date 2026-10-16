@@ -5,8 +5,10 @@ import SwiftUI
 /// `quickAuthorFilter`; the two stack.
 struct RepoFilterButton: View {
     @Bindable var store: PRStore
-    @State private var isPresented = false
+    /// Owned by the popover: the funnel's click and the F key both flip it.
+    @Binding var isPresented: Bool
     @State private var search = ""
+    @FocusState private var searchFocused: Bool
     @State private var kind: Kind = .repositories
 
     enum Kind: Hashable { case repositories, authors }
@@ -49,6 +51,9 @@ struct RepoFilterButton: View {
             TextField(text: $search, prompt: Text(kind == .repositories ? "Search repositories" : "Search authors", bundle: .app)) { EmptyView() }
                 .textFieldStyle(.roundedBorder)
                 .controlSize(.small)
+                .focused($searchFocused)
+                // Open and type: the search takes the keys, so F and the triage letters are letters here.
+                .onAppear { searchFocused = true }
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
                     switch kind {

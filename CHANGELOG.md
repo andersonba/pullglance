@@ -7,7 +7,7 @@ publishes it as the release notes.
 ## [Unreleased]
 
 ### Added
-- In the popover, Vim's `H J K L` do what the arrows do: `J`/`K` move the focus through the rows (and `J` starts it), `H`/`L` switch tabs.
+- In the popover, Vim's `H J K L` do what the arrows do: `J`/`K` move the focus through the rows (and `J` starts it), `H`/`L` switch tabs. `F` opens the repository/author filter with its search field ready to type.
 
 ### Security
 - Update offers and their release notes must now carry a valid EdDSA signature, and downloaded updates are verified before extraction. Release checks also reject incorrect update metadata and accidental signing-key changes.
