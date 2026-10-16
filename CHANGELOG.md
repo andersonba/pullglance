@@ -7,9 +7,14 @@ publishes it as the release notes.
 ## [Unreleased]
 
 ### Added
-- The number of pull requests that need you, next to the clock, with the sections it counts chosen in Settings.
-- My PRs by state and To review by who asks first, with merge, comment, snooze, pin and mark-as-ready from the row, mouse or keyboard.
-- Timed snooze with a dot on the icon when it ends, and an optional notification.
-- A review window that walks the changed files, marks them viewed and lets you approve or comment without leaving it.
-- A welcome window that checks `gh` is installed and logged in.
+- The number of pull requests that need you, next to the clock. Settings › Sections picks which sections it counts; it can show two numbers, and it rolls like an odometer when it changes.
+- Two tabs: My PRs by state (needs action, ready to merge, waiting for review, drafts), To review by what asks for you first. Quick filters by section, author and repository, also by clicking a row's avatar or repository name.
+- Repository rules per owner: hide every repository but some, or only some, with search.
+- Actions from the row, by swipe, menu or key: merge (through the merge queue when the base needs one, or when checks pass through GitHub's auto-merge), comment, approve, snooze, pin, refresh, mark a draft as ready, open, copy link. Everything that cannot be undone asks first.
+- Snooze until something happens on the pull request, or for a length you choose; a timed snooze ends with the row marked, a dot on the icon and an optional notification.
+- Keyboard: ↓ drives the list, every key works on the row under the pointer, ⌘/ shows them all.
+- A review window, behind Settings › Advanced › Experimental: the pull request page with a native bar that walks the changed files, marks them viewed, marks tests in bulk, and approves or comments without leaving it.
+- A welcome window on the first launch that checks `gh` is installed and logged in, and a right-click menu on the icon.
+- English and Brazilian Portuguese.
+- Everything through the `gh` you are already logged into. Preferences, avatars and a small log stay on your Mac; Settings › Advanced exports diagnostics.
 - Install and upgrade through Homebrew; the app tells you when a release is out.
