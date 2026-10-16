@@ -5,9 +5,14 @@ let package = Package(
     name: "Pullglance",
     defaultLocalization: "en",
     platforms: [.macOS(.v15)],
+    dependencies: [
+        // In-app updates. A binary xcframework; Scripts/make-app.sh embeds it in the bundle and re-signs it.
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.10.0"),
+    ],
     targets: [
         .executableTarget(
             name: "Pullglance",
+            dependencies: [.product(name: "Sparkle", package: "Sparkle")],
             path: "Sources/Pullglance",
             resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)],
@@ -22,6 +27,10 @@ let package = Package(
                 // `swift run` has no bundle: give the bare executable an Info.plist (LSUIElement, a debug identifier)
                 // so it behaves like the packaged app. Release builds get theirs from Scripts/make-app.sh.
                 .unsafeFlags(["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__info_plist", "-Xlinker", "\(Context.packageDirectory)/Scripts/Info-debug.plist"], .when(configuration: .debug)),
+                // Where Sparkle.framework is found at run time: inside the packaged app, and, for the bare
+                // `swift run` executable and the test bundle, which have no bundle to carry it, in the SwiftPM artifact.
+                .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"]),
+                .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "\(Context.packageDirectory)/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64"], .when(configuration: .debug)),
             ]
         ),
         .testTarget(
