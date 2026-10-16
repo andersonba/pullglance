@@ -1,4 +1,4 @@
-import { install } from './entry'
+import { install as installScript } from './entry'
 import { mountComparePage, mountFilesPage, digestOf } from './test-fixtures'
 import { DEFAULT_SETTINGS } from '@/features/tests/settings'
 import { storage } from '#imports'
@@ -23,6 +23,12 @@ const userScrolls = (y: number) => Object.defineProperty(window, 'scrollY', { co
 
 const listingsOf = (events: Event[]) => events.filter((e) => e.name === 'listing').map((e) => e.payload)
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+// Every install is disposed after its test: the document is shared, and a watcher left behind would read
+// (and, on a compare page, mark up) the page of the next test, at a moment that depends on machine speed.
+const installed: Array<{ dispose(): void }> = []
+const install: typeof installScript = (deps) => { const api = installScript(deps); installed.push(api); return api }
+afterEach(() => { for (const api of installed.splice(0)) api.dispose() })
 
 /**
  * A page that scrolls: each file's `#diff-<id>` box sits at a page offset, the window has a scrollY, and
@@ -215,14 +221,11 @@ const END_VIEWPORT = 833
 
 describe('jump intent at the end of the page', () => {
   beforeEach(() => { storage._resetForTests(); document.body.innerHTML = '' })
-  // install() has no teardown: let the 600 ms re-read that setSettings schedules land here, not in the next test.
-  afterEach(async () => { await wait(700) })
   const paths = END_PR.map((f) => f.path)
   const setup = (events: Event[] = []) => {
     mountFilesPage({ files: END_PR, containers: true })
     const api = install({ post: (e) => events.push(e) })
-    // No compare memory: install() has no teardown, and this watcher outlives the test (it would restore marks in later ones).
-    api.setSettings({ rememberCompare: false })
+    api.setSettings({})
     const page = layoutPage(paths, END_HEIGHTS, {}, END_VIEWPORT)
     page.setScroll(page.maxScroll)                       // scrolled to the end: the 7th file covers the top edge
     return { api, page }
@@ -502,5 +505,20 @@ describe('review script API', () => {
     expect(box.querySelector('.diff-file-header.collapsed')).not.toBeNull()                // still folded
     expect(box.querySelector('button[aria-pressed]')!.getAttribute('aria-pressed')).toBe('true')   // still viewed
     await wait(300)
+  })
+
+  it('dispose() ends the script: nothing is posted, and a page mounted afterwards is not touched', async () => {
+    mountComparePage({ files: [{ path: 'a.ts' }] })
+    const events: Event[] = []
+    const api = install({ post: (e) => events.push(e) })
+    api.setSettings({ ...DEFAULT_SETTINGS })
+    await vi.waitFor(() => expect(listingsOf(events)).toHaveLength(1))
+    api.dispose()
+    const posted = events.length
+    document.body.innerHTML = ''
+    mountComparePage({ files: [{ path: 'b.ts' }, { path: 'c.ts' }] })
+    await wait(1300)                                 // past the listing watcher's minimum interval and the 600 ms re-read
+    expect(document.querySelector('button[data-ghra-viewed]')).toBeNull()
+    expect(events.length).toBe(posted)
   })
 })

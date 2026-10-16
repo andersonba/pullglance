@@ -29,6 +29,13 @@ export function install(deps: Deps) {
   let rules: Rule[] = rulesFromSettings(settings)
   let lastReceipt: Receipt | null = null
   const lock = new OperationLock()
+  // Every delayed re-read goes through here, so dispose() can cancel what is still pending.
+  const timers = new Set<ReturnType<typeof setTimeout>>()
+  const later = (ms: number, fn: () => void) => {
+    const t = setTimeout(() => { timers.delete(t); fn() }, ms)
+    timers.add(t)
+  }
+  let disposed = false
 
   const context = (): Context => {
     const kind = adapter.pageKind() === 'pull' ? 'pull' : adapter.pageKind() === 'compare' ? 'compare' : 'other'
@@ -209,7 +216,7 @@ export function install(deps: Deps) {
   let settingsReady = false
   let lastCursorKey = ''
   const postCursor = async () => {
-    if (!settingsReady) return
+    if (!settingsReady || disposed) return
     const cursor = await currentFile()
     const key = cursor ? `${cursor.id}|${cursor.index}|${cursor.total}|${cursor.viewed}` : `none:${noCursorReason}`
     if (key === lastCursorKey) return
@@ -218,10 +225,11 @@ export function install(deps: Deps) {
   }
   let scrollTimer: ReturnType<typeof setTimeout> | null = null
   // Capture phase: scroll events do not bubble, and GitHub may scroll an inner pane rather than the window.
-  document.addEventListener('scroll', () => {
+  const onScroll = () => {
     if (scrollTimer) return
     scrollTimer = setTimeout(() => { scrollTimer = null; void postCursor() }, CURSOR_THROTTLE_MS)
-  }, { passive: true, capture: true })
+  }
+  document.addEventListener('scroll', onScroll, { passive: true, capture: true })
 
   // Scroll anchoring by hand. Diffs render lazily; when one above the file we jumped to gets its real height,
   // the page shifts under the reader. Chrome compensates natively, WebKit does not. For a short while after a
@@ -290,7 +298,7 @@ export function install(deps: Deps) {
       location.hash = `#diff-${id}`
     }
     lastCursorKey = ''
-    setTimeout(() => { void postCursor() }, 250)
+    later(250, () => { void postCursor() })
     return el ? 'element' : 'hash'
   }
 
@@ -377,7 +385,7 @@ export function install(deps: Deps) {
   // the listing watcher starts on the first setSettings.
   let listingWatch: ListingWatch | null = null
 
-  adapter.onContextChange((ctx) => {
+  const unwatchContext = adapter.onContextChange((ctx) => {
     if (ctx === null || ctx.key !== lastReceipt?.context.key) lastReceipt = null
     lock.cancel()
     deps.post({ name: 'context', payload: context() })
@@ -387,7 +395,7 @@ export function install(deps: Deps) {
     highlight(null)
     lastCursorKey = ''
     listingWatch?.reset()
-    for (const ms of [600, 1500, 3000]) setTimeout(() => { invalidateListing(); void postCursor() }, ms)
+    for (const ms of [600, 1500, 3000]) later(ms, () => { invalidateListing(); void postCursor() })
   })
   deps.post({ name: 'context', payload: context() })
 
@@ -400,9 +408,10 @@ export function install(deps: Deps) {
     editing = active
     deps.post({ name: 'editing', payload: { active } })
   }
-  document.addEventListener('focusin', updateEditing)
   // On focusout the next element is not active yet; read it after the focus move settles.
-  document.addEventListener('focusout', () => { queueMicrotask(updateEditing) })
+  const onFocusOut = () => { queueMicrotask(updateEditing) }
+  document.addEventListener('focusin', updateEditing)
+  document.addEventListener('focusout', onFocusOut)
 
   /**
    * A structural picture of the page for the app's capture: counts, selectors and positions, never a
@@ -468,7 +477,25 @@ export function install(deps: Deps) {
       settingsReady = true
       listingWatch ??= watchListing(adapter, (listing) => { cachedListing = listing; void postCursor() }, (payload) => deps.post({ name: 'listing', payload }))
       // The file list may render after the first read (a navigation inside GitHub): look again a few times.
-      for (const ms of [600, 1500, 3000]) setTimeout(() => { invalidateListing(); void postCursor() }, ms)
+      for (const ms of [600, 1500, 3000]) later(ms, () => { invalidateListing(); void postCursor() })
+    },
+    /**
+     * Ends the script: nothing observes, listens or posts after this, and a pending re-read is dropped. The
+     * app never calls it (the script lives as long as the document); tests do, between installs on one
+     * document, or a watcher from one test reads and marks up the page of the next.
+     */
+    dispose: () => {
+      disposed = true
+      unwatchContext()
+      listingWatch?.stop()
+      for (const t of timers) clearTimeout(t)
+      timers.clear()
+      if (scrollTimer) { clearTimeout(scrollTimer); scrollTimer = null }
+      stopAnchor?.()
+      lock.cancel()
+      document.removeEventListener('scroll', onScroll, { capture: true })
+      document.removeEventListener('focusin', updateEditing)
+      document.removeEventListener('focusout', onFocusOut)
     },
     counts, mark, undo, unmarkAll, scrollToUnviewed: (direction: 'next' | 'previous') => scrollToUnviewed(direction),
     /** The first unviewed file from the top of the page, wherever the reader is: where a review request starts. */
@@ -483,12 +510,12 @@ export function install(deps: Deps) {
 const LISTING_DEBOUNCE_MS = 200
 const EMPTY_LISTING = { total: 0, viewed: 0, partial: false }
 
-interface ListingWatch { reset(): void }
+interface ListingWatch { reset(): void; stop(): void }
 
 /**
  * Posts `{ total, viewed, partial }` now and again whenever it changes (debounced DOM observation).
  * `reset()` forgets the last value (a new context posts even with the same numbers). When the file list
- * goes away after a success, the empty listing is posted once.
+ * goes away after a success, the empty listing is posted once. `stop()` ends the observation for good.
  */
 function watchListing(adapter: GitHubAdapter, onListing: (listing: FileListing) => void, post: (listing: typeof EMPTY_LISTING) => void): ListingWatch {
   let last = ''          // dedupe key of the last post; reset() clears it
@@ -502,7 +529,9 @@ function watchListing(adapter: GitHubAdapter, onListing: (listing: FileListing) 
     showing = payload.total > 0
     post(payload)
   }
+  let stopped = false
   const check = async () => {
+    if (stopped) return
     lastRun = Date.now()
     const listing = await adapter.listFiles().catch(() => null)
     if (!listing) { if (showing) emit(EMPTY_LISTING); return }
@@ -515,11 +544,15 @@ function watchListing(adapter: GitHubAdapter, onListing: (listing: FileListing) 
     timer = setTimeout(() => { timer = null; void check() }, wait)
   }
   // Viewed state lives in classes and ARIA attributes (classic collapse, aria-pressed buttons), not only in child lists.
-  new MutationObserver(schedule).observe(document.documentElement, {
+  const observer = new MutationObserver(schedule)
+  observer.observe(document.documentElement, {
     childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'aria-pressed', 'aria-expanded'],
   })
   void check()
-  return { reset: () => { last = ''; lastRun = 0; schedule() } }
+  return {
+    reset: () => { last = ''; lastRun = 0; schedule() },
+    stop: () => { stopped = true; observer.disconnect(); if (timer) clearTimeout(timer); timer = null },
+  }
 }
 
 // Installed by the app's WKUserScript in the isolated world; tests call install() directly.
