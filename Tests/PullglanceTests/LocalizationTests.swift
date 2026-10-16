@@ -3,8 +3,11 @@ import Testing
 @testable import Pullglance
 
 @Suite struct LocalizationTests {
+    /// The legacy SwiftPM build lowercases the folder (pt-br.lproj); the Swift Build one keeps pt-BR.lproj.
     private func bundle(_ locale: String) throws -> Bundle {
-        let path = try #require(Bundle.app.path(forResource: locale, ofType: "lproj"))
+        let path = try #require(Bundle.app.paths(forResourcesOfType: "lproj", inDirectory: nil).first {
+            URL(fileURLWithPath: $0).deletingPathExtension().lastPathComponent.lowercased() == locale
+        })
         return try #require(Bundle(path: path))
     }
 
