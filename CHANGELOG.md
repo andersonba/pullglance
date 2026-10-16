@@ -6,6 +6,8 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-16
+
 ### Added
 - The app updates itself: a release shows up as "Update to X.Y.Z…" in the menus, and installing it is one click, with the release notes in the dialog. This version still arrives through `brew upgrade --cask pullglance` and the "Open Anyway" step; from the next one on, neither.
 
