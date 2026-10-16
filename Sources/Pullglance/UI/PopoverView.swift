@@ -639,12 +639,12 @@ struct PopoverView: View {
             // In reorder mode nothing inside the row is clickable; the whole row is the drag handle.
             .allowsHitTesting(!reordering)
             .contentShape(Rectangle())
-            .gesture(reorderDrag(for: pr, in: section, among: among), including: reordering && reorderable ? .all : .none)
+            .gesture(reorderDrag(for: pr, in: section, among: among), including: reordering && reorderable ? .all : .subviews)
             // Hold a moment to enter reorder mode. Simultaneous, so a quick click still opens the PR; once
             // the mode is on the tap is off, so the release does not open anything.
             .simultaneousGesture(
                 LongPressGesture(minimumDuration: Self.holdToReorder, maximumDistance: 6).onEnded { _ in setReordering(true) },
-                including: reorderable && !reordering ? .all : .none
+                including: reorderable && !reordering ? .all : .subviews
             )
         }
     }
