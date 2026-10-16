@@ -29,7 +29,12 @@ Requires macOS 15 on Apple silicon and [Homebrew](https://brew.sh). The cask bri
 ```sh
 brew tap andersonba/pullglance https://github.com/andersonba/pullglance
 brew install --cask andersonba/pullglance/pullglance
-gh auth login
+```
+
+Pullglance uses the `gh` login on your Mac. This logs you in only if you are not already:
+
+```sh
+gh auth status || gh auth login
 ```
 
 The app is not notarized, so macOS blocks the first launch: open it once, then allow it in System Settings › Privacy & Security › Open Anyway. Expect the same after an upgrade. `brew upgrade --cask pullglance` updates it, and the app tells you when a release is out.
