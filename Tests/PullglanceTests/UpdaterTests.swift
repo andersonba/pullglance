@@ -33,4 +33,9 @@ import Testing
         updater.updateSessionFinished()
         #expect(updater.available == nil)
     }
+
+    @Test func withoutAFeedThereIsNoUpdater() {
+        // The test bundle, like the debug build, has no SUFeedURL: Sparkle must not start.
+        #expect(SparkleUpdater.makeIfConfigured() == nil)
+    }
 }

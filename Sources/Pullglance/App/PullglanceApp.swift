@@ -29,7 +29,8 @@ struct PullglanceApp: App {
             store = PRStore(client: GHClient(), notifier: Bundle.main.bundleIdentifier == nil ? nil : SnoozeNotifier())
         }
         _store = State(initialValue: store)
-        let updates = Updater(present: {})
+        // Sparkle starts only in the packaged app (its Info.plist has the feed); never in a snapshot run.
+        let updates = snapshot == nil ? SparkleUpdater.makeIfConfigured() : nil
         _updates = State(initialValue: updates)
         if let snapshot {
             // Debug run: render to files and leave; no menu bar item, no timer.
