@@ -20,7 +20,8 @@ final class SparkleUpdater: NSObject, SPUUpdaterDelegate, SPUStandardUserDriverD
         // The controller takes this object as both delegates, so it is built after super.init and started by hand.
         let controller = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: self, userDriverDelegate: self)
         self.controller = controller
-        let updater = Updater(present: { controller.checkForUpdates(nil) })
+        // Sparkle's window takes key status away from the popover; like every other window, dismiss it first.
+        let updater = Updater(present: { PopoverDismissal.dismiss(); controller.checkForUpdates(nil) })
         updater.driver = self
         self.updater = updater
         controller.startUpdater()
