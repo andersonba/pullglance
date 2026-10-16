@@ -6,6 +6,11 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+### Fixed
+- A pull request in a repository that requires no review is ready to merge as soon as GitHub offers the button, even with a review still requested.
+- The popover shrinks with its content: a shorter tab no longer floats lower in the window with empty glass above it.
+- Section headers stay on one line; "20 most recent" moved next to "Open all on GitHub" and shows only when the list is cut.
+
 ## [0.1.0] - 2026-10-15
 
 ### Added
