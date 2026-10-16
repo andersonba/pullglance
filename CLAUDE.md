@@ -25,7 +25,8 @@ Everything reaches GitHub through the user's own `gh`. `docs/how-it-works.md` ex
 - `otool -l .build/debug/Pullglance | grep -A4 LC_BUILD_VERSION` must say `sdk 27.0` (or the current SDK).
   SwiftPM 6.4's default build system stamps `sdk 15.0` otherwise, and SwiftUI then runs the app in macOS 15
   compatibility: taps inside the swipe rows stop firing and the popover never shrinks. `Package.swift` passes
-  `-platform_version` to prevent it; bump the version there when the SDK moves.
+  `-platform_version` to prevent it; bump the version there when the SDK moves, and drop the flag once
+  https://github.com/swiftlang/swift-package-manager/issues/10696 is fixed in the toolchain in use.
 - When the popover misbehaves after a toolchain or macOS update, check that stamp before touching SwiftUI.
 
 ## Conventions
