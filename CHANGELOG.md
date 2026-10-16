@@ -6,6 +6,8 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-16
+
 ### Fixed
 - A pull request in a repository that requires no review is ready to merge as soon as GitHub offers the button, even with a review still requested.
 - The popover shrinks with its content: a shorter tab no longer floats lower in the window with empty glass above it.
