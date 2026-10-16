@@ -60,6 +60,9 @@ else
   echo "==> app"
   Scripts/make-app.sh
   lipo -archs build/Pullglance.app/Contents/MacOS/Pullglance | grep -q arm64 || die "the binary is not arm64, which is what the cask promises"
+  # The SDK stamp SwiftUI reads: 15.0 here means the compatibility paths that break the popover (Package.swift).
+  sdk="$(otool -l build/Pullglance.app/Contents/MacOS/Pullglance | awk '/LC_BUILD_VERSION/{f=1} f && /sdk/{print $2; exit}')"
+  [[ "${sdk%%.*}" -ge 26 ]] || die "the binary says it was linked against the macOS $sdk SDK; see the linkerSettings in Package.swift"
   rm -f "$ZIP"
   ditto -c -k --keepParent build/Pullglance.app "$ZIP"
   sha="$(shasum -a 256 "$ZIP" | cut -d' ' -f1)"

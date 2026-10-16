@@ -10,7 +10,12 @@ let package = Package(
             name: "Pullglance",
             path: "Sources/Pullglance",
             resources: [.process("Resources")],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            swiftSettings: [.swiftLanguageMode(.v6)],
+            // SwiftPM 6.4's default build system (swiftbuild) stamps LC_BUILD_VERSION with sdk = the deployment
+            // target (15.0) instead of the SDK it built against. SwiftUI picks behaviors by that stamp, and a
+            // binary "linked against macOS 15" on macOS 26+ loses taps inside the swipe rows and never shrinks
+            // the menu bar window. Say the real SDK; Scripts/release.sh refuses a binary without it.
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-platform_version", "-Xlinker", "macos", "-Xlinker", "15.0", "-Xlinker", "27.0"])]
         ),
         .testTarget(
             name: "PullglanceTests",
