@@ -460,8 +460,4 @@
 "Marked as ready for review" = "Marked as ready for review";
 "Update to %@…" = "Update to %@…";
 "Check for updates…" = "Check for updates…";
-"Skip this version" = "Skip this version";
 "Update available" = "Update available";
-"You're up to date" = "You're up to date";
-"Pullglance %@ is the latest version." = "Pullglance %@ is the latest version.";
-"Couldn't check for updates" = "Couldn't check for updates";

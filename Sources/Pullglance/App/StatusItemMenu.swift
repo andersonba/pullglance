@@ -6,12 +6,10 @@ import AppKit
 @MainActor
 final class StatusItemMenu: NSObject {
     private let store: PRStore
-    private let updates: UpdateChecker?
+    private let updates: Updater?
     private var monitor: Any?
-    /// The manual check in flight, so a second click while gh answers does not open the page twice.
-    private var manualCheck: Task<Void, Never>?
 
-    init(store: PRStore, updates: UpdateChecker? = nil) {
+    init(store: PRStore, updates: Updater? = nil) {
         self.store = store
         self.updates = updates
         super.init()
@@ -46,7 +44,7 @@ final class StatusItemMenu: NSObject {
             menu.addItem(item)
         }
         if let release = updates?.available {
-            add(String(format: String(localized: "Update to %@…", bundle: .app), release.version), #selector(openRelease))
+            add(String(format: String(localized: "Update to %@…", bundle: .app), release.version), #selector(checkForUpdates))
             menu.addItem(.separator())
         }
         add(String(localized: "Refresh now", bundle: .app), #selector(refresh), key: "r")
@@ -63,38 +61,15 @@ final class StatusItemMenu: NSObject {
         menu.addItem(version)
         if updates != nil {
             add(String(localized: "Check for updates…", bundle: .app), #selector(checkForUpdates))
-            menu.items.last?.isEnabled = manualCheck == nil
         }
         add(String(localized: "Quit", bundle: .app), #selector(quit), key: "q")
         return menu
     }
 
     @objc private func refresh() { Task { await store.refresh() } }
-    @objc private func openRelease() { if let url = updates?.available?.url { NSWorkspace.shared.open(url) } }
-    /// By hand: looks now and answers every time, with the release page when there is a newer version.
-    @objc private func checkForUpdates() {
-        guard let updates, manualCheck == nil else { return }
-        manualCheck = Task { [weak self] in
-            defer { self?.manualCheck = nil }
-            switch await updates.check(manual: true) {
-            case .available(let release):
-                NSWorkspace.shared.open(release.url)
-            case .upToDate:
-                Self.alert(String(localized: "You're up to date", bundle: .app),
-                           String(format: String(localized: "Pullglance %@ is the latest version.", bundle: .app), AppInfo.version))
-            case .failed(let message):
-                Self.alert(String(localized: "Couldn't check for updates", bundle: .app), message)
-            }
-        }
-    }
-
-    private static func alert(_ message: String, _ detail: String) {
-        let alert = NSAlert()
-        alert.messageText = message
-        alert.informativeText = detail
-        NSApp.activate()
-        alert.runModal()
-    }
+    /// The offer and the check by hand both hand the session to Sparkle: it shows the update it knows about
+    /// with its notes, or looks now and answers with its own "up to date" or error alert.
+    @objc private func checkForUpdates() { updates?.check() }
     @objc private func openMine() { NSWorkspace.shared.open(URL(string: "https://github.com/pulls")!) }
     @objc private func openReviews() { NSWorkspace.shared.open(URL(string: "https://github.com/pulls/review-requested")!) }
     /// Settings is a SwiftUI scene, opened by the `openSettings` environment action; the menu bar label,

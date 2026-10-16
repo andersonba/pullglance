@@ -48,9 +48,9 @@ struct PopoverView: View {
 
     /// `openRow` starts with that row's swipe tiles revealed (the demo snapshot); nil in the app.
     /// The update checker, for the footer's menu; nil in snapshots.
-    private let updates: UpdateChecker?
+    private let updates: Updater?
 
-    init(store: PRStore, tab: Tab = .mine, openRow: PullRequest.ID? = nil, updates: UpdateChecker? = nil) {
+    init(store: PRStore, tab: Tab = .mine, openRow: PullRequest.ID? = nil, updates: Updater? = nil) {
         self.store = store
         self.updates = updates
         _tab = State(initialValue: tab)

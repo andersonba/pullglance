@@ -6,7 +6,7 @@ struct PullglanceApp: App {
     private let snapshot: SnapshotOptions?
     /// Kept for the life of the app: it owns the right-click monitor.
     @State private var statusItemMenu: StatusItemMenu?
-    @State private var updates: UpdateChecker
+    @State private var updates: Updater?
 
     init() {
         // Thin overlay scrollers app-wide, whatever "Show scroll bars" says and even with a mouse plugged in.
@@ -29,7 +29,7 @@ struct PullglanceApp: App {
             store = PRStore(client: GHClient(), notifier: Bundle.main.bundleIdentifier == nil ? nil : SnoozeNotifier())
         }
         _store = State(initialValue: store)
-        let updates = UpdateChecker(fetch: { await GHClient().latestRelease(repo: AppInfo.repository) })
+        let updates = Updater(present: {})
         _updates = State(initialValue: updates)
         if let snapshot {
             // Debug run: render to files and leave; no menu bar item, no timer.
@@ -44,7 +44,6 @@ struct PullglanceApp: App {
             // After the menu bar item exists, so the window can be placed and the dot has an icon to land on.
             DispatchQueue.main.async { OnboardingWindowController.showIfDue() }
             _statusItemMenu = State(initialValue: StatusItemMenu(store: store, updates: updates))
-            updates.start()
         }
         Task { await AvatarCache.shared.pruneDisk() }
     }

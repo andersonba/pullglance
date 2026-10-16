@@ -224,11 +224,6 @@ struct GHClient: GHRunning {
         await run(Self.disableAutoMergeArguments(pullRequestID: pullRequestID))
     }
 
-    /// `gh api repos/<repo>/releases/latest`, for the app's own updates.
-    func latestRelease(repo: String) async -> GHOutcome {
-        await run(["api", "repos/\(repo)/releases/latest"])
-    }
-
     func markReady(url: URL) async -> GHOutcome {
         await run(["pr", "ready", url.absoluteString])
     }

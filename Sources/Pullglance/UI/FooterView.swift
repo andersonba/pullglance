@@ -6,7 +6,7 @@ struct FooterView: View {
     /// Opens the shortcuts card over the popover (the card is the popover's; the menu only asks for it).
     var showShortcuts: () -> Void = {}
     /// A newer release, when there is one: first item of the menu, and a dot on its button.
-    var updates: UpdateChecker? = nil
+    var updates: Updater? = nil
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
@@ -135,10 +135,9 @@ struct FooterView: View {
 
     @ViewBuilder private var menuItems: some View {
         if let updates, let release = updates.available {
-            Button { PopoverDismissal.open(release.url) } label: {
+            Button { updates.check() } label: {
                 Text("Update to \(release.version)…", bundle: .app)
             }
-            Button { updates.skip() } label: { Text("Skip this version", bundle: .app) }
             Divider()
         }
         Button { PopoverDismissal.open(URL(string: "https://github.com/pulls")!) } label: {
