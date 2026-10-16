@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Embedded in the bare `swift run` executable (Package.swift, debug only), which has no bundle of its own.
+       LSUIElement keeps it out of the Dock from the first instant, like the real app; without it the process
+       shows up in the Dock, hides itself, and macOS 26+ reports "App Running in Background" on every rebuild.
+       The debug identifier keeps its defaults apart from the installed app's. Scripts/make-app.sh writes the
+       real Info.plist for the bundle. -->
+  <key>CFBundleIdentifier</key><string>com.andersonba.pullglance.debug</string>
+  <key>CFBundleName</key><string>Pullglance</string>
+  <key>CFBundleExecutable</key><string>Pullglance</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>LSUIElement</key><true/>
+  <key>NSHighResolutionCapable</key><true/>
+</dict>
+</plist>
