@@ -1,10 +1,12 @@
 #!/bin/bash
 # Signs a release zip into a Sparkle appcast and verifies it against the public key the app embeds.
-#   Scripts/make-appcast.sh --version X.Y.Z --zip <zip> --notes <notes.md> --out <appcast.xml> --public-key <b64> [--key-file <plain-key>]
+#   Scripts/make-appcast.sh --version X.Y.Z --zip <zip> --notes <notes.md> --out <appcast.xml> --public-key <b64> \
+#       [--key-file <plain-key>] [--download-url-prefix <url>]
 #
 # The private EdDSA key is `gpg --decrypt`ed from ${PULLGLANCE_SPARKLE_KEY:-~/.config/pullglance/sparkle-ed25519.key.gpg}
 # (the author's YubiKey does the decrypting) and piped straight into generate_appcast: it never lands on disk
-# in plaintext. --key-file takes a plaintext key instead, for a rehearsal with a throwaway pair.
+# in plaintext. --key-file takes a plaintext key instead, for a rehearsal with a throwaway pair, and
+# --download-url-prefix points the rehearsal at a local server instead of the release's assets on GitHub.
 # The appcast holds one item, this release, with the notes embedded; the app reads the one on the latest release.
 # Sparkle's tools come from the distribution archive of the version Package.resolved pins, cached under build/.
 set -euo pipefail
@@ -12,7 +14,7 @@ cd "$(dirname "$0")/.."
 
 die() { echo "make-appcast: $*" >&2; exit 1; }
 
-version="" zip="" notes="" out="" public_key="" key_file=""
+version="" zip="" notes="" out="" public_key="" key_file="" prefix=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --version) version="$2"; shift 2 ;;
@@ -21,10 +23,12 @@ while [[ $# -gt 0 ]]; do
     --out) out="$2"; shift 2 ;;
     --public-key) public_key="$2"; shift 2 ;;
     --key-file) key_file="$2"; shift 2 ;;
+    --download-url-prefix) prefix="$2"; shift 2 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
-[[ -n "$version" && -n "$zip" && -n "$notes" && -n "$out" && -n "$public_key" ]] || die "usage: Scripts/make-appcast.sh --version X.Y.Z --zip <zip> --notes <md> --out <xml> --public-key <b64> [--key-file <key>]"
+[[ -n "$version" && -n "$zip" && -n "$notes" && -n "$out" && -n "$public_key" ]] || die "usage: Scripts/make-appcast.sh --version X.Y.Z --zip <zip> --notes <md> --out <xml> --public-key <b64> [--key-file <key>] [--download-url-prefix <url>]"
+prefix="${prefix:-https://github.com/andersonba/pullglance/releases/download/v$version/}"
 [[ -f "$zip" ]] || die "$zip is missing"
 [[ -f "$notes" ]] || die "$notes is missing"
 [[ -z "$key_file" || -f "$key_file" ]] || die "$key_file is missing"
@@ -64,7 +68,7 @@ private_key() {
 echo "==> appcast for $version"
 rm -f "$out"   # generate_appcast would "update" an item left over from an earlier run instead of writing this one
 private_key | "$tools/bin/generate_appcast" --ed-key-file - \
-  --download-url-prefix "https://github.com/andersonba/pullglance/releases/download/v$version/" \
+  --download-url-prefix "$prefix" \
   --embed-release-notes -o "$out" "$stage"
 
 # The key that signed must be the key the app carries, or every installed copy refuses the update.
