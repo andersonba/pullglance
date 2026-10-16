@@ -237,7 +237,7 @@
 "Opens pull requests in a window of the app, with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser." = "Opens pull requests in a window of the app, with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser.";
 "Quick filters" = "Quick filters";
 "Switch tab" = "Switch tab";
-"Start" = "Start";
+"Start · Move" = "Start · Move";
 "Open review" = "Open review";
 "Pin · Snooze · Refresh" = "Pin · Snooze · Refresh";
 "Comment · Merge" = "Comment · Merge";

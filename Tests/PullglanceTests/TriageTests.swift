@@ -35,6 +35,16 @@ import Testing
         #expect(TriageFocus.successor(of: "zz", in: ["a"]) == nil)
     }
 
+    /// Vim's hjkl stand in for the arrows: same keys to the rest of the triage, shift ignored, ⌘ still the menus'.
+    @Test func vimKeysAreTheArrows() {
+        #expect(TriageKey(characters: "j", keyCode: 38, modifiers: []) == .down)
+        #expect(TriageKey(characters: "k", keyCode: 40, modifiers: []) == .up)
+        #expect(TriageKey(characters: "h", keyCode: 4, modifiers: []) == .left)
+        #expect(TriageKey(characters: "l", keyCode: 37, modifiers: []) == .right)
+        #expect(TriageKey(characters: "J", keyCode: 38, modifiers: [.shift]) == .down)
+        #expect(TriageKey(characters: "j", keyCode: 38, modifiers: [.command]) == nil)
+    }
+
     @Test func keysMapOnlyWithoutModifiers() {
         #expect(TriageKey(characters: "p", keyCode: 35, modifiers: []) == .pin)
         #expect(TriageKey(characters: "P", keyCode: 35, modifiers: [.shift]) == .pin)

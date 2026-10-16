@@ -58,6 +58,11 @@ enum TriageKey: Equatable {
         default: break
         }
         switch characters?.lowercased() {
+        // Vim's hjkl are the arrows; the rest of the triage never knows which was pressed.
+        case "j": self = .down
+        case "k": self = .up
+        case "h": self = .left
+        case "l": self = .right
         case "p": self = .pin
         case "s": self = .snooze
         case "o": self = .open
@@ -132,7 +137,7 @@ struct ShortcutsCard: View {
             group(Text("Popover", bundle: .app)) {
                 line(Text("Refresh", bundle: .app), ["⌘R"])
                 line(Text("Quick filters", bundle: .app), ["0", "–", "9"])
-                line(Text("Switch tab", bundle: .app), ["←", "→"])
+                line(Text("Switch tab", bundle: .app), ["←", "→", "H", "L"])
                 line(Text("Settings…", bundle: .app), ["⌘,"])
             }
             group(Text("Row under the pointer", bundle: .app)) {
@@ -140,7 +145,7 @@ struct ShortcutsCard: View {
                 line(Text("Keyboard from here", bundle: .app), ["space"])
             }
             group(Text("Focused row", bundle: .app)) {
-                line(Text("Start", bundle: .app), ["↓"])
+                line(Text("Start · Move", bundle: .app), ["↓", "↑", "J", "K"])
                 line(Text("Open review", bundle: .app), ["↩"])
                 line(Text("Pin · Snooze · Refresh", bundle: .app), ["P", "S", "R"])
                 line(Text("Snooze for…", bundle: .app), ["⇧S"])
