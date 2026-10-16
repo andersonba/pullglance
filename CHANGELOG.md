@@ -6,6 +6,8 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-16
+
 ### Fixed
 - Clicking a row opens the pull request again, and the popover shrinks back when its content does. Builds made with Swift 6.4's new build system were stamped as linked against macOS 15, which put SwiftUI on compatibility paths that broke both; 0.1.1 shipped that way. The build now states the real SDK and the release script refuses a binary that does not.
 
