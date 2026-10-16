@@ -6,6 +6,8 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-15
+
 ### Added
 - The number of pull requests that need you, next to the clock. Settings › Sections picks which sections it counts; it can show two numbers, and it rolls like an odometer when it changes.
 - Two tabs: My PRs by state (needs action, ready to merge, waiting for review, drafts), To review by what asks for you first. Quick filters by section, author and repository, also by clicking a row's avatar or repository name.

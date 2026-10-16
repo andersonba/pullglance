@@ -4,7 +4,7 @@
 # `version` and `sha256` are written by Scripts/release.sh from the zip it uploads to the release.
 cask "pullglance" do
   version "0.1.0"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  sha256 "fade310d8b02acdd0fb4ef7a48362839925c35052aa8741871e3996da3167092"
 
   url "https://github.com/andersonba/pullglance/releases/download/v#{version}/Pullglance.zip"
   name "Pullglance"
