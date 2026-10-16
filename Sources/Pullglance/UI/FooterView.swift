@@ -5,6 +5,8 @@ struct FooterView: View {
     @Bindable var store: PRStore
     /// Opens the shortcuts card over the popover (the card is the popover's; the menu only asks for it).
     var showShortcuts: () -> Void = {}
+    /// A newer release, when there is one: first item of the menu, and a dot on its button.
+    var updates: UpdateChecker? = nil
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
@@ -86,6 +88,12 @@ struct FooterView: View {
                 menuItems
             } label: {
                 Image(systemName: "ellipsis.circle")
+                    .overlay(alignment: .topTrailing) {
+                        if updates?.available != nil {
+                            Circle().fill(.orange).frame(width: 6, height: 6).offset(x: 2, y: -2)
+                                .accessibilityLabel(Text("Update available", bundle: .app))
+                        }
+                    }
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
@@ -126,6 +134,13 @@ struct FooterView: View {
     }
 
     @ViewBuilder private var menuItems: some View {
+        if let updates, let release = updates.available {
+            Button { PopoverDismissal.open(release.url) } label: {
+                Text("Update to \(release.version)…", bundle: .app)
+            }
+            Button { updates.skip() } label: { Text("Skip this version", bundle: .app) }
+            Divider()
+        }
         Button { PopoverDismissal.open(URL(string: "https://github.com/pulls")!) } label: {
             Text("Open my PRs on GitHub", bundle: .app)
         }

@@ -55,10 +55,26 @@ if [[ "${1:-}" == "--install" ]]; then
   osascript -e 'tell application "Pullglance" to quit' >/dev/null 2>&1 || true
   # Give the old instance a moment to exit, otherwise `open` fails with -600.
   for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x "$APP_NAME" >/dev/null || break; sleep 0.3; done
-  rm -rf "/Applications/$APP_NAME.app"
-  cp -R "$OUT" "/Applications/$APP_NAME.app"
+  if pgrep -x "$APP_NAME" >/dev/null; then
+    echo "$APP_NAME is still running; quit it and run again" >&2
+    exit 1
+  fi
+  # Copy next to the destination, then swap by renaming, so the installed app is whole until the new one is.
+  STAGING="$(mktemp -d "/Applications/.$APP_NAME.XXXXXX")"
+  cp -R "$OUT" "$STAGING/$APP_NAME.app"
+  [[ -d "/Applications/$APP_NAME.app" ]] && mv "/Applications/$APP_NAME.app" "$STAGING/old.app"
+  mv "$STAGING/$APP_NAME.app" "/Applications/$APP_NAME.app"
+  rm -rf "$STAGING"
   # LaunchServices can still report the quitting instance for a moment (error -600); retry a few times.
-  for _ in 1 2 3 4 5; do open "/Applications/$APP_NAME.app" 2>/dev/null && break; sleep 1; done
+  opened=0
+  for _ in 1 2 3 4 5; do
+    if open "/Applications/$APP_NAME.app" 2>/dev/null; then opened=1; break; fi
+    sleep 1
+  done
+  if [[ $opened == 0 ]]; then
+    echo "installed, but could not open /Applications/$APP_NAME.app" >&2
+    exit 1
+  fi
 fi
 
 echo "done: $OUT (v$VERSION)"

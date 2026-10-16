@@ -12,6 +12,8 @@ extension Bundle {
 
 enum AppInfo {
     static let bundleID = "com.andersonba.pullglance"
+    /// Where releases live.
+    static let repository = "andersonba/pullglance"
     static let resourceBundleName = "Pullglance_Pullglance.bundle"
 
     static func resourceBundle(inResourcesDirectory directory: URL?) -> Bundle? {

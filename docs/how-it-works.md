@@ -16,6 +16,12 @@ GitHub's search index lags the repository by minutes, so after each search your 
 
 The first time it runs, Pullglance opens a short welcome window: it checks that the `gh` CLI is installed and logged in (and keeps checking while you fix either), then shows what the number counts, how the two tabs are ordered, how to act from a row, and what snooze does, with an optional switch for a notification when a timed snooze ends. Closing the window early is fine; it comes back next launch until `gh` is talking. You can reopen it any time with **Welcome…** in the icon's right-click menu.
 
+## Updates
+
+Shortly after launch, and once a day while it runs, Pullglance asks GitHub for the app's latest release through `gh`. When there is a newer one, the icon's right-click menu and the popover's **···** menu offer "Update to X.Y.Z…", which opens the release page; its notes end with the upgrade command (`brew upgrade --cask pullglance`, or `git pull` and the build script for a source checkout). "Skip this version" keeps that one quiet until the next. Nothing is downloaded by the app itself. "Check for updates…" in the icon's menu looks right away and always answers: the release page, "You're up to date", or what went wrong.
+
+Releases are cut by `Scripts/release.sh`, which writes the version and the zip's checksum into `Casks/pullglance.rb`, so Homebrew and the release always agree.
+
 ## My PRs
 
 Four sections, in the order you choose in Settings › Sections:

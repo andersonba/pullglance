@@ -24,13 +24,17 @@ Pullglance talks to GitHub through the `gh` CLI you are already logged into. No 
 
 ## Install
 
-Requires macOS 15 and [GitHub CLI](https://cli.github.com).
+Requires macOS 15 on Apple silicon and [Homebrew](https://brew.sh). The cask brings the [GitHub CLI](https://cli.github.com) with it.
 
 ```sh
-brew install gh && gh auth login
+brew tap andersonba/pullglance https://github.com/andersonba/pullglance
+brew install --cask andersonba/pullglance/pullglance
+gh auth login
 ```
 
-Build it with Xcode 26 installed; it lands in /Applications and opens:
+The app is not notarized, so macOS blocks the first launch: open it once, then allow it in System Settings › Privacy & Security › Open Anyway. Expect the same after an upgrade. `brew upgrade --cask pullglance` updates it, and the app tells you when a release is out.
+
+To build it yourself, with Xcode 26 (remove a Homebrew copy first; both live in /Applications):
 
 ```sh
 git clone https://github.com/andersonba/pullglance && cd pullglance
@@ -47,6 +51,7 @@ Everything stays on your Mac. Preferences in `UserDefaults`, author avatars in `
 swift run                     # start the app
 swift test                    # run the tests
 Scripts/build-review-js.sh    # rebuild the review window's page script
+Scripts/release.sh X.Y.Z      # cut a release from main: tests, tag, zip, cask, GitHub Release
 ```
 
 How it works, section by section: [docs/how-it-works.md](docs/how-it-works.md).

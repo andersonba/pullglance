@@ -458,3 +458,10 @@
 "Every key of a focused row" = "Todas as teclas da linha focada";
 "Mark as ready for review" = "Marcar como pronto para review";
 "Marked as ready for review" = "Marcado como pronto para review";
+"Update to %@…" = "Atualizar para %@…";
+"Check for updates…" = "Buscar atualizações…";
+"Skip this version" = "Pular esta versão";
+"Update available" = "Atualização disponível";
+"You're up to date" = "Você está na versão mais recente";
+"Pullglance %@ is the latest version." = "Pullglance %@ é a versão mais recente.";
+"Couldn't check for updates" = "Não foi possível buscar atualizações";

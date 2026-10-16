@@ -47,8 +47,12 @@ struct PopoverView: View {
     enum Tab: Hashable { case mine, review }
 
     /// `openRow` starts with that row's swipe tiles revealed (the demo snapshot); nil in the app.
-    init(store: PRStore, tab: Tab = .mine, openRow: PullRequest.ID? = nil) {
+    /// The update checker, for the footer's menu; nil in snapshots.
+    private let updates: UpdateChecker?
+
+    init(store: PRStore, tab: Tab = .mine, openRow: PullRequest.ID? = nil, updates: UpdateChecker? = nil) {
         self.store = store
+        self.updates = updates
         _tab = State(initialValue: tab)
         _openRow = State(initialValue: openRow)
     }
@@ -145,7 +149,7 @@ struct PopoverView: View {
             } else {
                 // The regular footer always sets the height; the triage keys draw over it while a row is focused.
                 ZStack {
-                    FooterView(store: store, showShortcuts: { showingShortcuts = true }).opacity(focusedPR == nil ? 1 : 0)
+                    FooterView(store: store, showShortcuts: { showingShortcuts = true }, updates: updates).opacity(focusedPR == nil ? 1 : 0)
                     if let focusedPR {
                         TriageFooter(isPinned: store.isPinned(focusedPR), isDormant: store.isDormant(focusedPR))
                     }

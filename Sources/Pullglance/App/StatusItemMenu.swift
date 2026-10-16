@@ -6,10 +6,14 @@ import AppKit
 @MainActor
 final class StatusItemMenu: NSObject {
     private let store: PRStore
+    private let updates: UpdateChecker?
     private var monitor: Any?
+    /// The manual check in flight, so a second click while gh answers does not open the page twice.
+    private var manualCheck: Task<Void, Never>?
 
-    init(store: PRStore) {
+    init(store: PRStore, updates: UpdateChecker? = nil) {
         self.store = store
+        self.updates = updates
         super.init()
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown, .leftMouseDown]) { [weak self] event in
             guard let self, self.isSecondaryClick(event), let button = self.statusButton(in: event.window) else { return event }
@@ -41,6 +45,10 @@ final class StatusItemMenu: NSObject {
             item.target = self
             menu.addItem(item)
         }
+        if let release = updates?.available {
+            add(String(format: String(localized: "Update to %@…", bundle: .app), release.version), #selector(openRelease))
+            menu.addItem(.separator())
+        }
         add(String(localized: "Refresh now", bundle: .app), #selector(refresh), key: "r")
         menu.addItem(.separator())
         // Short titles: the longest item sets the menu's width.
@@ -53,11 +61,40 @@ final class StatusItemMenu: NSObject {
         let version = NSMenuItem(title: String(format: String(localized: "Version %@", bundle: .app), AppInfo.version), action: nil, keyEquivalent: "")
         version.isEnabled = false
         menu.addItem(version)
+        if updates != nil {
+            add(String(localized: "Check for updates…", bundle: .app), #selector(checkForUpdates))
+            menu.items.last?.isEnabled = manualCheck == nil
+        }
         add(String(localized: "Quit", bundle: .app), #selector(quit), key: "q")
         return menu
     }
 
     @objc private func refresh() { Task { await store.refresh() } }
+    @objc private func openRelease() { if let url = updates?.available?.url { NSWorkspace.shared.open(url) } }
+    /// By hand: looks now and answers every time, with the release page when there is a newer version.
+    @objc private func checkForUpdates() {
+        guard let updates, manualCheck == nil else { return }
+        manualCheck = Task { [weak self] in
+            defer { self?.manualCheck = nil }
+            switch await updates.check(manual: true) {
+            case .available(let release):
+                NSWorkspace.shared.open(release.url)
+            case .upToDate:
+                Self.alert(String(localized: "You're up to date", bundle: .app),
+                           String(format: String(localized: "Pullglance %@ is the latest version.", bundle: .app), AppInfo.version))
+            case .failed(let message):
+                Self.alert(String(localized: "Couldn't check for updates", bundle: .app), message)
+            }
+        }
+    }
+
+    private static func alert(_ message: String, _ detail: String) {
+        let alert = NSAlert()
+        alert.messageText = message
+        alert.informativeText = detail
+        NSApp.activate()
+        alert.runModal()
+    }
     @objc private func openMine() { NSWorkspace.shared.open(URL(string: "https://github.com/pulls")!) }
     @objc private func openReviews() { NSWorkspace.shared.open(URL(string: "https://github.com/pulls/review-requested")!) }
     /// Settings is a SwiftUI scene, opened by the `openSettings` environment action; the menu bar label,
