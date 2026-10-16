@@ -7,6 +7,20 @@ cd "$(dirname "$0")/.."
 source version.env
 APP_NAME="Pullglance"
 BUNDLE_ID="com.andersonba.pullglance"
+# Sparkle: where the app looks for releases, and the public half of the key that signs them. The private half
+# lives GPG-encrypted outside the repository and is only ever read by Scripts/make-appcast.sh.
+SPARKLE_FEED_URL="https://github.com/andersonba/pullglance/releases/latest/download/appcast.xml"
+SPARKLE_PUBLIC_KEY="REPLACE-WITH-THE-PRODUCTION-PUBLIC-KEY"
+SPARKLE_FRAMEWORK=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+# A rehearsal runs beside the installed app, under its own identity, against a local feed signed with a
+# throwaway key. Read here only; the app never sees these.
+VERSION="${PULLGLANCE_REHEARSAL_VERSION:-$VERSION}"
+BUNDLE_ID="${PULLGLANCE_REHEARSAL_BUNDLE_ID:-$BUNDLE_ID}"
+SPARKLE_FEED_URL="${PULLGLANCE_REHEARSAL_FEED_URL:-$SPARKLE_FEED_URL}"
+SPARKLE_PUBLIC_KEY="${PULLGLANCE_REHEARSAL_PUBLIC_KEY:-$SPARKLE_PUBLIC_KEY}"
+[[ "$SPARKLE_PUBLIC_KEY" =~ ^[A-Za-z0-9+/]{43}=$ ]] || { echo "make-app: SPARKLE_PUBLIC_KEY is not an EdDSA public key; an app built with it could never update" >&2; exit 1; }
+ATS=""
+[[ -n "${PULLGLANCE_REHEARSAL_FEED_URL:-}" ]] && ATS='<key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>'
 OUT="build/$APP_NAME.app"
 RELEASE=".build/release"
 
@@ -18,6 +32,10 @@ rm -rf "$OUT"
 mkdir -p "$OUT/Contents/MacOS" "$OUT/Contents/Resources"
 cp "$RELEASE/$APP_NAME" "$OUT/Contents/MacOS/$APP_NAME"
 cp -R "$RELEASE/${APP_NAME}_${APP_NAME}.bundle" "$OUT/Contents/Resources/"
+
+echo "==> Sparkle.framework"
+mkdir -p "$OUT/Contents/Frameworks"
+cp -R "$SPARKLE_FRAMEWORK" "$OUT/Contents/Frameworks/"
 
 echo "==> icon"
 swift Scripts/make-icon.swift Assets/mascot.png build/AppIcon.iconset
@@ -43,11 +61,26 @@ cat > "$OUT/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>15.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHumanReadableCopyright</key><string>© 2026 andersonba</string>
+  <key>SUFeedURL</key><string>$SPARKLE_FEED_URL</string>
+  <key>SUPublicEDKey</key><string>$SPARKLE_PUBLIC_KEY</string>
+  <key>SUEnableAutomaticChecks</key><true/>
+  <key>SUScheduledCheckInterval</key><integer>86400</integer>
+  <key>SUAutomaticallyUpdate</key><false/>
+  <key>SUAllowsAutomaticUpdates</key><false/>
+  $ATS
 </dict>
 </plist>
 PLIST
 
 echo "==> codesign (ad hoc)"
+# Sparkle's helpers ship ad-hoc signed; re-sign them here as its documentation prescribes for a bundle
+# assembled outside Xcode: inside out, never --deep, hardened runtime kept.
+FW="$OUT/Contents/Frameworks/Sparkle.framework"
+codesign -f -s - -o runtime "$FW/Versions/B/XPCServices/Installer.xpc"
+codesign -f -s - -o runtime --preserve-metadata=entitlements "$FW/Versions/B/XPCServices/Downloader.xpc"
+codesign -f -s - -o runtime "$FW/Versions/B/Autoupdate"
+codesign -f -s - -o runtime "$FW/Versions/B/Updater.app"
+codesign -f -s - -o runtime "$FW"
 codesign --force --sign - --identifier "$BUNDLE_ID" "$OUT"
 
 if [[ "${1:-}" == "--install" ]]; then
