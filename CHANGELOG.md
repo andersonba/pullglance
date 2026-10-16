@@ -6,6 +6,9 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+### Added
+- The app updates itself: a release shows up as "Update to X.Y.Z…" in the menus, and installing it is one click, with the release notes in the dialog. No more `brew upgrade`, and no "Open Anyway" after the first install.
+
 ### Fixed
 - On macOS 15, clicking a row, its repository name or its author's avatar works again. Outside reorder mode the row's gestures were turned off with `GestureMask.none`, which also disables every gesture inside the row; `.subviews` turns off only the reorder drag and hold.
 

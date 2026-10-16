@@ -15,6 +15,9 @@ cask "pullglance" do
   depends_on arch: :arm64
   depends_on formula: "gh"
 
+  # The app updates itself (Sparkle); a plain `brew upgrade` leaves a copy the app already updated alone.
+  auto_updates true
+
   app "Pullglance.app"
 
   uninstall quit: "com.andersonba.pullglance"

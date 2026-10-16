@@ -37,7 +37,7 @@ Pullglance uses the `gh` login on your Mac. This logs you in only if you are not
 gh auth status || gh auth login
 ```
 
-The app is not notarized, so macOS blocks the first launch: open it once, then allow it in System Settings › Privacy & Security › Open Anyway. Expect the same after an upgrade. `brew upgrade --cask pullglance` updates it, and the app tells you when a release is out.
+The app is not notarized, so macOS blocks the first launch: open it once, then allow it in System Settings › Privacy & Security › Open Anyway. That happens once. From then on the app updates itself: each release shows up in its menus, and installing it is one click, with no terminal and no new prompt. `brew upgrade --cask pullglance` still works if you prefer it, and brings the Open Anyway step back for that one launch.
 
 To build it yourself, with Xcode 26 (remove a Homebrew copy first; both live in /Applications):
 

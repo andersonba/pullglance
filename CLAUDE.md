@@ -13,6 +13,12 @@ Everything reaches GitHub through the user's own `gh`. `docs/how-it-works.md` ex
   `Scripts/Info-debug.plist` (linker `-sectcreate`, debug only): it is a UI element from the first instant and
   has its own identity, `com.andersonba.pullglance.debug`, so its defaults never touch the installed app's.
   It reports version `dev` and is never nagged about updates.
+- The packaged app updates itself through Sparkle: `Scripts/make-app.sh` embeds the framework from the SwiftPM
+  artifact, re-signs it ad hoc and writes the feed URL and the public key into Info.plist. `swift run` has no
+  feed and never starts Sparkle. `Scripts/release.sh` signs the appcast (`Scripts/make-appcast.sh`) with the
+  private key kept GPG-encrypted at `~/.config/pullglance/sparkle-ed25519.key.gpg`, which the YubiKey decrypts,
+  so cutting a release needs it plugged in. A rehearsal against a local feed uses the `PULLGLANCE_REHEARSAL_*`
+  variables of `make-app.sh` and a throwaway key through `make-appcast.sh --key-file`.
 - The app log is `~/Library/Logs/Pullglance/pullglance.log` (`AppLog`); Settings › Advanced exports diagnostics.
 - The MenuBarExtra popover opens only on a real click. Synthetic events, `performClick` and osascript do not
   open it (Accessibility is not granted to the terminal), so anything that needs the popover open needs the
