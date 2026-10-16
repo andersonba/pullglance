@@ -752,7 +752,6 @@ struct PopoverView: View {
             title: Section.needsTeamsReview.title,
             count: store.viaTeamTotal,
             expanded: $store.isViaTeamExpanded,
-            detail: store.isViaTeamExpanded ? String(localized: "\(20) most recent", bundle: .app) : nil,
             sortMenu: store.isViaTeamExpanded ? sortMenu(for: .needsTeamsReview) : nil
         )
         if store.isViaTeamExpanded || reviewFilter == .needsTeamsReview {
@@ -772,12 +771,20 @@ struct PopoverView: View {
                     row(pr, section: .needsTeamsReview, showAuthor: true, teamLabel: pr.requestedTeams.first)
                     Divider()
                 }
-                Button {
-                    PopoverDismissal.open(URL(string: "https://github.com/pulls/review-requested")!)
-                } label: {
-                    Text("Open all on GitHub", bundle: .app).font(.caption)
+                HStack(spacing: 4) {
+                    // Only past the cap is the list a sample; the rest is on GitHub.
+                    if let total = store.viaTeamTotal, total > 20 {
+                        Text("\(20) most recent", bundle: .app).foregroundStyle(.secondary)
+                        Text(verbatim: "·").foregroundStyle(.tertiary)
+                    }
+                    Button {
+                        PopoverDismissal.open(URL(string: "https://github.com/pulls/review-requested")!)
+                    } label: {
+                        Text("Open all on GitHub", bundle: .app)
+                    }
+                    .buttonStyle(.link)
                 }
-                .buttonStyle(.link)
+                .font(.caption)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }

@@ -5,7 +5,6 @@ struct SectionHeader: View {
     /// nil hides the count (used for "Via team" before it has been fetched).
     let count: Int?
     var expanded: Binding<Bool>? = nil
-    var detail: String? = nil
     /// A small action shown only while the pointer is over the header (e.g. "Sort by update").
     var hoverAction: HoverAction? = nil
     /// One quiet menu at the right edge: the current order as its title (Priority, Recent, Manual) with the
@@ -37,14 +36,13 @@ struct SectionHeader: View {
                     .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(.tertiary)
             }
+            // One line, whatever the language: the title keeps its room and truncates last.
             Text(verbatim: count.map { "\(title) · \($0)" } ?? title)
                 .textCase(.uppercase)
-            if let detail {
-                Spacer()
-                Text(verbatim: detail).fontWeight(.regular)
-            }
+                .lineLimit(1)
+                .layoutPriority(1)
             if let sortMenu {
-                if detail == nil { Spacer() }
+                Spacer()
                 Menu {
                     Picker(selection: Binding(get: { sortMenu.isManual ? nil : sortMenu.sort }, set: { if let s = $0 { sortMenu.setSort(s) } })) {
                         Text("Priority", bundle: .app).tag(ListSort?.some(.priority))
@@ -73,7 +71,7 @@ struct SectionHeader: View {
                 .fixedSize()
             }
             if let hoverAction {
-                if detail == nil, sortMenu == nil { Spacer() }
+                if sortMenu == nil { Spacer() }
                 // Quiet on purpose: a secondary label, underlined only under the pointer.
                 Button(action: hoverAction.perform) {
                     Text(verbatim: hoverAction.title)
