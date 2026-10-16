@@ -24,8 +24,10 @@ for v in $(compgen -v PULLGLANCE_REHEARSAL_ 2>/dev/null); do die "$v is set: uns
 ZIP="build/Pullglance.zip"
 CASK="Casks/pullglance.rb"
 APPCAST="build/appcast.xml"
-# The key the app embeds; the appcast must verify against it (Scripts/make-appcast.sh checks).
-pub="$(sed -n 's/^SPARKLE_PUBLIC_KEY="\(.*\)"/\1/p' Scripts/make-app.sh)"
+# The key the app embeds; the appcast must verify against it (Scripts/make-appcast.sh checks). Only the line
+# that holds a literal key: make-app.sh assigns the same name again for the rehearsal override.
+pub="$(sed -n 's/^SPARKLE_PUBLIC_KEY="\([A-Za-z0-9+\/]\{43\}=\)"$/\1/p' Scripts/make-app.sh)"
+[[ "$pub" =~ ^[A-Za-z0-9+/]{43}=$ ]] || die "cannot read one SPARKLE_PUBLIC_KEY from Scripts/make-app.sh"
 # shellcheck disable=SC1091
 source version.env
 
