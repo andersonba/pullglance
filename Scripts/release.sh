@@ -2,10 +2,12 @@
 # Cuts a release from main: Scripts/release.sh X.Y.Z
 #
 # Runs the tests and the Web build, writes the version into version.env, moves CHANGELOG's Unreleased into
-# the version, builds and zips the app, writes the zip's sha256 into the cask, commits "release: vX.Y.Z",
-# tags, pushes, and publishes the GitHub Release with the zip. The cask and the release come from the same
-# bytes, and the cask is on main before the release exists, so the app's offer never points at a version
-# Homebrew cannot find.
+# the version, builds and zips the app, writes the zip's sha256 into the cask, signs the zip into an appcast
+# (Scripts/make-appcast.sh: the YubiKey must be plugged in), commits "release: vX.Y.Z", tags, pushes, and
+# publishes the GitHub Release with the zip and the appcast. The cask and the release come from the same
+# bytes, and the cask is on main before the release exists, so Homebrew never lacks a version that exists.
+# Installed apps read the appcast through releases/latest/download/appcast.xml, so a release and its offer
+# appear together.
 #
 # Phases, each resumable by running the same command again: prepare (any failure restores the files),
 # commit+tag (local), push, publish. A finished release is a no-op.
@@ -19,6 +21,9 @@ NEW="${1:-}"
 TAG="v$NEW"
 ZIP="build/Pullglance.zip"
 CASK="Casks/pullglance.rb"
+APPCAST="build/appcast.xml"
+# The key the app embeds; the appcast must verify against it (Scripts/make-appcast.sh checks).
+pub="$(sed -n 's/^SPARKLE_PUBLIC_KEY="\(.*\)"/\1/p' Scripts/make-app.sh)"
 # shellcheck disable=SC1091
 source version.env
 
@@ -34,6 +39,8 @@ if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
   [[ -f "$ZIP" ]] || die "tag $TAG exists but $ZIP is gone, and a rebuild is not byte-identical. If nothing was pushed: git tag -d $TAG && git reset --hard origin/main, then run again"
   cask_sha="$(sed -n 's/^  sha256 "\(.*\)"/\1/p' "$CASK")"
   [[ "$(shasum -a 256 "$ZIP" | cut -d' ' -f1)" == "$cask_sha" ]] || die "$ZIP does not match the sha256 in $CASK; see the note above about starting over"
+  [[ -f "$APPCAST" ]] || die "tag $TAG exists but $APPCAST is gone; see the note above about starting over"
+  swift Scripts/verify-appcast.swift "$APPCAST" "$ZIP" "$pub" >/dev/null || die "$APPCAST does not verify against the key in Scripts/make-app.sh"
   [[ -z "$remote_tag" || "$remote_tag" == "$(git rev-parse "$TAG")" ]] || die "origin already has a different $TAG"
   echo "==> resuming $TAG"
 else
@@ -74,6 +81,10 @@ else
     printf 'From a source checkout: `git pull && Scripts/make-app.sh --install`\n'
   } > build/notes.md
 
+  echo "==> appcast"
+  printf '%s\n' "$notes" > build/Pullglance.md
+  Scripts/make-appcast.sh --version "$NEW" --zip "$ZIP" --notes build/Pullglance.md --out "$APPCAST" --public-key "$pub"
+
   echo "==> commit and tag"
   git add version.env CHANGELOG.md "$CASK"
   git commit -q -m "release: $TAG"
@@ -92,10 +103,16 @@ if gh release view "$TAG" --json isDraft >/dev/null 2>&1; then
   else
     gh release upload "$TAG" "$ZIP"
   fi
+  has_appcast="$(gh release view "$TAG" --json assets --jq '[.assets[].name] | index("appcast.xml") != null')"
+  if [[ "$has_appcast" == "true" ]]; then
+    echo "    appcast.xml is already on the release"
+  else
+    gh release upload "$TAG" "$APPCAST"
+  fi
   if [[ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" == "true" ]]; then
     gh release edit "$TAG" --draft=false
   fi
 else
-  gh release create "$TAG" "$ZIP" --title "$TAG" --notes-file build/notes.md --verify-tag
+  gh release create "$TAG" "$ZIP" "$APPCAST" --title "$TAG" --notes-file build/notes.md --verify-tag
 fi
 echo "done: $TAG"
