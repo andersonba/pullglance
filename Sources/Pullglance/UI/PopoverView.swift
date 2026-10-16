@@ -157,6 +157,10 @@ struct PopoverView: View {
             }
         }
         .frame(width: 380)
+        // Out of the layout pass: resizing the window inside it would lay the popover out again, reentrantly.
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+            DispatchQueue.main.async { PopoverWindowFit.fit(height: height) }
+        }
         .animation(.easeInOut(duration: 0.15), value: focus.id != nil)
         .onAppear {
             SettingsOpener.bringSettingsForwardIfOpen()
