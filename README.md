@@ -53,11 +53,14 @@ Everything stays on your Mac. Preferences in `UserDefaults`, author avatars in `
 ## Developing
 
 ```sh
-swift run                     # start the app
+swift run                     # a debug build, for iterating: no Dock icon, its own settings, gone with the terminal
+Scripts/make-app.sh --install # the release app from this checkout, installed in /Applications: how to run it from source day to day
 swift test                    # run the tests
 Scripts/build-review-js.sh    # rebuild the review window's page script
 Scripts/release.sh X.Y.Z      # cut a release from main: tests, tag, zip, cask, GitHub Release
 ```
+
+Builds need Xcode 26 or newer. [CLAUDE.md](CLAUDE.md) has the notes a coding agent (or a new contributor) needs: the two ways to run it, where the log is, the build checks, and the toolchain pitfalls.
 
 How it works, section by section: [docs/how-it-works.md](docs/how-it-works.md).
 
