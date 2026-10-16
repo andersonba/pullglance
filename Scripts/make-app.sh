@@ -10,7 +10,7 @@ BUNDLE_ID="com.andersonba.pullglance"
 # Sparkle: where the app looks for releases, and the public half of the key that signs them. The private half
 # lives GPG-encrypted outside the repository and is only ever read by Scripts/make-appcast.sh.
 SPARKLE_FEED_URL="https://github.com/andersonba/pullglance/releases/latest/download/appcast.xml"
-SPARKLE_PUBLIC_KEY="REPLACE-WITH-THE-PRODUCTION-PUBLIC-KEY"
+SPARKLE_PUBLIC_KEY="YUURR8p6a4z/U+jOAREwyG/Y6mJYO9BcgJXaYeunRmI="
 SPARKLE_FRAMEWORK=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
 # A rehearsal runs beside the installed app, under its own identity, against a local feed signed with a
 # throwaway key. Read here only; the app never sees these.
