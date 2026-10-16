@@ -68,6 +68,16 @@ import Testing
         #expect(mineSection(for: makePR(ciState: .pending)) == .waitingForReview)
     }
 
+    /// `reviewDecision` is null when branch protection asks for no review: GitHub offers the merge button
+    /// as soon as nothing else blocks it, even with a review requested (and still pending).
+    @Test func noRequiredReviewWithGreenCIIsReadyToMerge() {
+        #expect(mineSection(for: makePR(reviewDecision: nil, ciState: .success, requestedTeams: ["core-reviewers"])) == .readyToMerge)
+        #expect(mineSection(for: makePR(reviewDecision: nil, ciState: .none)) == .readyToMerge)
+        #expect(mineSection(for: makePR(reviewDecision: nil, ciState: .pending)) == .waitingForReview)
+        #expect(mineSection(for: makePR(reviewDecision: nil, ciState: .success, isBlocked: true)) == .waitingForReview, "something else still blocks it")
+        #expect(mineSection(for: makePR(reviewDecision: nil, ciState: .success, hasMergeState: false)) == .waitingForReview, "unknown merge state is not a yes")
+    }
+
     @Test func reviewRequiredWaitsForReview() {
         #expect(mineSection(for: makePR(reviewDecision: .reviewRequired, ciState: .success)) == .waitingForReview)
     }

@@ -38,7 +38,7 @@ func pillPixels(_ view: NSView) -> (green: Int, orange: Int) {
 @Suite struct RowRefreshRenderTests {
     @Test func rowPillsFollowARefreshedPullRequest() async throws {
         let gh = FakeGH()
-        await gh.set(.success(envelope(nodes: [node(number: 7, ci: "SUCCESS", decision: nil), node(number: 8, ci: "FAILURE", decision: nil)])), for: SearchQuery.mine)
+        await gh.set(.success(envelope(nodes: [node(number: 7, ci: "SUCCESS", decision: "REVIEW_REQUIRED"), node(number: 8, ci: "FAILURE", decision: nil)])), for: SearchQuery.mine)
         await gh.set(.success(envelope(nodes: [])), for: SearchQuery.direct)
         let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() })
         await store.refresh()

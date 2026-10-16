@@ -77,6 +77,13 @@ struct PullRequest: Sendable, Equatable, Identifiable {
         hasMergeState && !usesMergeQueue && canEnableAutoMerge && isBlocked && autoMergeMethod == nil
     }
 
+    /// The review side lets it merge: approved, or no review required. `reviewDecision` is null when branch
+    /// protection asks for none, and GitHub then offers the merge button even with a request still pending,
+    /// as long as nothing else blocks it. Unknown merge state is not a yes.
+    var reviewAllowsMerge: Bool {
+        reviewDecision == .approved || (reviewDecision == nil && hasMergeState && !isBlocked)
+    }
+
     var id: String { "\(repo)#\(number)" }
     var checksURL: URL { url.appendingPathComponent("checks") }
     var repoName: String { repo.split(separator: "/").last.map(String.init) ?? repo }

@@ -34,6 +34,13 @@ import Testing
         #expect(pills(for: makePR(reviewDecision: nil, ciState: .none)) == [.awaitingReview])
     }
 
+    @Test func noRequiredReviewAndGreenIsReadyToMerge() {
+        #expect(pills(for: makePR(reviewDecision: nil, ciState: .success)) == [.readyToMerge])
+        #expect(pills(for: makePR(reviewDecision: nil, ciState: .success, isBlocked: true)) == [.awaitingReview])
+        #expect(pills(for: makePR(reviewDecision: nil, ciState: .success, hasMergeState: false)) == [.awaitingReview])
+        #expect(pills(for: makePR(isDraft: true, reviewDecision: nil, ciState: .success)) == [.awaitingReview])
+    }
+
     @Test func draftStillShowsAwaitingReview() {
         #expect(pills(for: makePR(isDraft: true, reviewDecision: .reviewRequired)) == [.awaitingReview])
     }

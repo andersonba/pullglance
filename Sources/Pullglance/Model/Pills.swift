@@ -26,12 +26,16 @@ func pills(for pr: PullRequest) -> [Pill] {
     case .pending: result.append(.ciRunning)
     case .success, .none: break
     }
+    let ready = !pr.isDraft && pr.mergeQueuePosition == nil && pr.ciState == .success && !pr.hasConflicts && !pr.isBehindBase
     switch pr.reviewDecision {
     case .changesRequested:
         result.append(.changesRequested)
     case .approved:
         result.append(.approved)
-        if !pr.isDraft, pr.mergeQueuePosition == nil, pr.ciState == .success, !pr.hasConflicts, !pr.isBehindBase { result.append(.readyToMerge) }
+        if ready { result.append(.readyToMerge) }
+    case nil where ready && pr.reviewAllowsMerge:
+        // No review required: nothing to wait for, whatever requests are still open.
+        result.append(.readyToMerge)
     case .reviewRequired, nil:
         result.append(.awaitingReview)
     }

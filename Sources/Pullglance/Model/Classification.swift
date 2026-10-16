@@ -9,7 +9,7 @@ func mineSection(for pr: PullRequest) -> Section {
     }
     // In the merge queue or with auto-merge on, GitHub merges by itself: nothing left to do here.
     if pr.mergeQueuePosition != nil || pr.autoMergeMethod != nil { return .waitingForReview }
-    if pr.reviewDecision == .approved, pr.ciState == .success || pr.ciState == .none {
+    if pr.reviewAllowsMerge, pr.ciState == .success || pr.ciState == .none {
         return .readyToMerge
     }
     return .waitingForReview
