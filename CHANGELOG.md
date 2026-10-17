@@ -8,9 +8,7 @@ publishes it as the release notes.
 
 ### Added
 - In the Review Desk, files you mark as viewed leave the file tree sidebar, and a folder goes with its last file, so the tree shows what is left to review; once everything is viewed the tree shows all files again. Works in both of GitHub's Files experiences. An eye button next to the progress turns it off, and the choice is remembered.
-
 - Settings › Review Desk has a choice for where a pull request opens: Files (the diff, at the first file still to review), Conversation, or By list, the rule that was implicit until now (My PRs on the conversation, To review on the diff). It applies to a click, to `↩`, and to the browser when the Desk is off. The test presets and the custom globs moved behind a Choose… button, with a one-line summary in their place, so the tab fits without scrolling.
-
 - The welcome window has a step for the global shortcut, with the recorder right there, and mentions `J` next to `↓`.
 
 ### Fixed
