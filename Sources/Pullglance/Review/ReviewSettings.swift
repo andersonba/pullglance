@@ -26,6 +26,20 @@ enum FilePillPosition: String, Codable, CaseIterable, Sendable {
     case bottom
 }
 
+/// Where a click or ↩ on a row opens a pull request. `byList` is the rule that was implicit before it was a
+/// choice: the user's own on the conversation, review requests on the diff.
+enum PullRequestLanding: String, Codable, CaseIterable, Sendable {
+    case files, conversation, byList
+
+    func landing(for tab: Section.Tab) -> ReviewAddress.Landing {
+        switch self {
+        case .files: .files
+        case .conversation: .conversation
+        case .byList: tab == .review ? .files : .conversation
+        }
+    }
+}
+
 struct ReviewSettings: Codable, Equatable, Sendable {
     var presets: [String: Bool]
     var customGlobsText: String
@@ -38,6 +52,8 @@ struct ReviewSettings: Codable, Equatable, Sendable {
     var windowEnabled: Bool = false
     /// Viewed files leave the page's file tree, so the tree shows what is left; the bar toggles it.
     var treeHidesViewed: Bool = true
+    /// Where a row opens its pull request; also the browser's page when the Desk is off.
+    var landing: PullRequestLanding = .byList
 
     static let `default` = ReviewSettings(
         presets: Dictionary(uniqueKeysWithValues: ReviewPresets.all.map { ($0.id, $0.enabled) }),
@@ -65,6 +81,7 @@ struct ReviewSettings: Codable, Equatable, Sendable {
         filePill = try c.decodeIfPresent(FilePillPosition.self, forKey: .filePill) ?? .bottom
         windowEnabled = try c.decodeIfPresent(Bool.self, forKey: .windowEnabled) ?? false
         treeHidesViewed = try c.decodeIfPresent(Bool.self, forKey: .treeHidesViewed) ?? true
+        landing = try c.decodeIfPresent(PullRequestLanding.self, forKey: .landing) ?? .byList
     }
 
     static let key = "reviewSettings"

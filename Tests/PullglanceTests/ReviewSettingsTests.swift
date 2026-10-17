@@ -57,6 +57,27 @@ import Testing
         #expect(s.scriptPayload["treeHidesViewed"] as? Bool == false)
     }
 
+    /// Where a pull request opens is one choice: the diff, the conversation, or by list (the rule that was
+    /// implicit until now: the user's own on the conversation, review requests on the diff). Settings saved
+    /// before the choice existed keep that rule.
+    @Test func landingChoiceDefaultsToByListAndResolvesPerTab() throws {
+        #expect(ReviewSettings.default.landing == .byList)
+        let old = Data(#"{"presets":{},"customGlobsText":"","autoMark":false,"rememberCompare":true,"verify":true,"loadBeforeMark":true}"#.utf8)
+        #expect(try JSONDecoder().decode(ReviewSettings.self, from: old).landing == .byList)
+        var s = ReviewSettings.default
+        s.landing = .files
+        let defaults = testDefaults()
+        s.save(defaults)
+        #expect(ReviewSettings.load(defaults).landing == .files)
+
+        #expect(PullRequestLanding.byList.landing(for: .mine) == .conversation)
+        #expect(PullRequestLanding.byList.landing(for: .review) == .files)
+        #expect(PullRequestLanding.files.landing(for: .mine) == .files)
+        #expect(PullRequestLanding.files.landing(for: .review) == .files)
+        #expect(PullRequestLanding.conversation.landing(for: .mine) == .conversation)
+        #expect(PullRequestLanding.conversation.landing(for: .review) == .conversation)
+    }
+
     /// The window is a beta: off unless turned on, and settings saved before the flag existed stay off.
     @Test func theReviewWindowIsOffByDefaultAndForOlderSettings() throws {
         #expect(ReviewSettings.default.windowEnabled == false)

@@ -330,9 +330,20 @@
 
 /* Settings › Review */
 "Review" = "Review";
+"Opening a pull request" = "Opening a pull request";
+"Files" = "Files";
+"Conversation" = "Conversation";
+"By list" = "By list";
+"The diff, at the first file still to review. Same for a click, ↩, and the browser when the Desk is off." = "The diff, at the first file still to review. Same for a click, ↩, and the browser when the Desk is off.";
+"The pull request page: comments, checks, merge. Same for a click, ↩, and the browser when the Desk is off." = "The pull request page: comments, checks, merge. Same for a click, ↩, and the browser when the Desk is off.";
+"My PRs open on the conversation; To review opens on the first file still to review. Same for a click, ↩, and the browser when the Desk is off." = "My PRs open on the conversation; To review opens on the first file still to review. Same for a click, ↩, and the browser when the Desk is off.";
+"Tests" = "Tests";
+"Choose…" = "Choose…";
+"What the Tests button in the bar marks as viewed in one go: presets by stack, plus your own globs." = "What the Tests button in the bar marks as viewed in one go: presets by stack, plus your own globs.";
+"%lld presets on · %lld custom globs" = "%lld presets on · %lld custom globs";
+"Custom globs, one per line. Lines starting with # are ignored." = "Custom globs, one per line. Lines starting with # are ignored.";
 "Files counted as tests" = "Files counted as tests";
 "Custom globs" = "Custom globs";
-"One glob per line. Lines starting with # are ignored." = "One glob per line. Lines starting with # are ignored.";
 "Mark automatically when opening a pull request" = "Mark automatically when opening a pull request";
 "Load the whole file list before marking" = "Load the whole file list before marking";
 "Verify on the server after marking" = "Verify on the server after marking";
