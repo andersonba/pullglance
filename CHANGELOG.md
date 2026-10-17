@@ -14,6 +14,7 @@ publishes it as the release notes.
 - The welcome window has a step for the global shortcut, with the recorder right there, and mentions `J` next to `↓`.
 
 ### Fixed
+- In the Review Desk, scrolling past the collapsed header of a viewed file no longer makes it the current file while an unviewed one is in view below: the highlight and the pill go to that one, where the arrows and the check go. A viewed file left open keeps the cursor, and once everything is viewed every file counts, as before.
 - In the Review Desk's file pill, the arrows show their tooltips again, with the keys: `⌘↑`/`⌘↓` go to the previous or next unviewed file and, once every file is viewed, walk every file, the same as the arrows. Before, the keys did nothing once everything was viewed.
 
 ### Changed

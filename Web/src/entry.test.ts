@@ -88,6 +88,9 @@ const REPORTED_PR = [
 ]
 const COLLAPSED = 48, EXPANDED = 600, PLACEHOLDER = 160
 const REPORTED_HEIGHTS = REPORTED_PR.map((f) => f.viewed ? COLLAPSED : f.largeDiff ? PLACEHOLDER : EXPANDED)
+/// The same page with the 5th file (viewed) left open: a viewed file that is being read keeps the cursor, so
+/// these geometry tests see the geometry alone (a collapsed viewed file at the top yields to the next unviewed).
+const REPORTED_HEIGHTS_5TH_OPEN = REPORTED_HEIGHTS.map((h, i) => i === 4 ? EXPANDED : h)
 
 describe('cursor on a page of collapsed files with a large-diff placeholder', () => {
   beforeEach(() => { storage._resetForTests(); document.body.innerHTML = '' })
@@ -110,7 +113,7 @@ describe('cursor on a page of collapsed files with a large-diff placeholder', ()
   it('takes the file starting at the top edge over an earlier box that reaches past it', async () => {
     mountFilesPage({ files: REPORTED_PR, containers: true })
     const api = install({ post: () => {} })
-    const page = layoutPage(REPORTED_PR.map((f) => f.path), REPORTED_HEIGHTS, STALE)
+    const page = layoutPage(REPORTED_PR.map((f) => f.path), REPORTED_HEIGHTS_5TH_OPEN, STALE)
     page.scrollTo(3)
     expect(await api.currentFile()).toMatchObject({ index: 3, total: 11, viewed: true })
     page.scrollTo(4)
@@ -206,7 +209,7 @@ describe('cursor on a page of collapsed files with a large-diff placeholder', ()
   it('takes the later file when a box of an earlier one sits at the same top edge (a header stuck at the top)', async () => {
     mountFilesPage({ files: REPORTED_PR, containers: true })
     const api = install({ post: () => {} })
-    const page = layoutPage(REPORTED_PR.map((f) => f.path), REPORTED_HEIGHTS, { 3: { from: REPORTED_HEIGHTS[3]! + 8, height: COLLAPSED } })
+    const page = layoutPage(REPORTED_PR.map((f) => f.path), REPORTED_HEIGHTS_5TH_OPEN, { 3: { from: REPORTED_HEIGHTS[3]! + 8, height: COLLAPSED } })
     page.scrollTo(4)                                   // the 4th's box sits exactly where the 5th starts
     expect(await api.currentFile()).toMatchObject({ index: 4 })
   })
@@ -261,10 +264,11 @@ describe('jump intent at the end of the page', () => {
     const { api, page } = setup(events)
     await api.stepFile(1)
     await api.stepFile(1)
-    page.setScroll(page.topOf(4))                        // the user scrolls up to the 5th file
+    page.setScroll(page.topOf(4))                        // the user scrolls up to the 5th file, a collapsed viewed one
     window.dispatchEvent(new Event('scroll'))
     await wait(250)
-    expect((events.filter((e) => e.name === 'current').at(-1)!.payload as any)).toMatchObject({ index: 4 })
+    // Not the jump's 9th: the edge rules again, and it yields the collapsed 5th to the 7th, the first unviewed in view.
+    expect((events.filter((e) => e.name === 'current').at(-1)!.payload as any)).toMatchObject({ index: 6 })
     page.setScroll(page.maxScroll)                       // and back down: the edge rules again, not the old jump
     expect(await api.currentFile()).toMatchObject({ index: 6 })
   })
@@ -551,5 +555,56 @@ describe('file tree: viewed files leave the sidebar', () => {
     await vi.waitFor(() => expect(document.getElementById('src/a.ts')!.hasAttribute(VIEWED_ATTR)).toBe(true))   // the listing watcher re-reads
     api.dispose()
     expect(document.querySelector(`[${VIEWED_ATTR}], [${HIDE_ATTR}]`)).toBeNull()
+  })
+})
+
+describe('cursor prefers the work left: a viewed file at the top edge yields to an unviewed one in view', () => {
+  beforeEach(() => { storage._resetForTests(); document.body.innerHTML = '' })
+  const MIXED = [{ path: 'src/a.ts', viewed: true }, { path: 'src/b.ts' }, { path: 'src/c.ts', viewed: true }, { path: 'src/d.ts' }]
+  const paths = MIXED.map((f) => f.path)
+
+  it('skips a collapsed viewed file when an unviewed one is visible below it', async () => {
+    mountFilesPage({ files: MIXED, containers: true })
+    const api = install({ post: () => {} })
+    api.setSettings({})
+    const page = layoutPage(paths, [48, 600, 48, 600], {}, 300)   // tops: 0, 56, 664, 720
+    expect(await api.currentFile()).toMatchObject({ path: 'src/b.ts', index: 1 })
+    page.setScroll(664)                                         // c's thin header at the top, d right under it
+    expect(await api.currentFile()).toMatchObject({ path: 'src/d.ts', index: 3 })
+  })
+
+  it('yields from the page top too, where no file has reached the edge yet', async () => {
+    mountFilesPage({ files: MIXED, containers: true })
+    const api = install({ post: () => {} })
+    api.setSettings({})
+    // The pull request's header is on screen: the first file box starts 380px down, as on GitHub.
+    layoutPage(paths, [48, 600, 48, 600], { 0: { from: 380, height: 48 }, 1: { from: 380, height: 600 }, 2: { from: 380, height: 48 }, 3: { from: 380, height: 600 } }, 943)
+    expect(await api.currentFile()).toMatchObject({ path: 'src/b.ts', index: 1 })
+  })
+
+  it('yields even when the file was jumped to, once it is marked on the page and collapses', async () => {
+    mountFilesPage({ files: [{ path: 'src/a.ts' }, { path: 'src/b.ts' }, { path: 'src/c.ts' }], containers: true })
+    const api = install({ post: () => {} })
+    api.setSettings({})
+    const page = layoutPage(['src/a.ts', 'src/b.ts', 'src/c.ts'], [600, 600, 600], {}, 700)
+    await api.firstUnviewed()                                   // the landing jump: the cursor is held on a by intent
+    expect(await api.currentFile()).toMatchObject({ path: 'src/a.ts', index: 0 })
+    filesHeader('src/a.ts').querySelector('button[aria-label="Not Viewed"]').click()   // GitHub's own button, not ours
+    page.setHeight(0, 48)                                       // and the file collapses; nothing scrolled
+    await vi.waitFor(async () => expect(await api.currentFile()).toMatchObject({ path: 'src/b.ts', index: 1 }))
+  })
+
+  it('stays on a viewed file when no unviewed one is in view, and when every file is viewed', async () => {
+    mountFilesPage({ files: [{ path: 'src/a.ts', viewed: true }, { path: 'src/b.ts' }], containers: true })
+    let api = install({ post: () => {} })
+    api.setSettings({})
+    layoutPage(['src/a.ts', 'src/b.ts'], [900, 600], {}, 400)    // a fills the viewport; b starts at 908
+    expect(await api.currentFile()).toMatchObject({ path: 'src/a.ts', index: 0 })
+    api.dispose()
+    mountFilesPage({ files: [{ path: 'src/a.ts', viewed: true }, { path: 'src/b.ts', viewed: true }], containers: true })
+    api = install({ post: () => {} })
+    api.setSettings({})
+    layoutPage(['src/a.ts', 'src/b.ts'], [48, 48], {}, 700)
+    expect(await api.currentFile()).toMatchObject({ path: 'src/a.ts', index: 0 })
   })
 })

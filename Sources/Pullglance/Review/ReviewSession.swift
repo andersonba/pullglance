@@ -139,7 +139,8 @@ final class ReviewSession {
     func scriptEvent(_ name: String, _ payload: Any?) {
         if name == "current" {
             let none = (payload as? [String: Any])?["none"] as? String
-            AppLog.shared.debug("review event current cursor=\(FileCursor(payload) != nil)\(none.map { " (\($0))" } ?? "")")
+            let d = payload as? [String: Any]
+            AppLog.shared.debug("review event current cursor=\(FileCursor(payload) != nil)\(none.map { " (\($0))" } ?? "") index=\(d?["index"] ?? "-") viewed=\(d?["viewed"] ?? "-") via=\(d?["via"] ?? "-")")
         } else {
             AppLog.shared.debug("review event \(name)")
         }
