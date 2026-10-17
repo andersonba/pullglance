@@ -225,11 +225,11 @@
 "Popover" = "Popover";
 "Focused row" = "Linha em foco";
 "Row under the pointer" = "Linha sob o ponteiro";
-"Open review · Copy link" = "Abrir review · Copiar link";
+"Open in Desk · Copy link" = "Abrir no Desk · Copiar link";
 "Keyboard from here" = "Teclado a partir daqui";
 "Row menu" = "Menu da linha";
-"Review window" = "Janela de review";
-"Review window (beta)" = "Janela de review (beta)";
+"Review Desk" = "Review Desk";
+"Review Desk (beta)" = "Review Desk (beta)";
 "Advanced" = "Avançado";
 "Experimental" = "Experimental";
 "Storage" = "Armazenamento";
@@ -238,11 +238,12 @@
 "Compare memory" = "Memória de compare";
 "Viewed files remembered on compare pages" = "Arquivos vistos lembrados nas páginas de compare";
 "Adds a Review tab here while on." = "Com ela ligada, aparece a aba Review aqui.";
-"Opens pull requests in a window of the app, with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser." = "Abre os pull requests numa janela do app, com barra de review e controles de arquivo. Desligada, o clique abre o pull request no GitHub, no seu navegador.";
+"Opens pull requests in the Review Desk: a window of the app with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser." = "Abre os pull requests no Review Desk: uma janela do app com barra de review e controles de arquivo. Desligado, o clique abre o pull request no GitHub, no seu navegador.";
 "Quick filters" = "Filtros rápidos";
 "Switch tab" = "Trocar de aba";
 "Start · Move" = "Começar · Mover";
-"Open review" = "Abrir review";
+"Open in Desk" = "Abrir no Desk";
+"Desk" = "Desk";
 "Pin · Snooze · Refresh" = "Fixar · Adormecer · Atualizar";
 "Comment · Merge" = "Comentar · Mergear";
 "Open on GitHub · Copy link" = "Abrir no GitHub · Copiar link";
@@ -376,7 +377,7 @@
 "Zoom Out" = "Reduzir";
 "Actual Size" = "Tamanho real";
 
-/* Review window */
+/* Review Desk */
 "Back (⌘[)" = "Voltar (⌘[)";
 "Forward (⌘])" = "Avançar (⌘])";
 "Reload (⌘R)" = "Recarregar (⌘R)";
@@ -406,20 +407,20 @@
 "Choose a file for %@" = "Escolha um arquivo para %@";
 "Open Link in Browser" = "Abrir link no navegador";
 
-/* Review window: file pill */
+/* Review Desk: file pill */
 "Viewed → next" = "Visto → próximo";
 "Next unviewed" = "Próximo não visto";
 "File controls" = "Controles de arquivo";
 "Viewed · click to unmark" = "Visto · clique para desmarcar";
 "Top" = "Em cima";
 "Bottom" = "Embaixo";
-"Review window" = "Janela de review";
+"Review Desk" = "Review Desk";
 "Floating over the page on Files and compare pages: previous and next file, viewed and next." = "Flutuando sobre a página em Files e no compare: arquivo anterior e próximo, visto e próximo.";
 "Mark Viewed and Go to Next" = "Marcar como visto e ir ao próximo";
 "Next File" = "Próximo arquivo";
 "Previous File" = "Arquivo anterior";
 
-/* Review window: pill redesign */
+/* Review Desk: pill redesign */
 "Viewed files are hidden in the file tree · click to show them" = "Arquivos vistos estão ocultos na árvore de arquivos · clique para mostrar";
 "Viewed files are shown in the file tree · click to hide them" = "Arquivos vistos aparecem na árvore de arquivos · clique para ocultar";
 "Show viewed files in the file tree" = "Mostrar arquivos vistos na árvore de arquivos";
@@ -456,7 +457,7 @@
 "Previous unviewed file" = "Arquivo não visto anterior";
 "Next unviewed file" = "Próximo arquivo não visto";
 "Capture now" = "Capturar agora";
-"Review window picture" = "Foto da janela de review";
+"Review Desk picture" = "Foto do Review Desk";
 "A picture of the page and a summary of its structure, into the log folder. Also ⇧⌘P in the window." = "Uma imagem da página e um resumo da estrutura dela, na pasta do log. Também ⇧⌘P na janela.";
 "All viewed" = "Tudo visto";
 "Previous file (⌘↑)" = "Arquivo anterior (⌘↑)";

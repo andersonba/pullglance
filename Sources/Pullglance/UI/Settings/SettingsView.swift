@@ -64,7 +64,7 @@ struct SettingsView: View {
             // The review window is a beta (Diagnostics turns it on); its tab exists only while it is on.
             if review.settings.windowEnabled {
                 ReviewSettingsView()
-                    .tabItem { Label { Text("Review", bundle: .app) } icon: { Image(systemName: "checklist") } }
+                    .tabItem { Label { Text("Review Desk", bundle: .app) } icon: { Image(systemName: "checklist") } }
                     .tag(SettingsTab.review)
             }
             AdvancedSettingsView(store: store)
@@ -660,8 +660,8 @@ struct AdvancedSettingsView: View {
             SwiftUI.Section {
                 Toggle(isOn: $review.settings.windowEnabled) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Review window (beta)", bundle: .app)
-                        Text("Opens pull requests in a window of the app, with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser.", bundle: .app)
+                        Text("Review Desk (beta)", bundle: .app)
+                        Text("Opens pull requests in the Review Desk: a window of the app with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser.", bundle: .app)
                             .font(.caption2).foregroundStyle(.tertiary)
                         Text("Adds a Review tab here while on.", bundle: .app)
                             .font(.caption2).foregroundStyle(.tertiary)
@@ -746,7 +746,7 @@ struct AdvancedSettingsView: View {
                         .controlSize(.small)
                         .disabled(ReviewWindowController.shared?.window?.isVisible != true)
                 } label: {
-                    Text("Review window picture", bundle: .app)
+                    Text("Review Desk picture", bundle: .app)
                     Text("A picture of the page and a summary of its structure, into the log folder. Also ⇧⌘P in the window.", bundle: .app).font(.caption2).foregroundStyle(.tertiary)
                 }
             } header: {

@@ -18,7 +18,7 @@ The first time it runs, Pullglance opens a short welcome window: it checks that 
 
 ## Background App Activity (macOS 26 and later)
 
-Pullglance is a menu bar app: no Dock icon, and it keeps running after its windows close. macOS 26 and later lists apps like that under System Settings › General › Login Items & Extensions › Background App Activity, and may announce the first occurrence with an "App Running in Background" notification. That entry is the app itself, not a helper. Turning it off, or choosing **Stop Running in Background** on a Dock icon, quits Pullglance and keeps it from staying up; turn it back on to use the app again. The review window puts a Dock icon up while it is open, so ⌘-Tab reaches it, and takes it down when it closes.
+Pullglance is a menu bar app: no Dock icon, and it keeps running after its windows close. macOS 26 and later lists apps like that under System Settings › General › Login Items & Extensions › Background App Activity, and may announce the first occurrence with an "App Running in Background" notification. That entry is the app itself, not a helper. Turning it off, or choosing **Stop Running in Background** on a Dock icon, quits Pullglance and keeps it from staying up; turn it back on to use the app again. The Review Desk puts a Dock icon up while it is open, so ⌘-Tab reaches it, and takes it down when it closes.
 
 ## Updates
 
@@ -60,16 +60,16 @@ Swipe a row to the left, right-click it, or focus it with the keyboard:
 
 ## Keyboard
 
-`⌥⌘P` opens and closes the popover from any app (Settings › General changes or removes the shortcut). With the popover open, `↓` (or `J`) focuses the first row; `↑↓` move, `←→` switch tabs, and Vim's `H J K L` do the same as the arrows, `F` opens the repository/author filter with its search ready, `↩` opens the review window, `P` pins, `S` snoozes, `O` opens on GitHub, `R` refreshes, `C` comments, `M` merges where offered, `⌘C` copies the link, `esc` leaves. With the pointer on a row and no focus, `↩` and `⌘C` act on that row and `space` makes it the focus; with a focus, `space` opens the focused row's menu, the same one a right-click shows. `0`–`9` pick the quick filter chips. `⌘/` opens the full list of shortcuts, including the review window's.
+`⌥⌘P` opens and closes the popover from any app (Settings › General changes or removes the shortcut). With the popover open, `↓` (or `J`) focuses the first row; `↑↓` move, `←→` switch tabs, and Vim's `H J K L` do the same as the arrows, `F` opens the repository/author filter with its search ready, `↩` opens the pull request in the Review Desk, `P` pins, `S` snoozes, `O` opens on GitHub, `R` refreshes, `C` comments, `M` merges where offered, `⌘C` copies the link, `esc` leaves. With the pointer on a row and no focus, `↩` and `⌘C` act on that row and `space` makes it the focus; with a focus, `space` opens the focused row's menu, the same one a right-click shows. `0`–`9` pick the quick filter chips. `⌘/` opens the full list of shortcuts, including the Review Desk's.
 
 ## Filters
 
 - The funnel next to the tabs narrows both tabs to a few repositories or a few authors, for the session. Clicking a row's avatar or repository name does the same for that author or repository.
 - Settings › Filters hides organizations or accounts, and per owner keeps everything except a few repositories or only a chosen few. These leave the searches themselves, so lists, totals and the badge all follow.
 
-## Review window (beta)
+## Review Desk (beta)
 
-Off by default; Settings › Review turns it on. With it on, a click on a row opens the pull request in a window of its own, with a review bar above the page: the pull request's state, the file progress, and one primary action (merge when ready, approve otherwise) with the rest in its menu. On the Files tab a floating pill shows the current file, steps to the previous or next one, marks it viewed, and marks all test files viewed by preset or by your own globs (Settings › Review). Files marked as viewed leave GitHub's file tree sidebar (a folder goes with its last file), so the tree is what is left to review; once everything is viewed the tree is whole again. The eye button next to the progress turns that off, and the choice is kept. Compare pages remember what you collapsed. The GitHub session lives in the app, separate from your browser; downloads are quarantined like a browser's.
+Off by default; Settings › Review Desk turns it on. With it on, a click on a row opens the pull request in the Review Desk, a window of its own with a review bar above the page: the pull request's state, the file progress, and one primary action (merge when ready, approve otherwise) with the rest in its menu. On the Files tab a floating pill shows the current file, steps to the previous or next one, marks it viewed, and marks all test files viewed by preset or by your own globs (Settings › Review Desk). Files marked as viewed leave GitHub's file tree sidebar (a folder goes with its last file), so the tree is what is left to review; once everything is viewed the tree is whole again. The eye button next to the progress turns that off, and the choice is kept. Compare pages remember what you collapsed. The GitHub session lives in the app, separate from your browser; downloads are quarantined like a browser's.
 
 ## Settings (⌘,)
 

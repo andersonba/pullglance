@@ -56,7 +56,7 @@ Everything stays on your Mac. Preferences in `UserDefaults`, author avatars in `
 swift run                     # a debug build, for iterating: no Dock icon, its own settings, gone with the terminal
 Scripts/make-app.sh --install # the release app from this checkout, installed in /Applications: how to run it from source day to day
 swift test                    # run the tests
-Scripts/build-review-js.sh    # rebuild the review window's page script
+Scripts/build-review-js.sh    # rebuild the Review Desk's page script
 Scripts/release.sh X.Y.Z      # cut a release from main: tests, tag, zip, cask, GitHub Release
 ```
 

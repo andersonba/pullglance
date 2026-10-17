@@ -7,7 +7,10 @@ publishes it as the release notes.
 ## [Unreleased]
 
 ### Added
-- In the review window, files you mark as viewed leave the file tree sidebar, and a folder goes with its last file, so the tree shows what is left to review; once everything is viewed the tree shows all files again. Works in both of GitHub's Files experiences. An eye button next to the progress turns it off, and the choice is remembered.
+- In the Review Desk, files you mark as viewed leave the file tree sidebar, and a folder goes with its last file, so the tree shows what is left to review; once everything is viewed the tree shows all files again. Works in both of GitHub's Files experiences. An eye button next to the progress turns it off, and the choice is remembered.
+
+### Changed
+- The review window is now the Review Desk, in Settings, the shortcuts card and the triage hints; "Review" stays as the name of its menu, which holds the review actions.
 
 ## [0.3.0] - 2026-10-17
 

@@ -26,7 +26,7 @@ struct ReviewSettingsView: View {
                 Text("Floating over the page on Files and compare pages: previous and next file, viewed and next.", bundle: .app)
                     .font(.caption2).foregroundStyle(.tertiary)
             } header: {
-                Text("Review window", bundle: .app)
+                Text("Review Desk", bundle: .app)
             }
             SwiftUI.Section {
                 ForEach(groups, id: \.name) { group in

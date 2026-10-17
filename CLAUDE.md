@@ -2,6 +2,8 @@
 
 macOS menu bar app for pull requests: SwiftUI + AppKit, Swift 6 language mode, SwiftPM, no Xcode project.
 Everything reaches GitHub through the user's own `gh`. `docs/how-it-works.md` explains the product section by section.
+The window that hosts a pull request's page with the native review bar is the **Review Desk** in everything the
+user reads (strings, docs, changelog); in code it keeps its `Review*` names.
 
 ## Running it
 

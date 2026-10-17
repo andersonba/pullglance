@@ -79,7 +79,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    static let defaultTitle = String(localized: "Review", bundle: .app)
+    static let defaultTitle = String(localized: "Review Desk", bundle: .app)
 
     // MARK: showing
 

@@ -225,11 +225,11 @@
 "Popover" = "Popover";
 "Focused row" = "Focused row";
 "Row under the pointer" = "Row under the pointer";
-"Open review · Copy link" = "Open review · Copy link";
+"Open in Desk · Copy link" = "Open in Desk · Copy link";
 "Keyboard from here" = "Keyboard from here";
 "Row menu" = "Row menu";
-"Review window" = "Review window";
-"Review window (beta)" = "Review window (beta)";
+"Review Desk" = "Review Desk";
+"Review Desk (beta)" = "Review Desk (beta)";
 "Advanced" = "Advanced";
 "Experimental" = "Experimental";
 "Storage" = "Storage";
@@ -238,11 +238,12 @@
 "Compare memory" = "Compare memory";
 "Viewed files remembered on compare pages" = "Viewed files remembered on compare pages";
 "Adds a Review tab here while on." = "Adds a Review tab here while on.";
-"Opens pull requests in a window of the app, with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser." = "Opens pull requests in a window of the app, with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser.";
+"Opens pull requests in the Review Desk: a window of the app with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser." = "Opens pull requests in the Review Desk: a window of the app with a review bar and file controls. Off, a click opens the pull request on GitHub in your browser.";
 "Quick filters" = "Quick filters";
 "Switch tab" = "Switch tab";
 "Start · Move" = "Start · Move";
-"Open review" = "Open review";
+"Open in Desk" = "Open in Desk";
+"Desk" = "Desk";
 "Pin · Snooze · Refresh" = "Pin · Snooze · Refresh";
 "Comment · Merge" = "Comment · Merge";
 "Open on GitHub · Copy link" = "Open on GitHub · Copy link";
@@ -376,7 +377,7 @@
 "Zoom Out" = "Zoom Out";
 "Actual Size" = "Actual Size";
 
-/* Review window */
+/* Review Desk */
 "Back (⌘[)" = "Back (⌘[)";
 "Forward (⌘])" = "Forward (⌘])";
 "Reload (⌘R)" = "Reload (⌘R)";
@@ -406,20 +407,20 @@
 "Choose a file for %@" = "Choose a file for %@";
 "Open Link in Browser" = "Open Link in Browser";
 
-/* Review window: file pill */
+/* Review Desk: file pill */
 "Viewed → next" = "Viewed → next";
 "Next unviewed" = "Next unviewed";
 "File controls" = "File controls";
 "Viewed · click to unmark" = "Viewed · click to unmark";
 "Top" = "Top";
 "Bottom" = "Bottom";
-"Review window" = "Review window";
+"Review Desk" = "Review Desk";
 "Floating over the page on Files and compare pages: previous and next file, viewed and next." = "Floating over the page on Files and compare pages: previous and next file, viewed and next.";
 "Mark Viewed and Go to Next" = "Mark Viewed and Go to Next";
 "Next File" = "Next File";
 "Previous File" = "Previous File";
 
-/* Review window: pill redesign */
+/* Review Desk: pill redesign */
 "Viewed files are hidden in the file tree · click to show them" = "Viewed files are hidden in the file tree · click to show them";
 "Viewed files are shown in the file tree · click to hide them" = "Viewed files are shown in the file tree · click to hide them";
 "Show viewed files in the file tree" = "Show viewed files in the file tree";
@@ -456,7 +457,7 @@
 "Previous unviewed file" = "Previous unviewed file";
 "Next unviewed file" = "Next unviewed file";
 "Capture now" = "Capture now";
-"Review window picture" = "Review window picture";
+"Review Desk picture" = "Review Desk picture";
 "A picture of the page and a summary of its structure, into the log folder. Also ⇧⌘P in the window." = "A picture of the page and a summary of its structure, into the log folder. Also ⇧⌘P in the window.";
 "All viewed" = "All viewed";
 "Previous file (⌘↑)" = "Previous file (⌘↑)";
