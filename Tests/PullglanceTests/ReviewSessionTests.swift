@@ -213,6 +213,34 @@ final class FakeScripting: ReviewScripting {
         await s.settle()
         #expect(scripting.calls.filter { $0.function == "mark" }.count == 1)
     }
+    /// Auto-mark is once per pull request, across app runs too: a restart (an update installs one) must not
+    /// mark again the files the user unmarked on a visit before it.
+    @Test func autoMarkRemembersThePullRequestAcrossSessions() async {
+        let gh = FakeGH()
+        let defaults = testDefaults()
+        let store = PRStore(client: gh, defaults: defaults, now: { Date() })
+        let settings = ReviewSettingsStore(defaults: defaults)
+        settings.settings.autoMark = true
+        func session() -> (ReviewSession, FakeScripting) {
+            let scripting = FakeScripting()
+            scripting.results["counts"] = .success(["total": 3, "viewed": 1, "matching": 2, "partial": false, "perRule": ["js-unit": 2]])
+            scripting.results["mark"] = .success(["marked": 2, "failed": 0, "canUndo": true])
+            return (ReviewSession(store: store, client: gh, scripting: scripting, settings: settings, defaults: defaults), scripting)
+        }
+        let (first, firstScripting) = session()
+        first.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await first.settle()
+        #expect(firstScripting.calls.filter { $0.function == "mark" }.count == 1)
+        let (second, secondScripting) = session()
+        second.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await second.settle()
+        #expect(secondScripting.calls.filter { $0.function == "mark" }.isEmpty)
+        // Another pull request is still new.
+        second.pageChanged(to: URL(string: "https://github.com/acme/web/pull/8/files"))
+        await second.settle()
+        #expect(secondScripting.calls.filter { $0.function == "mark" }.count == 1)
+    }
+
     @Test func aFailedMergeShowsInTheBarAndSuccessStaysQuiet() async {
         let (s, _, _, _) = await make(mine: [pr7])
         s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7"))

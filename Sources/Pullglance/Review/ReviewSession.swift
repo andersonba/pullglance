@@ -47,7 +47,12 @@ final class ReviewSession {
     /// `repo#number` whose file counts are being fetched; a second report of the same page does not refetch.
     @ObservationIgnored private var countsInFlightFor: String?
     /// `repo#number` of pull requests auto-marked in this app run; auto-mark happens once per pull request.
-    @ObservationIgnored private var autoMarked: Set<String> = []
+    /// Pull requests auto-marked already, in order, kept in the defaults: auto-mark is once per pull request
+    /// across app runs too. An update restarts the app, and marking again what the user unmarked since would
+    /// not be automatic, it would be a fight. Capped; the oldest go first.
+    @ObservationIgnored private var autoMarked: [String] = []
+    static let autoMarkedKey = "reviewAutoMarked"
+    static let autoMarkedCap = 500
 
     private(set) var page: ReviewPage = .other
     /// The store's pull request for the page, read live: the store is observable, so the bar follows its cycles.
@@ -99,6 +104,7 @@ final class ReviewSession {
         self.settingsStore = settings
         self.defaults = defaults
         isBarHidden = defaults.bool(forKey: "reviewBarHidden")
+        autoMarked = defaults.stringArray(forKey: Self.autoMarkedKey) ?? []
         settings.onChange = { [weak self] _ in self?.scheduleSettingsPush() }
     }
 
@@ -199,12 +205,17 @@ final class ReviewSession {
         }
     }
 
-    /// Settings › Review "Mark automatically": once the Files tab of a pull request has matching files, mark them,
-    /// once per pull request per app run (a later visit respects what the user unmarked).
+    /// Settings › Review Desk "Mark automatically": once the Files tab of a pull request has matching files,
+    /// mark them, once per pull request, ever (a later visit, in this run or the next, respects what the user
+    /// unmarked).
     private func autoMarkIfNeeded(generation gen: Int) async {
         guard gen == generation, settingsStore.settings.autoMark, matchCount > 0, !busy,
               case .pullRequest(let repo, let number, .files) = page else { return }
-        guard autoMarked.insert("\(repo)#\(number)").inserted else { return }
+        let key = "\(repo)#\(number)"
+        guard !autoMarked.contains(key) else { return }
+        autoMarked.append(key)
+        if autoMarked.count > Self.autoMarkedCap { autoMarked.removeFirst(autoMarked.count - Self.autoMarkedCap) }
+        defaults.set(autoMarked, forKey: Self.autoMarkedKey)
         await mark()
     }
 
