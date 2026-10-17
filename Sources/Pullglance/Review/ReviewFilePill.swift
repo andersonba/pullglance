@@ -10,12 +10,8 @@ struct ReviewFilePill: View {
     /// The moment the last file got viewed: a green pulse on the capsule and a bounce of the seal.
     @State private var celebrating = false
 
-    /// Unviewed files, from GitHub's own numbers when the bar has them (the classic page renders files
-    /// progressively, so the page's count can miss unloaded ones); the page's count on compare.
-    private var left: Int? {
-        if let counts = session.fileCounts { return max(0, counts.total - counts.viewed) }
-        return session.pageCounts.map { max(0, $0.total - $0.viewed) }
-    }
+    /// Unviewed files, as the session counts them.
+    private var left: Int? { session.unviewedLeft }
 
     var body: some View {
         if let file = session.currentFile {
@@ -31,14 +27,15 @@ struct ReviewFilePill: View {
                         .lineLimit(1).fixedSize()
                 }
                 // With files still unviewed the arrows go to those; once everything is viewed they walk
-                // every file, so a mark can be undone from here.
-                ControlGroup {
-                    Button { Task { left == 0 ? await session.stepFile(-1) : await session.scroll(.previous) } } label: { Image(systemName: "chevron.up") }
-                        .help(left == 0 ? Text("Previous file (⌘↑)", bundle: .app) : Text("Previous unviewed file", bundle: .app))
-                    Button { Task { left == 0 ? await session.stepFile(1) : await session.scroll(.next) } } label: { Image(systemName: "chevron.down") }
-                        .help(left == 0 ? Text("Next file (⌘↓)", bundle: .app) : Text("Next unviewed file", bundle: .app))
+                // every file, so a mark can be undone from here. Two plain buttons rather than a ControlGroup:
+                // the group becomes one segmented control and drops its children's tooltips.
+                HStack(spacing: 2) {
+                    Button { Task { await session.stepUnviewed(-1) } } label: { Image(systemName: "chevron.up").frame(width: 14) }
+                        .help(left == 0 ? Text("Previous file (⌘↑)", bundle: .app) : Text("Previous unviewed file (⌘↑)", bundle: .app))
+                    Button { Task { await session.stepUnviewed(1) } } label: { Image(systemName: "chevron.down").frame(width: 14) }
+                        .help(left == 0 ? Text("Next file (⌘↓)", bundle: .app) : Text("Next unviewed file (⌘↓)", bundle: .app))
                 }
-                .controlGroupStyle(.navigation)
+                .buttonStyle(.bordered)
                 .fixedSize()
                 if let threads = session.pullRequest?.unresolvedThreads, threads > 0 {
                     // Open review threads: click goes to the next file that has one, ⌥-click to the previous.

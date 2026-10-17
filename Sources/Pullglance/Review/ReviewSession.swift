@@ -383,6 +383,19 @@ final class ReviewSession {
         _ = try? await scripting.call("scrollToUnviewed", ["args": [direction.rawValue]])
     }
 
+    /// Files still unviewed: GitHub's own numbers when the bar has them (the classic page renders files
+    /// progressively, so the page's count can run short), else the page's.
+    var unviewedLeft: Int? {
+        if let counts = fileCounts { return max(0, counts.total - counts.viewed) }
+        return pageCounts.map { max(0, $0.total - $0.viewed) }
+    }
+
+    /// The pill's arrows and ⌘↑/⌘↓, one movement: the previous or next unviewed file while some are left;
+    /// once every file is viewed, every file, so a mark can be undone from there.
+    func stepUnviewed(_ delta: Int) async {
+        if unviewedLeft == 0 { await stepFile(delta) } else { await scroll(delta > 0 ? .next : .previous) }
+    }
+
     /// How long a result stays in the bar before the progress returns. Errors stay until the next action.
     var noticeLifetime: Duration = .seconds(4)
     private var noticeClear: Task<Void, Never>?

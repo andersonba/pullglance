@@ -278,6 +278,27 @@ final class FakeScripting: ReviewScripting {
         #expect(!s.isEditingInPage)
     }
 
+    /// The pill's arrows and ⌘↑/⌘↓ are one movement: the previous or next unviewed file while some are left,
+    /// and every file once all are viewed, so a mark can be undone from there.
+    @Test func unviewedStepWalksEveryFileOnceAllAreViewed() async {
+        let (s, _, scripting, _) = await make(mine: [pr7])
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        s.scriptEvent("listing", nil)
+        await s.settle()
+        #expect(s.unviewedLeft == 2)
+        await s.stepUnviewed(1)
+        #expect(scripting.calls.last?.function == "scrollToUnviewed")
+        #expect(scripting.calls.last?.args.first as? String == "next")
+        scripting.results["counts"] = .success(["total": 3, "viewed": 3, "matching": 0, "partial": false, "perRule": [:]])
+        s.scriptEvent("listing", nil)
+        await s.settle()
+        #expect(s.unviewedLeft == 0)
+        await s.stepUnviewed(-1)
+        #expect(scripting.calls.last?.function == "stepFile")
+        #expect(scripting.calls.last?.args.first as? Int == -1)
+    }
+
     @Test func fileCursorComesFromTheScriptAndDrivesThePill() async {
         let (s, _, scripting, _) = await make(mine: [pr7])
         s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))

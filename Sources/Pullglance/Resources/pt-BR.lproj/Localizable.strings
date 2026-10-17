@@ -454,8 +454,8 @@
 "act on it" = "agem nela";
 "Welcome…" = "Boas-vindas…";
 "%lld left" = "faltam %lld";
-"Previous unviewed file" = "Arquivo não visto anterior";
-"Next unviewed file" = "Próximo arquivo não visto";
+"Previous unviewed file (⌘↑)" = "Arquivo não visto anterior (⌘↑)";
+"Next unviewed file (⌘↓)" = "Próximo arquivo não visto (⌘↓)";
 "Capture now" = "Capturar agora";
 "Review Desk picture" = "Foto do Review Desk";
 "A picture of the page and a summary of its structure, into the log folder. Also ⇧⌘P in the window." = "Uma imagem da página e um resumo da estrutura dela, na pasta do log. Também ⇧⌘P na janela.";

@@ -596,8 +596,8 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     @objc func nextFile() { if session.showsFilePill { Task { await session.stepFile(1) } } }
     @objc func previousFile() { if session.showsFilePill { Task { await session.stepFile(-1) } } }
     @objc func undoMarking() { if session.page.showsBar { Task { await session.undo() } } }
-    @objc func nextUnviewed() { if session.page.showsBar { Task { await session.scroll(.next) } } }
-    @objc func previousUnviewed() { if session.page.showsBar { Task { await session.scroll(.previous) } } }
+    @objc func nextUnviewed() { if session.page.showsBar { Task { await session.stepUnviewed(1) } } }
+    @objc func previousUnviewed() { if session.page.showsBar { Task { await session.stepUnviewed(-1) } } }
     @objc func refreshReview() { if session.page.showsBar { Task { await session.refresh() } } }
     @objc func toggleReviewBar() { session.isBarHidden.toggle() }
 

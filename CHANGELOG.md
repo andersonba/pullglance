@@ -9,6 +9,9 @@ publishes it as the release notes.
 ### Added
 - In the Review Desk, files you mark as viewed leave the file tree sidebar, and a folder goes with its last file, so the tree shows what is left to review; once everything is viewed the tree shows all files again. Works in both of GitHub's Files experiences. An eye button next to the progress turns it off, and the choice is remembered.
 
+### Fixed
+- In the Review Desk's file pill, the arrows show their tooltips again, with the keys: `⌘↑`/`⌘↓` go to the previous or next unviewed file and, once every file is viewed, walk every file, the same as the arrows. Before, the keys did nothing once everything was viewed.
+
 ### Changed
 - The review window is now the Review Desk, in Settings, the shortcuts card and the triage hints; "Review" stays as the name of its menu, which holds the review actions.
 
