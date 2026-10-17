@@ -6,6 +6,9 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+### Changed
+- The pull request number in a row is easier to find: semibold, in the accent color, with tabular digits, still next to the repository name.
+
 ## [0.4.0] - 2026-10-17
 
 ### Added

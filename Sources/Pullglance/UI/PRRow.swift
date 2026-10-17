@@ -50,7 +50,8 @@ struct PRRow: View {
                         } else {
                             Text(verbatim: pr.repoName)
                         }
-                        Text(verbatim: " #\(pr.number)")
+                        // The number carries weight and the accent: the one thing on the line people quote and search for.
+                        Text(verbatim: " ") + Text(verbatim: "#\(pr.number)").fontWeight(.semibold).monospacedDigit().foregroundStyle(Color.accentColor)
                     }
                     if showAuthor { Text(verbatim: "· \(pr.author)") }
                     if let teamLabel { Text(verbatim: "· \(teamLabel)").foregroundStyle(.purple) }
