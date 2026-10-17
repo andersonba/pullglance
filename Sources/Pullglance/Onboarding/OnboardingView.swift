@@ -1,4 +1,5 @@
 import AppKit
+import KeyboardShortcuts
 import SwiftUI
 
 /// Which step is showing. Owned by the window controller so ← → and Esc can drive it from AppKit; the
@@ -104,6 +105,11 @@ struct OnboardingView: View {
         case .requirements: requirements
         case .badgeAndTabs: if active { BadgeAndTabsAnimation().frame(height: 120) } else { Color.clear.frame(height: 120) }
         case .rowActions: if active { RowActionsAnimation().frame(height: 120) } else { Color.clear.frame(height: 120) }
+        case .hotkey:
+            requirementRow(symbol: "keyboard", tint: .blue, title: Text("Open the popover", bundle: .app),
+                           detail: Text("From any app. Click to change; ⌫ removes it.", bundle: .app)) {
+                KeyboardShortcuts.Recorder(for: .togglePopover) { EmptyView() }.controlSize(.small)
+            }
         case .notifications:
             requirementRow(symbol: "bell.badge", tint: .orange, title: Text("Notify when a snooze ends", bundle: .app),
                            detail: Text("Optional. macOS asks once; you can change it in Settings later.", bundle: .app)) {

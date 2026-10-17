@@ -11,6 +11,8 @@ publishes it as the release notes.
 
 - Settings › Review Desk has a choice for where a pull request opens: Files (the diff, at the first file still to review), Conversation, or By list, the rule that was implicit until now (My PRs on the conversation, To review on the diff). It applies to a click, to `↩`, and to the browser when the Desk is off. The test presets and the custom globs moved behind a Choose… button, with a one-line summary in their place, so the tab fits without scrolling.
 
+- The welcome window has a step for the global shortcut, with the recorder right there, and mentions `J` next to `↓`.
+
 ### Fixed
 - In the Review Desk's file pill, the arrows show their tooltips again, with the keys: `⌘↑`/`⌘↓` go to the previous or next unviewed file and, once every file is viewed, walk every file, the same as the arrows. Before, the keys did nothing once everything was viewed.
 

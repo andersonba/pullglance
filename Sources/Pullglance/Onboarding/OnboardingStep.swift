@@ -21,6 +21,8 @@ struct OnboardingStep: Identifiable, Equatable, Sendable {
         case badgeAndTabs
         /// The drawn row sliding open and taking the keyboard focus.
         case rowActions
+        /// The global shortcut's recorder, ⌥⌘P unless changed.
+        case hotkey
         /// The "notify when a snooze ends" toggle.
         case notifications
     }
@@ -48,8 +50,12 @@ struct OnboardingStep: Identifiable, Equatable, Sendable {
                        content: .badgeAndTabs, button: "Continue"),
         OnboardingStep(id: "actions", pose: .neutral,
                        title: "Act from the row",
-                       text: "Swipe a row for Pin, Snooze and Comment. Press ↓ to drive the list from the keyboard, ⌘/ shows every key. The same keys work on the row under the pointer. Right-click the icon up there for the menu.",
+                       text: "Swipe a row for Pin, Snooze and Comment. Press ↓ or J to drive the list from the keyboard, ⌘/ shows every key. The same keys work on the row under the pointer. Right-click the icon up there for the menu.",
                        content: .rowActions, button: "Continue"),
+        OnboardingStep(id: "hotkey", pose: .glance,
+                       title: "Open it from anywhere",
+                       text: "⌥⌘P opens and closes the popover whichever app is in front, with the icon lit as for a click. Record another shortcut here, or later in Settings › General.",
+                       content: .hotkey, button: "Continue"),
         OnboardingStep(id: "snooze", pose: .pointing,
                        title: "Snooze what can wait",
                        text: "Snooze puts a row to sleep until something happens on it, or for a length you choose. When a timed snooze ends, the row comes back marked and the icon gets a dot. That's it: the icon is next to the clock, with a dot right now so you can find it.",

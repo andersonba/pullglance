@@ -3,13 +3,16 @@ import Testing
 @testable import Pullglance
 
 @Suite struct OnboardingStepTests {
-    @Test func fiveStepsInTheAgreedOrder() {
+    @Test func sixStepsInTheAgreedOrder() {
         let steps = OnboardingStep.all
-        #expect(steps.count == 5)
-        #expect(Set(steps.map(\.id)).count == 5)
+        #expect(steps.count == 6)
+        #expect(Set(steps.map(\.id)).count == 6)
         #expect(steps[1].content == .requirements)
         #expect(steps.filter { $0.content == .requirements }.count == 1)
         #expect(steps.filter { $0.content == .notifications }.count == 1)
+        // The shortcut comes after the keys inside the popover and before the send-off.
+        #expect(OnboardingStep.index(of: "hotkey") == 4)
+        #expect(steps[4].content == .hotkey)
         #expect(steps.last?.content == .notifications)
         #expect(steps[1].pose == .waiting)
         #expect(steps.last?.pose == .pointing)
