@@ -223,6 +223,51 @@ import Testing
         #expect(store.badgeRoll == nil, "turned off")
     }
 
+    /// Two numbers: a change in the second one alone rolls too, in its own direction. The first number
+    /// standing still is not "nothing changed".
+    @Test func dualBadgeRollsWhenOnlyTheSecondNumberChanges() async throws {
+        let gh = try await happyGH()
+        let store = PRStore(client: gh, defaults: testDefaults(), now: { Date() }, badgeRollDuration: .milliseconds(60))
+        store.badgeMode = .dual
+        await store.refresh()
+        #expect(store.badgeRoll == nil, "first load")
+        let first = try #require(store.badgeCount)
+        let second = try #require(store.badgeSecondCount)
+        // A new review request lands in the second number (`defaultDualSecond`) and leaves the first alone.
+        let direct = try JSONSerialization.jsonObject(with: try fixture("search-direct.json")) as! [String: Any]
+        var data = direct["data"] as! [String: Any]
+        var search = data["search"] as! [String: Any]
+        var nodes = search["nodes"] as! [Any]
+        nodes.append(try JSONSerialization.jsonObject(with: Data(node(number: 9, ci: "SUCCESS", author: "alice").utf8)))
+        search["nodes"] = nodes; data["search"] = search
+        await gh.set(.success(try JSONSerialization.data(withJSONObject: ["data": data])), for: SearchQuery.direct)
+        await store.refresh()
+        #expect(store.badgeCount == first && store.badgeSecondCount == second + 1)
+        let roll = try #require(store.badgeRoll)
+        #expect(roll.from == "\(first) · \(second)" && roll.to == "\(first) · \(second + 1)" && roll.up)
+        _ = await waitUntil { store.badgeRoll == nil }
+        // Back down: the same row gone again rolls the other way.
+        await gh.set(.success(try fixture("search-direct.json")), for: SearchQuery.direct)
+        await store.refresh()
+        let back = try #require(store.badgeRoll)
+        #expect(back.from == "\(first) · \(second + 1)" && back.to == "\(first) · \(second)" && !back.up)
+    }
+
+    /// Settings' Preview with two numbers and nothing in the first: it steps the second one, the one that
+    /// can go one lower, so there is something to see.
+    @Test func dualBadgePreviewRollsTheNumberThatCanStepDown() async throws {
+        let store = PRStore(client: try await happyGH(), defaults: testDefaults(), now: { Date() }, badgeRollDuration: .milliseconds(60))
+        store.badgeMode = .dual
+        await store.refresh()
+        for section in PRStore.defaultDualFirst { store.setBadgeSlot(nil, for: section) }
+        #expect(store.badgeCount == 0)
+        let second = try #require(store.badgeSecondCount)
+        #expect(second > 0)
+        store.previewBadgeRoll()
+        let roll = try #require(store.badgeRoll)
+        #expect(roll.from == "0 · \(second - 1)" && roll.to == store.badgeText && roll.up)
+    }
+
     @Test func sectionPreferencesDefaultAndPersist() async throws {
         let defaults = testDefaults()
         let store = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })

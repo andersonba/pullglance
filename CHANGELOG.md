@@ -9,6 +9,9 @@ publishes it as the release notes.
 ### Added
 - In the popover, Vim's `H J K L` do what the arrows do: `J`/`K` move the focus through the rows (and `J` starts it), `H`/`L` switch tabs. `F` opens the repository/author filter with its search field ready to type. With a row focused, `space` opens its menu, the same one a right-click shows.
 
+### Fixed
+- With two numbers in the menu bar, the odometer roll now plays when only the second number changes, and in that number's direction; before, only a change in the first one rolled. Settings › General › Preview also rolls when the first number is 0, by stepping the second.
+
 ### Security
 - Update offers and their release notes must now carry a valid EdDSA signature, and downloaded updates are verified before extraction. Release checks also reject incorrect update metadata and accidental signing-key changes.
 

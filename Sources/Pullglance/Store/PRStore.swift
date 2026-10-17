@@ -1338,6 +1338,7 @@ final class PRStore {
     /// one that comes from a setting or the first load does not.
     private func recomputeBadge(source: BadgeChangeSource = .settings, firstValue: Int? = nil) {
         let previous = badgeCount
+        let previousSecond = badgeSecondCount
         let previousText = badgeText
         if badgeCount == nil, let firstValue { badgeCount = firstValue }
         guard badgeCount != nil else { return }
@@ -1347,16 +1348,22 @@ final class PRStore {
         let counted = countedSections
         badgeCount = count(counted.first)
         badgeSecondCount = counted.second.map(count)
-        guard source == .data, rollsBadge, let previous, let now = badgeCount, now != previous,
+        // Either number moving is news; the direction follows the first one when it moved, else the second.
+        guard source == .data, rollsBadge, let previous, let now = badgeCount,
               let previousText, let text = badgeText, previousText != text else { return }
-        roll(from: previousText, to: text, up: now > previous)
+        let up = now != previous ? now > previous : (badgeSecondCount ?? 0) > (previousSecond ?? 0)
+        roll(from: previousText, to: text, up: up)
     }
 
-    /// Settings › General "Preview": one step up from one less, so the roll can be seen on demand.
+    /// Settings › General "Preview": one step up from one less, so the roll can be seen on demand. With two
+    /// numbers, the first steps when it can, else the second, so a zero in front does not hide the roll.
     func previewBadgeRoll() {
         guard let count = badgeCount else { return }
-        let before = Pullglance.badgeText(first: max(count - 1, 0), second: badgeSecondCount, mode: badgeMode) ?? "0"
-        roll(from: before, to: badgeText ?? "1", up: true)
+        let second = badgeSecondCount
+        let before = count > 0
+            ? Pullglance.badgeText(first: count - 1, second: second, mode: badgeMode)
+            : Pullglance.badgeText(first: count, second: second.map { max($0 - 1, 0) }, mode: badgeMode)
+        roll(from: before ?? "0", to: badgeText ?? "1", up: true)
     }
 
     /// Steps `badgeRoll.progress` from 0 to 1 with an ease-out, a dozen frames; each frame redraws the label.
