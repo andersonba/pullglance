@@ -3,14 +3,20 @@ import AppKit
 /// MenuBarExtra offers no API to close its window, and closing it ourselves left the extra's bookkeeping
 /// behind: on macOS 26 the status item is shown "active" by a replicant the system draws over it, and that
 /// stayed until a real click elsewhere reached the extra's global event monitor, so the popover took two
-/// clicks to come back. The extra does close on Esc, through its own path, and a key event posted to our
-/// own window is delivered like a typed one. So dismissing is typing Esc at the popover.
+/// clicks to come back. Dismissing goes through `PopoverPresenter`, whose binding cancels the extra's session
+/// the way SwiftUI itself does. The Esc below is the older route, kept for a popover the presenter does not
+/// know to be up: the extra closes on a typed Esc, and a key event posted to our own window is delivered like
+/// one. It only works for a popover the system opened on a click.
 @MainActor
 enum PopoverDismissal {
     private static var escapePostedAt: Date?
 
     static func dismiss() {
         guard let key = NSApp.keyWindow, key.className.contains("MenuBarExtraWindow") else { return }
+        if PopoverPresenter.shared.isPresented {
+            PopoverPresenter.shared.isPresented = false
+            return
+        }
         escapePostedAt = Date()
         for type in [NSEvent.EventType.keyDown, .keyUp] {
             if let event = NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,

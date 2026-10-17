@@ -20,9 +20,12 @@ Everything reaches GitHub through the user's own `gh`. `docs/how-it-works.md` ex
   so cutting a release needs it plugged in. A rehearsal against a local feed uses the `PULLGLANCE_REHEARSAL_*`
   variables of `make-app.sh` and a throwaway key through `make-appcast.sh --key-file`.
 - The app log is `~/Library/Logs/Pullglance/pullglance.log` (`AppLog`); Settings › Advanced exports diagnostics.
-- The MenuBarExtra popover opens only on a real click. Synthetic events, `performClick` and osascript do not
-  open it (Accessibility is not granted to the terminal), so anything that needs the popover open needs the
-  user's click; instrument with `AppLog` and read the log instead.
+- The MenuBarExtra popover opens on a real click or on the global shortcut (⌥⌘P, `PopoverHotKey`), which
+  goes through `PopoverPresenter` and the MenuBarExtraAccess package: on macOS 27 the window belongs to a
+  session of the system's menu bar host, `performClick` does nothing, and the icon lights only for sessions
+  the host begins, so the hotkey asks the host first. From a terminal nothing opens it (synthetic events and
+  osascript need Accessibility, not granted), so anything that needs the popover open needs the user; instrument
+  with `AppLog` and read the log instead.
 
 ## Checks before claiming anything works
 

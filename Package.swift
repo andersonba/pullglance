@@ -8,11 +8,13 @@ let package = Package(
     dependencies: [
         // In-app updates. A binary xcframework; Scripts/make-app.sh embeds it in the bundle and re-signs it.
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.10.0"),
+        // Opens and closes the MenuBarExtra window from code (the global hotkey); SwiftUI has no API for it.
+        .package(url: "https://github.com/orchetect/MenuBarExtraAccess", from: "1.3.1"),
     ],
     targets: [
         .executableTarget(
             name: "Pullglance",
-            dependencies: [.product(name: "Sparkle", package: "Sparkle")],
+            dependencies: [.product(name: "Sparkle", package: "Sparkle"), .product(name: "MenuBarExtraAccess", package: "MenuBarExtraAccess")],
             path: "Sources/Pullglance",
             resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)],

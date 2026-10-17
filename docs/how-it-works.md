@@ -60,7 +60,7 @@ Swipe a row to the left, right-click it, or focus it with the keyboard:
 
 ## Keyboard
 
-With the popover open, `↓` (or `J`) focuses the first row; `↑↓` move, `←→` switch tabs, and Vim's `H J K L` do the same as the arrows, `F` opens the repository/author filter with its search ready, `↩` opens the review window, `P` pins, `S` snoozes, `O` opens on GitHub, `R` refreshes, `C` comments, `M` merges where offered, `⌘C` copies the link, `esc` leaves. With the pointer on a row and no focus, `↩` and `⌘C` act on that row and `space` makes it the focus; with a focus, `space` opens the focused row's menu, the same one a right-click shows. `0`–`9` pick the quick filter chips. `⌘/` opens the full list of shortcuts, including the review window's.
+`⌥⌘P` opens and closes the popover from any app. With the popover open, `↓` (or `J`) focuses the first row; `↑↓` move, `←→` switch tabs, and Vim's `H J K L` do the same as the arrows, `F` opens the repository/author filter with its search ready, `↩` opens the review window, `P` pins, `S` snoozes, `O` opens on GitHub, `R` refreshes, `C` comments, `M` merges where offered, `⌘C` copies the link, `esc` leaves. With the pointer on a row and no focus, `↩` and `⌘C` act on that row and `space` makes it the focus; with a focus, `space` opens the focused row's menu, the same one a right-click shows. `0`–`9` pick the quick filter chips. `⌘/` opens the full list of shortcuts, including the review window's.
 
 ## Filters
 

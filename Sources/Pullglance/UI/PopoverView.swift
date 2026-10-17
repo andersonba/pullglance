@@ -374,7 +374,9 @@ struct PopoverView: View {
             }
             return true
         case .escape:
-            guard focus.id != nil else { return false }
+            // Without a focus, Esc closes the popover, through the presenter: a popover the library opened
+            // has no system session behind it to answer the key, which would only beep.
+            guard focus.id != nil else { PopoverDismissal.dismiss(); return true }
             focus.clear()
             return true
         case .shortcuts:

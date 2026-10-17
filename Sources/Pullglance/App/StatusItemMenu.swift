@@ -16,6 +16,8 @@ final class StatusItemMenu: NSObject {
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown, .leftMouseDown]) { [weak self] event in
             guard let self, self.isSecondaryClick(event), let button = self.statusButton(in: event.window) else { return event }
             PopoverDismissal.dismiss()
+            // The icon stays unlit while this menu is up: on macOS 27 the system draws the item and lights
+            // it only for sessions of its own; `button.highlight` from here changes nothing visible.
             self.menu().popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.maxY + 4), in: button)
             return nil
         }

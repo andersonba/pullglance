@@ -8,6 +8,7 @@ publishes it as the release notes.
 
 ### Added
 - In the popover, Vim's `H J K L` do what the arrows do: `J`/`K` move the focus through the rows (and `J` starts it), `H`/`L` switch tabs. `F` opens the repository/author filter with its search field ready to type. With a row focused, `space` opens its menu, the same one a right-click shows.
+- `⌥⌘P` opens and closes the popover from any app, with the menu bar icon lit as for a click. The shortcut is fixed for now.
 
 ### Fixed
 - With two numbers in the menu bar, the odometer roll now plays when only the second number changes, and in that number's direction; before, only a change in the first one rolled. Settings › General › Preview also rolls when the first number is 0, by stepping the second.

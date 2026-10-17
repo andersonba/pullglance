@@ -1,8 +1,11 @@
+import MenuBarExtraAccess
 import SwiftUI
 
 @main
 struct PullglanceApp: App {
     @State private var store: PRStore
+    /// The popover's presentation, for the global hotkey; a click on the icon keeps working on its own.
+    @State private var popover = PopoverPresenter.shared
     private let snapshot: SnapshotOptions?
     /// Kept for the life of the app: it owns the right-click monitor.
     @State private var statusItemMenu: StatusItemMenu?
@@ -45,6 +48,7 @@ struct PullglanceApp: App {
             // After the menu bar item exists, so the window can be placed and the dot has an icon to land on.
             DispatchQueue.main.async { OnboardingWindowController.showIfDue() }
             _statusItemMenu = State(initialValue: StatusItemMenu(store: store, updates: updates))
+            PopoverHotKey.install()
         }
         Task { await AvatarCache.shared.pruneDisk() }
     }
@@ -57,6 +61,7 @@ struct PullglanceApp: App {
             MenuBarLabel(text: store.badgeText, hasData: store.badgeCount != nil, isError: store.lastError != nil, roll: store.badgeRoll, showsWokeDot: store.hasUnseenWoke)
                 .help(Text(verbatim: store.badgeDescription ?? ""))
         }
+        .menuBarExtraAccess(isPresented: $popover.isPresented) { item in popover.statusItem = item }
         .menuBarExtraStyle(.window)
 
         .commands { ReviewCommands() }
