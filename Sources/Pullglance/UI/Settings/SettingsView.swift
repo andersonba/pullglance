@@ -1,4 +1,5 @@
 import AppKit
+import KeyboardShortcuts
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -21,9 +22,17 @@ final class SettingsSelection {
 /// Brings the Settings window to the front from a menu bar app, which is otherwise never active.
 @MainActor
 enum SettingsOpener {
+    /// Closes the popover and activates the app a moment later: when the popover's session ends, the system
+    /// hands the focus back to the app that had it, and an activation issued before that is undone.
+    /// Nothing here touches the popover's window while it is up: taking the key from it as it appears made
+    /// `MenuBarExtraAccess` re-present it in a loop that pinned the main thread.
     static func activate() {
         PopoverDismissal.dismiss()
-        NSApp.activate(ignoringOtherApps: true)
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(200))
+            NSApp.activate(ignoringOtherApps: true)
+            settingsWindow?.makeKeyAndOrderFront(nil)
+        }
     }
 
     static let languagePane = URL(string: "x-apple.systempreferences:com.apple.Localization-Settings.extension")!
@@ -34,11 +43,6 @@ enum SettingsOpener {
     }
 
     /// Clicking the menu bar icon while Settings is open (likely buried) brings the window back.
-    static func bringSettingsForwardIfOpen() {
-        guard let window = settingsWindow, window.isVisible else { return }
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
-    }
 }
 
 struct SettingsView: View {
@@ -68,6 +72,8 @@ struct SettingsView: View {
                 .tag(SettingsTab.advanced)
         }
         .frame(width: 520)
+        // ⌘, from the popover opens the window through SwiftUI's own command: bring it forward all the same.
+        .onAppear { SettingsOpener.activate() }
         .onChange(of: review.settings.windowEnabled) { _, on in
             if !on, selection.tab == .review { selection.tab = .advanced }
         }
@@ -109,6 +115,13 @@ struct GeneralSettingsView: View {
                     }
                 } label: {
                     Text("Roll the number when it changes", bundle: .app)
+                }
+                KeyboardShortcuts.Recorder(for: .togglePopover) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Open the popover", bundle: .app)
+                        Text("From any app. Click to change; ⌫ removes it.", bundle: .app)
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
                 }
                 Toggle(isOn: $store.notifiesSnoozeEnd) {
                     VStack(alignment: .leading, spacing: 2) {

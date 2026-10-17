@@ -136,7 +136,7 @@ struct ShortcutsCard: View {
                     .help(Text("Exit", bundle: .app))
             }
             group(Text("Popover", bundle: .app)) {
-                line(Text("Open from any app", bundle: .app), ["⌥⌘P"])
+                if let hotkey = PopoverHotKey.current { line(Text("Open from any app", bundle: .app), [hotkey]) }
                 line(Text("Refresh", bundle: .app), ["⌘R"])
                 line(Text("Quick filters", bundle: .app), ["0", "–", "9"])
                 line(Text("Switch tab", bundle: .app), ["←", "→", "H", "L"])

@@ -31,7 +31,12 @@ echo "==> assembling $OUT"
 rm -rf "$OUT"
 mkdir -p "$OUT/Contents/MacOS" "$OUT/Contents/Resources"
 cp "$RELEASE/$APP_NAME" "$OUT/Contents/MacOS/$APP_NAME"
-cp -R "$RELEASE/${APP_NAME}_${APP_NAME}.bundle" "$OUT/Contents/Resources/"
+# Resource bundles: the app's own and those of packages that look themselves up with `Bundle.module`
+# (KeyboardShortcuts' localizations), which crash when theirs is missing next to the executable or here.
+for bundle in "$RELEASE"/*_*.bundle; do
+  case "$bundle" in *Tests.bundle) continue ;; esac
+  cp -R "$bundle" "$OUT/Contents/Resources/"
+done
 
 echo "==> Sparkle.framework"
 mkdir -p "$OUT/Contents/Frameworks"

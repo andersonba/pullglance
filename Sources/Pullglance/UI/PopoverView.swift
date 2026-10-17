@@ -169,7 +169,6 @@ struct PopoverView: View {
         .frame(width: 380)
         .animation(.easeInOut(duration: 0.15), value: focus.id != nil)
         .onAppear {
-            SettingsOpener.bringSettingsForwardIfOpen()
             store.startCIPolling()
             store.popoverDidOpen()
         }

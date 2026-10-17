@@ -100,6 +100,8 @@
 /* Footer & Diagnostics */
 "Updated now" = "Updated now";
 "Refresh in %@" = "Refresh in %@";
+"Open the popover" = "Open the popover";
+"From any app. Click to change; ⌫ removes it." = "From any app. Click to change; ⌫ removes it.";
 "Open from any app" = "Open from any app";
 "Refresh" = "Refresh";
 "Refresh failed: %@" = "Refresh failed: %@";

@@ -1,5 +1,5 @@
 import AppKit
-import Carbon.HIToolbox
+import KeyboardShortcuts
 import Observation
 
 /// The popover's presentation as seen from outside SwiftUI. `MenuBarExtraAccess` binds `isPresented` to the
@@ -8,10 +8,28 @@ import Observation
 @MainActor @Observable
 final class PopoverPresenter {
     static let shared = PopoverPresenter()
-    var isPresented = false
+    var isPresented = false {
+        didSet {
+            guard isPresented, !oldValue else { return }
+            // A breaker for a presentation that feeds on itself: the library re-presents a window that loses
+            // the key as soon as it appears, each time the binding flips back to true, and the main thread
+            // never comes up for air. Nobody opens the popover ten times in two seconds on purpose.
+            let now = Date()
+            openings.removeAll { now.timeIntervalSince($0) > Self.burstWindow }
+            openings.append(now)
+            if openings.count > Self.burstLimit {
+                AppLog.shared.info("popover: \(openings.count) openings in \(Int(Self.burstWindow)) s, refusing this one")
+                openings.removeAll()
+                isPresented = false
+            }
+        }
+    }
     /// The extra's status item, handed over by `menuBarExtraAccess`.
     var statusItem: NSStatusItem?
     private var lastToggle = Date.distantPast
+    private var openings: [Date] = []
+    static let burstLimit = 9
+    static let burstWindow: TimeInterval = 2
 
     func toggle() {
         // One press, one toggle: the Carbon handler has been seen firing several times per press.
@@ -47,21 +65,19 @@ final class PopoverPresenter {
     }
 }
 
-/// The system-wide shortcut that opens and closes the popover from any app: ⌥⌘P for now. Carbon's hot keys
-/// need no Accessibility grant and are delivered whichever app is in front.
+/// The system-wide shortcut that opens and closes the popover from any app: ⌥⌘P unless the user records
+/// another one in Settings › General. KeyboardShortcuts keeps the choice in the defaults and registers the hot
+/// key (Carbon: no Accessibility grant, delivered whichever app is in front).
 @MainActor
 enum PopoverHotKey {
-    private static var reference: EventHotKeyRef?
-    private static var handler: EventHandlerRef?
-
     static func install() {
-        var type = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
-            Task { @MainActor in PopoverPresenter.shared.toggle() }
-            return noErr
-        }, 1, &type, nil, &handler)
-        let id = EventHotKeyID(signature: OSType(0x5047_4C4E), id: 1)  // "PGLN"
-        let status = RegisterEventHotKey(UInt32(kVK_ANSI_P), UInt32(optionKey | cmdKey), id, GetApplicationEventTarget(), 0, &reference)
-        if status != noErr { AppLog.shared.info("hotkey: ⌥⌘P not registered, status \(status)") }
+        KeyboardShortcuts.onKeyDown(for: .togglePopover) { PopoverPresenter.shared.toggle() }
     }
+
+    /// The shortcut as the cards print it ("⌥⌘P"), nil when the user removed it.
+    static var current: String? { KeyboardShortcuts.getShortcut(for: .togglePopover)?.description }
+}
+
+extension KeyboardShortcuts.Name {
+    static let togglePopover = Self("togglePopover", initial: .init(.p, modifiers: [.option, .command]))
 }

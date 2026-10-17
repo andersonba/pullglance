@@ -10,11 +10,13 @@ let package = Package(
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.10.0"),
         // Opens and closes the MenuBarExtra window from code (the global hotkey); SwiftUI has no API for it.
         .package(url: "https://github.com/orchetect/MenuBarExtraAccess", from: "1.3.1"),
+        // The user-chosen global shortcut: a recorder for Settings and the hot key behind it (Carbon, no permissions).
+        .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "3.1.0"),
     ],
     targets: [
         .executableTarget(
             name: "Pullglance",
-            dependencies: [.product(name: "Sparkle", package: "Sparkle"), .product(name: "MenuBarExtraAccess", package: "MenuBarExtraAccess")],
+            dependencies: [.product(name: "Sparkle", package: "Sparkle"), .product(name: "MenuBarExtraAccess", package: "MenuBarExtraAccess"), .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts")],
             path: "Sources/Pullglance",
             resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)],
