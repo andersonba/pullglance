@@ -1,4 +1,5 @@
 import { DIFF_BODY, EMBEDDED_SCRIPT_OPEN, FILE_HEADER, LARGE_DIFF_BODY, TOOLBAR, VIEWED_BUTTON_ARIA, VIEWED_BUTTON_CSS_ONLY } from './fragments'
+import { primerTreeHtml } from './tree'
 
 /**
  * `largeDiff`: GitHub's "Large diffs are not rendered by default." placeholder instead of the diff body.
@@ -14,6 +15,8 @@ export interface FixtureOptions {
   simulateToggle?: boolean
   /** Wraps each file in a `#diff-<digest>` container, as the live new Files UI does. */
   containers?: boolean
+  /** The file tree sidebar (Primer TreeView), as the live new Files UI renders it. */
+  tree?: boolean
 }
 
 export function digestOf(path: string): string {
@@ -86,7 +89,7 @@ export function buildFilesPageHtml(options: FixtureOptions): string {
   else if (opts.variant !== 'no-embedded') embedded = `${EMBEDDED_SCRIPT_OPEN}${JSON.stringify(embeddedJson(opts)).replace(/</g, '\\u003c')}</script>`
   return `<!doctype html><html><head><title>PR de teste by acme · Pull Request #42 · acme/web</title></head><body class="logged-in">
 <react-app app-name="repo" initial-path="${opts.basePath}/files">${embedded}
-<div data-target="react-app.reactRoot">${toolbar}<div id="diff-content-parent">${headers}</div></div></react-app></body></html>`
+<div data-target="react-app.reactRoot">${toolbar}${opts.tree ? primerTreeHtml(opts.files) : ''}<div id="diff-content-parent">${headers}</div></div></react-app></body></html>`
 }
 
 const installedDocuments = new WeakSet<Document>()

@@ -1,7 +1,7 @@
 import { AbortedInFlight, type HostAdapter } from '@/core/host'
 import type { ChangedFile, FileListing, PageContext, SetViewedOutcome } from '@/core/model'
 import { fetchServerRoute, postFileReview, type FetchLike } from './api'
-import type { StrategyRegistry } from './page/concepts'
+import { UnsupportedPage, type FileTreeSource, type StrategyRegistry } from './page/concepts'
 import type { Diagnostics } from './page/diagnostics'
 import { basePathOf, isFilesPagePath, pageKindOf, readContext, type PageKind } from './page/location'
 import { hasFetchedRoute, routeFor, storeFetchedRoute } from './page/route-source'
@@ -23,7 +23,7 @@ export interface GitHubAdapterDeps {
 }
 export interface GitHubAdapterConfig { rememberCompare: boolean }
 export interface ToolbarSlot { el: Element; placement: 'first' | 'last' | 'after'; hostFlag?: string }
-export interface GitHubAdapter extends HostAdapter { resolver: PageResolver; isFilesPage(): boolean; pageKind(): PageKind | null; diagnostics(): Diagnostics; toolbarSlot(): ToolbarSlot | null; configure(c: Partial<GitHubAdapterConfig>): void; flushMemory(): Promise<void> }
+export interface GitHubAdapter extends HostAdapter { resolver: PageResolver; isFilesPage(): boolean; pageKind(): PageKind | null; diagnostics(): Diagnostics; toolbarSlot(): ToolbarSlot | null; fileTree(): FileTreeSource | null; configure(c: Partial<GitHubAdapterConfig>): void; flushMemory(): Promise<void> }
 
 export function createGitHubAdapter(deps: GitHubAdapterDeps = {}): GitHubAdapter {
   const doc = deps.doc ?? document
@@ -206,6 +206,20 @@ export function createGitHubAdapter(deps: GitHubAdapterDeps = {}): GitHubAdapter
     loadAll,
     onContextChange,
     diagnostics: () => resolver.diagnostics(),
+    /**
+     * The file tree sidebar, or null on a page without one. A tree GitHub rebuilt (a navigation inside the
+     * page, a switch of UI) may leave the chosen strategy pointing at nothing: then the choice is forgotten
+     * and made again, once.
+     */
+    fileTree: () => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        let source: FileTreeSource
+        try { source = resolver.fileTree() } catch (e) { if (e instanceof UnsupportedPage) return null; throw e }
+        if (source.root()) return source
+        resolver.invalidateConcept('fileTree')
+      }
+      return null
+    },
     configure: (c) => { Object.assign(config, c) },
     flushMemory: () => memory?.flush() ?? Promise.resolve(),
     toolbarSlot: () => {

@@ -10,6 +10,8 @@ export interface Settings {
   verify: boolean
   rememberCompare: boolean
   loadBeforeMark: boolean
+  /** Viewed files leave the file tree sidebar (the bar's toggle). */
+  treeHidesViewed: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -21,6 +23,7 @@ export const DEFAULT_SETTINGS: Settings = {
   verify: true,
   rememberCompare: true,
   loadBeforeMark: true,
+  treeHidesViewed: true,
 }
 
 export function normalize(raw: Partial<Settings> | null | undefined): Settings {
@@ -33,6 +36,7 @@ export function normalize(raw: Partial<Settings> | null | undefined): Settings {
     verify: raw?.verify ?? DEFAULT_SETTINGS.verify,
     rememberCompare: typeof raw?.rememberCompare === 'boolean' ? raw.rememberCompare : DEFAULT_SETTINGS.rememberCompare,
     loadBeforeMark: typeof raw?.loadBeforeMark === 'boolean' ? raw.loadBeforeMark : DEFAULT_SETTINGS.loadBeforeMark,
+    treeHidesViewed: typeof raw?.treeHidesViewed === 'boolean' ? raw.treeHidesViewed : DEFAULT_SETTINGS.treeHidesViewed,
   }
 }
 

@@ -1,4 +1,5 @@
 import { digestOf } from './build'
+import { classicTreeHtml } from './tree'
 
 /**
  * Fixture da página de compare (UI clássica, Rails). Fragmentos copiados de um compare público em 2026-10-09:
@@ -15,6 +16,8 @@ export interface CompareOptions {
   simulateToggle?: boolean  // default true
   /** A página clássica de arquivos do PR: o GitHub põe o checkbox "Viewed" nativo em `.file-actions`. */
   nativeViewed?: boolean
+  /** A árvore lateral da página clássica de arquivos do PR (`<file-tree>`); compare ao vivo não tem. */
+  tree?: boolean
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
@@ -57,6 +60,7 @@ export function buildComparePageHtml(opts: CompareOptions): string {
     <div class="toc-diff-stats">Showing <strong>${opts.files.length} changed files</strong> with <strong>10 additions</strong> and <strong>2 deletions</strong>.</div>
   </div>
   <div id="files_bucket" class="files-bucket">
+    ${opts.tree ? `<diff-layout><div class="Layout-sidebar">${classicTreeHtml(opts.files)}</div></diff-layout>` : ''}
     <div id="files" class="diff-view js-diff-container">${opts.files.map((f) => fileHtml(f, opts.nativeViewed === true)).join('\n')}${pending}</div>
   </div>
 </div></body></html>`

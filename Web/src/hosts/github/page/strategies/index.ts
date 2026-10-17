@@ -4,6 +4,8 @@ import { fileHeaderClassic } from './file-header/classic-header'
 import { fileListClassic } from './file-list/classic-files'
 import { fileListPageRoute } from './file-list/embedded-json'
 import { fileListRenderedHeaders } from './file-list/rendered-headers'
+import { fileTreeClassic } from './file-tree/classic-file-tree'
+import { fileTreePrimer } from './file-tree/primer-tree-view'
 import { toolbarSlotClassicToc } from './toolbar-slot/classic-toc'
 import { toolbarSlotFilesToolbar } from './toolbar-slot/files-toolbar'
 import { toolbarSlotFloating } from './toolbar-slot/floating'
@@ -19,5 +21,6 @@ export function defaultRegistry(): StrategyRegistry {
     fileHeader: [fileHeaderAriaLink, fileHeaderClassic],
     viewedControl: [viewedControlAria, viewedControlClassicCheckbox, viewedControlClassicButton, viewedControlClassicCollapse, viewedControlCssModule],
     toolbarSlot: [toolbarSlotFilesToolbar, toolbarSlotClassicToc, toolbarSlotFloating],
+    fileTree: [fileTreePrimer, fileTreeClassic],
   }
 }

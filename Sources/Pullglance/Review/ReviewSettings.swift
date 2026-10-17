@@ -36,6 +36,8 @@ struct ReviewSettings: Codable, Equatable, Sendable {
     var filePill: FilePillPosition = .bottom
     /// The review window is a beta: off, rows open on GitHub in the browser as they always did.
     var windowEnabled: Bool = false
+    /// Viewed files leave the page's file tree, so the tree shows what is left; the bar toggles it.
+    var treeHidesViewed: Bool = true
 
     static let `default` = ReviewSettings(
         presets: Dictionary(uniqueKeysWithValues: ReviewPresets.all.map { ($0.id, $0.enabled) }),
@@ -62,6 +64,7 @@ struct ReviewSettings: Codable, Equatable, Sendable {
         loadBeforeMark = try c.decode(Bool.self, forKey: .loadBeforeMark)
         filePill = try c.decodeIfPresent(FilePillPosition.self, forKey: .filePill) ?? .bottom
         windowEnabled = try c.decodeIfPresent(Bool.self, forKey: .windowEnabled) ?? false
+        treeHidesViewed = try c.decodeIfPresent(Bool.self, forKey: .treeHidesViewed) ?? true
     }
 
     static let key = "reviewSettings"
@@ -73,7 +76,8 @@ struct ReviewSettings: Codable, Equatable, Sendable {
     /// The `Settings` object the script's `setSettings` expects.
     var scriptPayload: [String: Any] {
         ["version": 1, "presets": presets, "customGlobs": customGlobs, "customGlobsText": customGlobsText,
-         "autoMark": autoMark, "verify": verify, "rememberCompare": rememberCompare, "loadBeforeMark": loadBeforeMark]
+         "autoMark": autoMark, "verify": verify, "rememberCompare": rememberCompare, "loadBeforeMark": loadBeforeMark,
+         "treeHidesViewed": treeHidesViewed]
     }
 
     static func load(_ defaults: UserDefaults) -> ReviewSettings {

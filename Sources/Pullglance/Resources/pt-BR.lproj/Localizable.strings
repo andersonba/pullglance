@@ -420,6 +420,10 @@
 "Previous File" = "Arquivo anterior";
 
 /* Review window: pill redesign */
+"Viewed files are hidden in the file tree · click to show them" = "Arquivos vistos estão ocultos na árvore de arquivos · clique para mostrar";
+"Viewed files are shown in the file tree · click to hide them" = "Arquivos vistos aparecem na árvore de arquivos · clique para ocultar";
+"Show viewed files in the file tree" = "Mostrar arquivos vistos na árvore de arquivos";
+"Hide viewed files in the file tree" = "Ocultar arquivos vistos na árvore de arquivos";
 "Mark this file as viewed and go to the next unviewed one (⌘↩)" = "Marcar este arquivo como visto e ir ao próximo não visto (⌘↩)";
 "%lld of %lld" = "%lld de %lld";
 "%lld of %lld viewed" = "%lld de %lld vistos";

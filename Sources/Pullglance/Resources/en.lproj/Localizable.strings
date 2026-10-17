@@ -420,6 +420,10 @@
 "Previous File" = "Previous File";
 
 /* Review window: pill redesign */
+"Viewed files are hidden in the file tree · click to show them" = "Viewed files are hidden in the file tree · click to show them";
+"Viewed files are shown in the file tree · click to hide them" = "Viewed files are shown in the file tree · click to hide them";
+"Show viewed files in the file tree" = "Show viewed files in the file tree";
+"Hide viewed files in the file tree" = "Hide viewed files in the file tree";
 "Mark this file as viewed and go to the next unviewed one (⌘↩)" = "Mark this file as viewed and go to the next unviewed one (⌘↩)";
 "%lld of %lld" = "%lld of %lld";
 "%lld of %lld viewed" = "%lld of %lld viewed";

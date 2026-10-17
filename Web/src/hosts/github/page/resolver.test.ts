@@ -2,7 +2,7 @@ import { PageResolver } from './resolver'
 import { UnsupportedPage, type Strategy, type StrategyRegistry, type ViewedControlLocator, type FileListSource, type ToolbarSlotSource, type FileHeaderLocator } from './concepts'
 
 const strat = <T>(id: string, priority: number, probe: boolean, value: T): Strategy<T> => ({ id, priority, probe: () => probe, create: () => value })
-const emptyRegistry = (): StrategyRegistry => ({ fileList: [], fileHeader: [], viewedControl: [], toolbarSlot: [] })
+const emptyRegistry = (): StrategyRegistry => ({ fileList: [], fileHeader: [], viewedControl: [], toolbarSlot: [], fileTree: [] })
 
 describe('PageResolver', () => {
   it('conceito de documento: escolhe maior prioridade que responde e cacheia', () => {

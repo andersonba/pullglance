@@ -102,6 +102,7 @@ struct ReviewBar: View {
         case nil:
             if let counts = session.fileCounts {
                 counter(viewed: counts.viewed, total: counts.total)
+                if case .pullRequest(_, _, .files) = session.page { treeToggle }
             } else if case .compare = session.page, let c = session.pageCounts {
                 counter(viewed: c.viewed, total: c.total)
             } else if session.page.showsBar {
@@ -115,6 +116,21 @@ struct ReviewBar: View {
             ProgressView(value: total == 0 ? 0 : Double(viewed) / Double(total)).progressViewStyle(.linear).frame(width: 64).controlSize(.mini)
             Text("\(viewed) of \(total) viewed", bundle: .app).font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
         }
+    }
+
+    /// Whether viewed files leave the page's file tree. Next to the progress, since it is about the same
+    /// files; a preference, so it is remembered. Only where the tree is: the pull request's Files tab.
+    private var treeToggle: some View {
+        let hiding = ReviewSettingsStore.shared.settings.treeHidesViewed
+        return Button {
+            ReviewSettingsStore.shared.settings.treeHidesViewed.toggle()
+        } label: {
+            Image(systemName: hiding ? "eye.slash" : "eye")
+                .foregroundStyle(hiding ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
+        }
+        .buttonStyle(.plain)
+        .help(hiding ? Text("Viewed files are hidden in the file tree · click to show them", bundle: .app) : Text("Viewed files are shown in the file tree · click to hide them", bundle: .app))
+        .accessibilityLabel(hiding ? Text("Show viewed files in the file tree", bundle: .app) : Text("Hide viewed files in the file tree", bundle: .app))
     }
 
     private var canUndo: Bool {

@@ -4,6 +4,7 @@ import type { FileListing, Receipt, Rule } from '@/core/model'
 import { OperationLock } from '@/core/lock'
 import { DEFAULT_SETTINGS, normalize, rulesFromSettings, type Settings } from '@/features/tests/settings'
 import { createGitHubAdapter, type GitHubAdapter } from '@/hosts/github/adapter'
+import { createTreeSync } from '@/features/tree/hide-viewed'
 
 /** `ready` is whether this document's script has received the app's settings: a fresh document says no. */
 export interface Context { kind: 'pull' | 'compare' | 'other'; basePath: string; key: string | null; ready: boolean }
@@ -25,6 +26,8 @@ const LISTING_MIN_INTERVAL_MS = 1000
 
 export function install(deps: Deps) {
   const adapter = deps.adapter ?? createGitHubAdapter()
+  // The file tree sidebar follows the listing: viewed files leave it while the setting says so.
+  const treeSync = createTreeSync(document, () => adapter.fileTree())
   let settings: Settings = DEFAULT_SETTINGS
   let rules: Rule[] = rulesFromSettings(settings)
   let lastReceipt: Receipt | null = null
@@ -99,10 +102,12 @@ export function install(deps: Deps) {
   // present in both UIs; the new UI's header is sticky and useless for positions).
   let cachedListing: FileListing | null = null
   // An empty listing is never cached: it is what a page that has not rendered its files yet looks like.
+  // Every listing read goes through here: the tree sidebar follows it.
+  const noteListing = (listing: FileListing) => { cachedListing = listing; treeSync.apply(listing.files) }
   const files = async (): Promise<FileListing> => {
     if (cachedListing) return cachedListing
     const listing = await adapter.listFiles()
-    if (listing.files.length > 0) cachedListing = listing
+    if (listing.files.length > 0) noteListing(listing)
     return listing
   }
   const invalidateListing = () => { cachedListing = null }
@@ -475,7 +480,9 @@ export function install(deps: Deps) {
       rules = rulesFromSettings(settings)
       adapter.configure({ rememberCompare: settings.rememberCompare })
       settingsReady = true
-      listingWatch ??= watchListing(adapter, (listing) => { cachedListing = listing; void postCursor() }, (payload) => deps.post({ name: 'listing', payload }))
+      treeSync.setHidden(settings.treeHidesViewed)
+      if (cachedListing) treeSync.apply(cachedListing.files)
+      listingWatch ??= watchListing(adapter, (listing) => { noteListing(listing); void postCursor() }, (payload) => deps.post({ name: 'listing', payload }))
       // The file list may render after the first read (a navigation inside GitHub): look again a few times.
       for (const ms of [600, 1500, 3000]) later(ms, () => { invalidateListing(); void postCursor() })
     },
@@ -488,6 +495,7 @@ export function install(deps: Deps) {
       disposed = true
       unwatchContext()
       listingWatch?.stop()
+      treeSync.dispose()
       for (const t of timers) clearTimeout(t)
       timers.clear()
       if (scrollTimer) { clearTimeout(scrollTimer); scrollTimer = null }

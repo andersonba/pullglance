@@ -69,7 +69,7 @@ Swipe a row to the left, right-click it, or focus it with the keyboard:
 
 ## Review window (beta)
 
-Off by default; Settings › Review turns it on. With it on, a click on a row opens the pull request in a window of its own, with a review bar above the page: the pull request's state, the file progress, and one primary action (merge when ready, approve otherwise) with the rest in its menu. On the Files tab a floating pill shows the current file, steps to the previous or next one, marks it viewed, and marks all test files viewed by preset or by your own globs (Settings › Review). Compare pages remember what you collapsed. The GitHub session lives in the app, separate from your browser; downloads are quarantined like a browser's.
+Off by default; Settings › Review turns it on. With it on, a click on a row opens the pull request in a window of its own, with a review bar above the page: the pull request's state, the file progress, and one primary action (merge when ready, approve otherwise) with the rest in its menu. On the Files tab a floating pill shows the current file, steps to the previous or next one, marks it viewed, and marks all test files viewed by preset or by your own globs (Settings › Review). Files marked as viewed leave GitHub's file tree sidebar (a folder goes with its last file), so the tree is what is left to review; once everything is viewed the tree is whole again. The eye button next to the progress turns that off, and the choice is kept. Compare pages remember what you collapsed. The GitHub session lives in the app, separate from your browser; downloads are quarantined like a browser's.
 
 ## Settings (⌘,)
 

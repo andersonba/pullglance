@@ -50,11 +50,29 @@ export interface ToolbarSlotSource {
   hostFlag?: string
 }
 
+/** A node of the file tree sidebar: a file, known by the digest its link points at, or a directory. */
+export interface FileTreeItem {
+  kind: 'file' | 'directory'
+  /** The `#diff-<digest>` digest for a file; empty for a directory. */
+  id: string
+  el: Element
+}
+
+/**
+ * The file tree sidebar. Everything is read live: GitHub rebuilds the tree on navigation, so nothing here
+ * holds an element between calls, and `root()` is null while there is no tree on the page.
+ */
+export interface FileTreeSource {
+  root(): Element | null
+  items(): FileTreeItem[]
+}
+
 export interface StrategyRegistry {
   fileList: Strategy<FileListSource>[]
   fileHeader: Strategy<FileHeaderLocator>[]
   viewedControl: Strategy<ViewedControlLocator>[]
   toolbarSlot: Strategy<ToolbarSlotSource>[]
+  fileTree: Strategy<FileTreeSource>[]
 }
 
 export class UnsupportedPage extends Error {

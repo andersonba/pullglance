@@ -6,6 +6,9 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+### Added
+- In the review window, files you mark as viewed leave the file tree sidebar, and a folder goes with its last file, so the tree shows what is left to review; once everything is viewed the tree shows all files again. Works in both of GitHub's Files experiences. An eye button next to the progress turns it off, and the choice is remembered.
+
 ## [0.3.0] - 2026-10-17
 
 ### Added

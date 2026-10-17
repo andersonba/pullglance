@@ -2,6 +2,7 @@ import { install as installScript } from './entry'
 import { mountComparePage, mountFilesPage, digestOf } from './test-fixtures'
 import { DEFAULT_SETTINGS } from '@/features/tests/settings'
 import { storage } from '#imports'
+import { HIDE_ATTR, VIEWED_ATTR } from '@/features/tree/hide-viewed'
 
 type Event = { name: string; payload: unknown }
 
@@ -520,5 +521,35 @@ describe('review script API', () => {
     await wait(1300)                                 // past the listing watcher's minimum interval and the 600 ms re-read
     expect(document.querySelector('button[data-ghra-viewed]')).toBeNull()
     expect(events.length).toBe(posted)
+  })
+})
+
+describe('file tree: viewed files leave the sidebar', () => {
+  it('marks the tree from the listing and follows the setting', async () => {
+    mountFilesPage({ files: [{ path: 'src/a.ts', viewed: true }, { path: 'src/b.ts' }], tree: true })
+    const api = install({ post: () => {} })
+    api.setSettings({})
+    await api.counts(null)
+    const root = document.querySelector('ul[role="tree"]')!
+    expect(root.getAttribute(HIDE_ATTR)).toBe('true')
+    expect(document.getElementById('src/a.ts')!.hasAttribute(VIEWED_ATTR)).toBe(true)
+    expect(document.getElementById('src/b.ts')!.hasAttribute(VIEWED_ATTR)).toBe(false)
+    expect(document.getElementById('src')!.hasAttribute(VIEWED_ATTR)).toBe(false)
+    api.setSettings({ treeHidesViewed: false })
+    expect(root.hasAttribute(HIDE_ATTR)).toBe(false)
+    api.setSettings({ treeHidesViewed: true })
+    expect(root.getAttribute(HIDE_ATTR)).toBe('true')
+  })
+
+  it('follows a file marked on the page, and dispose takes the marks away', async () => {
+    mountFilesPage({ files: [{ path: 'src/a.ts' }, { path: 'src/b.ts' }], tree: true })
+    const api = install({ post: () => {} })
+    api.setSettings({})
+    await api.counts(null)
+    expect(document.getElementById('src/a.ts')!.hasAttribute(VIEWED_ATTR)).toBe(false)
+    filesHeader('src/a.ts').querySelector('button[aria-label="Not Viewed"]').click()   // the user marks a file on the page
+    await vi.waitFor(() => expect(document.getElementById('src/a.ts')!.hasAttribute(VIEWED_ATTR)).toBe(true))   // the listing watcher re-reads
+    api.dispose()
+    expect(document.querySelector(`[${VIEWED_ATTR}], [${HIDE_ATTR}]`)).toBeNull()
   })
 })
