@@ -6,6 +6,8 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-17
+
 ### Added
 - In the popover, Vim's `H J K L` do what the arrows do: `J`/`K` move the focus through the rows (and `J` starts it), `H`/`L` switch tabs. `F` opens the repository/author filter with its search field ready to type. With a row focused, `space` opens its menu, the same one a right-click shows.
 - A global shortcut opens and closes the popover from any app, with the menu bar icon lit as for a click: `⌥⌘P` to start with, changeable or removable in Settings › General.
