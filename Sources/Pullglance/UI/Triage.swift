@@ -149,6 +149,7 @@ struct ShortcutsCard: View {
             group(Text("Focused row", bundle: .app)) {
                 line(Text("Start · Move", bundle: .app), ["↓", "↑", "J", "K"])
                 line(Text("Open review", bundle: .app), ["↩"])
+                line(Text("Row menu", bundle: .app), ["space"])
                 line(Text("Pin · Snooze · Refresh", bundle: .app), ["P", "S", "R"])
                 line(Text("Snooze for…", bundle: .app), ["⇧S"])
                 line(Text("Comment · Merge", bundle: .app), ["C", "M"])

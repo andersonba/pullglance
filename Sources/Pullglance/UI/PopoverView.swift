@@ -27,6 +27,14 @@ struct PopoverView: View {
     @State private var rowDrag: RowDrag? = nil
     /// Row frames in the list's coordinate space, refreshed only while nothing is being dragged.
     @State private var rowFrames: [PullRequest.ID: CGRect] = [:]
+    /// The same rows in the window's coordinates (SwiftUI's global space): where a synthetic right-click lands.
+    /// Kept across closings: `onGeometryChange` stays silent when a row comes back at the frame it left with.
+    @State private var rowWindowFrames: [PullRequest.ID: CGRect] = [:]
+    /// The rows on screen right now. A row the lazy stack dropped, or a closed popover's, has no place to click.
+    @State private var visibleRows: Set<PullRequest.ID> = []
+    /// While a context menu opened from the keyboard is up: its fabricated press is never released from the
+    /// row's point of view (the menu's tracking eats the up), so the hold-to-reorder gesture must stand down.
+    @State private var menuFromKeyboard = false
     /// Keyboard triage: the focused row, if any. See `TriageFocus`.
     @State private var focus = TriageFocus()
     /// The row under the pointer: ↩ and ⌘C act on it without a focus, and space adopts it as the focus.
@@ -247,6 +255,69 @@ struct PopoverView: View {
         return triageRows.first { $0.pr.id == id }?.pr
     }
 
+    /// Opens the focused row's `.contextMenu` from the keyboard. SwiftUI has no call for that, so a right-click
+    /// is fabricated at the row's middle, in the window's coordinates, and posted the way `PopoverDismissal`
+    /// posts its Esc. The menu that opens is the row's own, keys and all.
+    private func showContextMenu(for id: PullRequest.ID, in window: NSWindow?) {
+        guard let window, let content = window.contentView else { return }
+        guard visibleRows.contains(id), let frame = rowWindowFrames[id], !frame.isEmpty else {
+            AppLog.shared.debug("triage: space on \(id), row not on screen"); return
+        }
+        // The row's middle: the title, not the CI dot or the repository link at its edges. SwiftUI's global
+        // space has its origin at the top-left of the window's content; AppKit's at the bottom-left.
+        let point = NSPoint(x: frame.midX, y: content.bounds.height - frame.midY)
+        AppLog.shared.debug("triage: space on \(id), click at \(Int(point.x)),\(Int(point.y)) in \(Int(content.bounds.height))pt")
+        // The hold gesture fires at `holdToReorder` whether or not the menu is still up, so the flag stands
+        // until the menu ends tracking; the sleep only covers a click that opened no menu at all.
+        menuFromKeyboard = true
+        let watch = MenuTrackingWatch { menuFromKeyboard = false }
+        Task {
+            try? await Task.sleep(for: .seconds(Self.holdToReorder + 0.5))
+            menuFromKeyboard = false
+            watch.giveUp(after: Self.holdToReorder + 0.5)
+        }
+        // Down then up, in order. The menu's tracking swallows the up, exactly as with a real right-click.
+        Self.fabricatedEvents += 2
+        for (type, number) in [(NSEvent.EventType.rightMouseDown, Self.fabricatedEvents - 1), (.rightMouseUp, Self.fabricatedEvents)] {
+            if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                              windowNumber: window.windowNumber, context: nil, eventNumber: number, clickCount: 1, pressure: 1) {
+                NSApp.postEvent(event, atStart: false)
+            }
+        }
+    }
+    /// Event numbers for the fabricated clicks: distinct per press, like the system's.
+    private static var fabricatedEvents = 0
+
+    /// Watches for the menu the fabricated click should open: runs `onEnd` when it ends tracking, and
+    /// `giveUp` stops watching, with a line in the verbose log when no menu opened at all.
+    @MainActor private final class MenuTrackingWatch {
+        private var tokens: [NSObjectProtocol] = []
+        private var opened = false
+
+        init(onEnd: @escaping @MainActor () -> Void) {
+            tokens.append(NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { [weak self] in self?.opened = true }
+            })
+            tokens.append(NotificationCenter.default.addObserver(forName: NSMenu.didEndTrackingNotification, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { [weak self] in
+                    self?.stop()
+                    onEnd()
+                }
+            })
+        }
+
+        func giveUp(after seconds: Double) {
+            guard !opened, !tokens.isEmpty else { return }
+            AppLog.shared.debug("triage: no menu opened within \(seconds)s")
+            stop()
+        }
+
+        private func stop() {
+            tokens.forEach { NotificationCenter.default.removeObserver($0) }
+            tokens.removeAll()
+        }
+    }
+
     /// Plain keys while the popover is up and nothing else wants them: no field being edited, no modal,
     /// no reorder mode. ↓ starts; from then on the letters act on the focused row and Esc ends it.
     private func handleKey(_ event: NSEvent) -> Bool {
@@ -282,7 +353,11 @@ struct PopoverView: View {
             return true
         case .space:
             openRow = nil
-            if let hovered { focus.set(hovered.pr.id) } else if focus.id == nil { focus.move(1, in: ids) }
+            // With a focus, space opens the row's menu, the keyboard's right-click; without one it picks the row.
+            // A focus whose row left the list (a quick filter, a refresh) opens nothing rather than someone else's menu.
+            if let id = focus.id {
+                if ids.contains(id) { showContextMenu(for: id, in: event.window) }
+            } else if let hovered { focus.set(hovered.pr.id) } else { focus.move(1, in: ids) }
             return true
         case .up:
             guard focus.id != nil else { return false }
@@ -525,6 +600,9 @@ struct PopoverView: View {
             }
             .opacity(reordering && !reorderable ? 0.4 : 1)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.listSpace)) } action: { if rowDrag == nil { rowFrames[pr.id] = $0 } }
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { rowWindowFrames[pr.id] = $0 }
+            .onAppear { visibleRows.insert(pr.id) }
+            .onDisappear { visibleRows.remove(pr.id) }
             .background(lifted ? AnyShapeStyle(.regularMaterial) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 8))
             .offset(y: dragOffset(for: pr.id))
             .shadow(color: .black.opacity(lifted ? 0.25 : 0), radius: 10, y: 4)
@@ -648,7 +726,7 @@ struct PopoverView: View {
             // Hold a moment to enter reorder mode. Simultaneous, so a quick click still opens the PR; once
             // the mode is on the tap is off, so the release does not open anything.
             .simultaneousGesture(
-                LongPressGesture(minimumDuration: Self.holdToReorder, maximumDistance: 6).onEnded { _ in setReordering(true) },
+                LongPressGesture(minimumDuration: Self.holdToReorder, maximumDistance: 6).onEnded { _ in if !menuFromKeyboard { setReordering(true) } },
                 including: reorderable && !reordering ? .all : .subviews
             )
         }
