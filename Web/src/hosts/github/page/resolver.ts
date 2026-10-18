@@ -1,7 +1,7 @@
-import { UnsupportedPage, type FileHeader, type FileHeaderLocator, type FileListSource, type FileTreeSource, type Strategy, type StrategyRegistry, type ToolbarSlotSource, type ViewedControl, type ViewedControlLocator } from './concepts'
+import { UnsupportedPage, type FileHeader, type FileHeaderLocator, type FileListSource, type FileTreeSource, type PageReadiness, type Strategy, type StrategyRegistry, type ToolbarSlotSource, type ViewedControl, type ViewedControlLocator } from './concepts'
 import type { Diagnostics } from './diagnostics'
 
-type DocConcept = 'fileList' | 'toolbarSlot' | 'fileTree'
+type DocConcept = 'fileList' | 'toolbarSlot' | 'fileTree' | 'pageReady'
 
 export class PageResolver {
   private cache = new Map<DocConcept, unknown>()
@@ -51,6 +51,7 @@ export class PageResolver {
   fileList(): FileListSource { return this.resolveDoc<FileListSource>('fileList') }
   toolbarSlot(): ToolbarSlotSource { return this.resolveDoc<ToolbarSlotSource>('toolbarSlot') }
   fileTree(): FileTreeSource { return this.resolveDoc<FileTreeSource>('fileTree') }
+  pageReady(): PageReadiness { return this.resolveDoc<PageReadiness>('pageReady') }
 
   headerById(id: string): FileHeader | null {
     for (const [s, loc] of this.instances<FileHeaderLocator>('fileHeader')) {

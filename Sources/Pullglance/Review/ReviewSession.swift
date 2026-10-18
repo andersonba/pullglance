@@ -209,10 +209,11 @@ final class ReviewSession {
     /// mark them, once per pull request, ever (a later visit, in this run or the next, respects what the user
     /// unmarked).
     private func autoMarkIfNeeded(generation gen: Int) async {
-        guard gen == generation, settingsStore.settings.autoMark, matchCount > 0, !busy,
-              case .pullRequest(let repo, let number, .files) = page else { return }
+        guard gen == generation, settingsStore.settings.autoMark, case .pullRequest(let repo, let number, .files) = page else { return }
         let key = "\(repo)#\(number)"
+        guard matchCount > 0, !busy else { AppLog.shared.debug("review auto-mark \(key): waiting, matching=\(matchCount) busy=\(busy)"); return }
         guard !autoMarked.contains(key) else { return }
+        AppLog.shared.debug("review auto-mark \(key): matching=\(matchCount), marking")
         autoMarked.append(key)
         if autoMarked.count > Self.autoMarkedCap { autoMarked.removeFirst(autoMarked.count - Self.autoMarkedCap) }
         defaults.set(autoMarked, forKey: Self.autoMarkedKey)
@@ -298,6 +299,9 @@ final class ReviewSession {
         await perform { [self] in
             let ids = ruleIDs(for: presetChoice, settings: settingsStore.settings)
             let raw = try await scripting.call("mark", ["args": [ruleArgument(ids)]]) as? [String: Any] ?? [:]
+            let failures = (raw["failures"] as? [[String: Any]] ?? []).map { "\($0["path"] ?? "?"): \($0["error"] ?? "?")" }
+            AppLog.shared.debug("review mark: rules=\(ids.map { $0.joined(separator: ",") } ?? "auto") targets=\(raw["targets"] ?? "-") marked=\(raw["marked"] ?? "-") failed=\(raw["failed"] ?? "-") unknown=\(raw["unknown"] ?? "-") listing=\(raw["completeness"] ?? "-") waitedForPage=\(raw["waitedForPage"] ?? "-")ms")
+            if !failures.isEmpty { AppLog.shared.info("review mark failed for \(failures.count) file(s): \(failures.joined(separator: " | "))") }
             return .marked(count: raw["marked"] as? Int ?? 0, failed: raw["failed"] as? Int ?? 0, canUndo: raw["canUndo"] as? Bool ?? false)
         }
     }
@@ -430,7 +434,7 @@ final class ReviewSession {
     }
 
     private func perform(_ action: @MainActor () async throws -> Notice) async {
-        guard !busy else { return }
+        guard !busy else { AppLog.shared.debug("review action skipped: busy"); return }
         busy = true
         notice = .loading
         // A context change clears the notice; a result for the old diff then stays unshown.

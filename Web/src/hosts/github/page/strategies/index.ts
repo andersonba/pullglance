@@ -6,6 +6,8 @@ import { fileListPageRoute } from './file-list/embedded-json'
 import { fileListRenderedHeaders } from './file-list/rendered-headers'
 import { fileTreeClassic } from './file-tree/classic-file-tree'
 import { fileTreePrimer } from './file-tree/primer-tree-view'
+import { pageReadyDocument } from './page-ready/document'
+import { pageReadyReactHydration } from './page-ready/react-hydration'
 import { toolbarSlotClassicToc } from './toolbar-slot/classic-toc'
 import { toolbarSlotFilesToolbar } from './toolbar-slot/files-toolbar'
 import { toolbarSlotFloating } from './toolbar-slot/floating'
@@ -22,5 +24,6 @@ export function defaultRegistry(): StrategyRegistry {
     viewedControl: [viewedControlAria, viewedControlClassicCheckbox, viewedControlClassicButton, viewedControlClassicCollapse, viewedControlCssModule],
     toolbarSlot: [toolbarSlotFilesToolbar, toolbarSlotClassicToc, toolbarSlotFloating],
     fileTree: [fileTreePrimer, fileTreeClassic],
+    pageReady: [pageReadyReactHydration, pageReadyDocument],
   }
 }

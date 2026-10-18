@@ -22,6 +22,16 @@ user reads (strings, docs, changelog); in code it keeps its `Review*` names.
   so cutting a release needs it plugged in. A rehearsal against a local feed uses the `PULLGLANCE_REHEARSAL_*`
   variables of `make-app.sh` and a throwaway key through `make-appcast.sh --key-file`.
 - The app log is `~/Library/Logs/Pullglance/pullglance.log` (`AppLog`); Settings › Advanced exports diagnostics.
+- The Review Desk's page script (`Web/`, built into `Sources/Pullglance/Resources/review.js`) reads GitHub's
+  page through strategies per UI variant (`Web/src/hosts/github/page/strategies/`). GitHub's new Files UI is
+  server-rendered and hydrated by React afterwards: a click before React owns the node is redrawn away. One
+  concept, `PageReadiness`, answers "is the page ready" per UI, and `adapter.whenPageReady` is the single gate
+  every write or scroll goes through (`pageReady()` in `Web/src/entry.ts`); reads never wait. A new feature
+  that clicks, scrolls or marks starts with that wait, and a new UI variant gets its readiness strategy there.
+  The new UI also renders the file list again after load from data it fetches, replacing nodes: a mark can
+  come back unviewed on the page while the server has it. `setViewed` keeps a short watch (`stick`) and
+  clicks the replaced button again; a change on the same node is the user's and is left alone.
+
 - The MenuBarExtra popover opens on a real click or on the global shortcut (⌥⌘P by default, `PopoverHotKey`), which
   goes through `PopoverPresenter` and the MenuBarExtraAccess package: on macOS 27 the window belongs to a
   session of the system's menu bar host, `performClick` does nothing, and the icon lights only for sessions

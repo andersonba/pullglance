@@ -20,10 +20,13 @@ export interface GitHubAdapterDeps {
   compareMemory?: CompareMemory | null
   /** tamanho do lote de restauração por quadro */
   restoreBatch?: number
+  /** How long a mark keeps an eye on its button for a stale re-render, and how often it looks. */
+  stickMs?: number
+  stickEveryMs?: number
 }
 export interface GitHubAdapterConfig { rememberCompare: boolean }
 export interface ToolbarSlot { el: Element; placement: 'first' | 'last' | 'after'; hostFlag?: string }
-export interface GitHubAdapter extends HostAdapter { resolver: PageResolver; isFilesPage(): boolean; pageKind(): PageKind | null; diagnostics(): Diagnostics; toolbarSlot(): ToolbarSlot | null; fileTree(): FileTreeSource | null; configure(c: Partial<GitHubAdapterConfig>): void; flushMemory(): Promise<void> }
+export interface GitHubAdapter extends HostAdapter { resolver: PageResolver; isFilesPage(): boolean; pageKind(): PageKind | null; diagnostics(): Diagnostics; toolbarSlot(): ToolbarSlot | null; fileTree(): FileTreeSource | null; stopWatching(): void; isPageReady(): boolean; whenPageReady(timeoutMs: number, signal?: AbortSignal): Promise<number>; configure(c: Partial<GitHubAdapterConfig>): void; flushMemory(): Promise<void> }
 
 export function createGitHubAdapter(deps: GitHubAdapterDeps = {}): GitHubAdapter {
   const doc = deps.doc ?? document
@@ -35,6 +38,9 @@ export function createGitHubAdapter(deps: GitHubAdapterDeps = {}): GitHubAdapter
   const loadTimeoutMs = deps.loadTimeoutMs ?? 5000
   const memory = deps.compareMemory === undefined ? new CompareMemory() : deps.compareMemory
   const restoreBatch = deps.restoreBatch ?? 25
+  const stickMs = deps.stickMs ?? 4000
+  const stickEveryMs = deps.stickEveryMs ?? 200
+  const watchers = new Set<ReturnType<typeof setTimeout>>()
   const config: GitHubAdapterConfig = { rememberCompare: true }
 
   const currentContext = () => readContext(win.location, doc)
@@ -113,6 +119,8 @@ export function createGitHubAdapter(deps: GitHubAdapterDeps = {}): GitHubAdapter
     const control = controlFor(file.id)
     if (control) {
       if (control.isViewed() === viewed) return 'noop'
+      // A click before the page owns the button is redrawn away by the hydration: wait for it.
+      if (control.isReady) await waitFor(() => control.isReady!(), domTimeoutMs, signal, `page still loading: the Viewed button of ${file.path} is not React's yet`)
       control.toggle()
       try {
         await waitFor(() => control.isViewed() === viewed, domTimeoutMs, signal, `GitHub didn't confirm marking ${file.path}`)
@@ -121,6 +129,7 @@ export function createGitHubAdapter(deps: GitHubAdapterDeps = {}): GitHubAdapter
         throw e
       }
       overlay.set(ctx.key, file.id, viewed)
+      stick(file, control.el, viewed)
       return 'dom'
     }
     if ((overlay.get(ctx.key, file.id) ?? file.viewed) === viewed) return 'noop'
@@ -128,6 +137,30 @@ export function createGitHubAdapter(deps: GitHubAdapterDeps = {}): GitHubAdapter
     await postFileReview(ctx.basePath, file.path, viewed, fetchImpl, signal)
     overlay.set(ctx.key, file.id, viewed)
     return 'api'
+  }
+
+  /**
+   * The new Files UI renders the file list again after load, from data it fetched (`page_data/diff_entries`),
+   * replacing the nodes; a mark confirmed on the page and on the server came back unviewed when that render
+   * used data older than the click (seen live 2026-10-17). GitHub's state is then stale, so a click on the
+   * fresh button sends the same state again and the page catches up. Only a replaced node is corrected: the
+   * same node showing the other state is the user's own click. A few times at most, for a few seconds.
+   */
+  function stick(file: ChangedFile, clicked: Element, viewed: boolean): void {
+    const started = Date.now()
+    let el = clicked
+    let corrections = 0
+    const look = () => {
+      watchers.delete(timer)
+      const fresh = controlFor(file.id)
+      if (fresh && fresh.el !== el) {
+        el = fresh.el
+        if (fresh.isViewed() !== viewed && corrections < 3) { corrections++; fresh.toggle() }
+      }
+      if (Date.now() - started < stickMs) { timer = setTimeout(look, stickEveryMs); watchers.add(timer) }
+    }
+    let timer = setTimeout(look, stickEveryMs)
+    watchers.add(timer)
   }
 
   async function reconcile(ids: string[]): Promise<Map<string, boolean>> {
@@ -206,6 +239,22 @@ export function createGitHubAdapter(deps: GitHubAdapterDeps = {}): GitHubAdapter
     loadAll,
     onContextChange,
     diagnostics: () => resolver.diagnostics(),
+    /** Ends the watches `stick` left behind (tests, between documents). */
+    stopWatching: () => { for (const t of watchers) clearTimeout(t); watchers.clear() },
+    /** Whether the page is done taking itself over (see `PageReadiness`); a page we cannot read counts as ready. */
+    isPageReady: () => {
+      try { return resolver.pageReady().isReady() } catch (e) { if (e instanceof UnsupportedPage) return true; throw e }
+    },
+    /**
+     * Waits for the page to be ready, up to `timeoutMs`, and resolves with the milliseconds waited either way:
+     * a page variant we misjudge must slow a click down, never stop it.
+     */
+    whenPageReady: async (timeoutMs, signal) => {
+      const started = Date.now()
+      const ready = () => { try { return resolver.pageReady().isReady() } catch { return true } }
+      await waitFor(ready, timeoutMs, signal).catch((e) => { if (e instanceof WaitAborted) throw e })
+      return Date.now() - started
+    },
     /**
      * The file tree sidebar, or null on a page without one. A tree GitHub rebuilt (a navigation inside the
      * page, a switch of UI) may leave the chosen strategy pointing at nothing: then the choice is forgotten

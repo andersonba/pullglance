@@ -17,6 +17,12 @@ export interface FixtureOptions {
   containers?: boolean
   /** The file tree sidebar (Primer TreeView), as the live new Files UI renders it. */
   tree?: boolean
+  /**
+   * Whether React has taken the page over (default): GitHub's `<react-app>` carries the class `loaded`, as on
+   * the live page once its app has mounted. `false` is the server-rendered page before that, where a click is
+   * lost to the redraw.
+   */
+  hydrated?: boolean
 }
 
 export function digestOf(path: string): string {
@@ -117,9 +123,15 @@ export function mountFilesPage(options: FixtureOptions): Document {
   const basePath = options.basePath ?? '/acme/web/pull/42'
   ;(window as any).happyDOM.setURL(`https://github.com${basePath}/files`)
   document.documentElement.innerHTML = html.replace(/^<!doctype html><html>/, '').replace(/<\/html>$/, '')
+  if (options.hydrated !== false) hydrate(document)
   toggleEnabled = options.simulateToggle !== false
   if (toggleEnabled) installToggleSimulation(document)
   return document
+}
+
+/** What GitHub's app leaves on the page once mounted: the `loaded` class on `<react-app>`. */
+export function hydrate(doc: Document): void {
+  for (const app of Array.from(doc.querySelectorAll('react-app'))) app.classList.add('loaded')
 }
 
 /**

@@ -6,6 +6,9 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+### Fixed
+- In the Review Desk, marking right after a page load sometimes left the file unmarked on the page while GitHub had it as viewed: GitHub's new Files UI finishes taking the page over, and renders the file list again from data it fetches, after the page looks ready, and a click before that is drawn over. Every mark, step or jump now waits for the page to be ready, and a mark that the page draws over is applied again. "Mark automatically" was the usual victim.
+
 ### Changed
 - The pull request number in a row is easier to find: semibold, in the accent color, with tabular digits, still next to the repository name.
 

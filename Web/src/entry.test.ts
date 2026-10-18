@@ -608,3 +608,29 @@ describe('cursor prefers the work left: a viewed file at the top edge yields to 
     expect(await api.currentFile()).toMatchObject({ path: 'src/a.ts', index: 0 })
   })
 })
+
+describe('nothing writes to the page before it is ready', () => {
+  beforeEach(() => { storage._resetForTests(); document.body.innerHTML = '' })
+  const hydrateLater = (ms: number) => setTimeout(() => { document.querySelector('react-app')!.classList.add('loaded') }, ms)
+
+  it('mark waits for the hydration, then marks', async () => {
+    mountFilesPage({ files: [{ path: 'src/a.test.ts' }, { path: 'src/b.ts' }], hydrated: false })   // the server's page, app not mounted
+    const api = install({ post: () => {} })
+    api.setSettings({})
+    hydrateLater(80)
+    const result = await api.mark(null)
+    expect(result).toMatchObject({ marked: 1, failed: 0 })
+    expect(result.waitedForPage).toBeGreaterThanOrEqual(50)
+  })
+
+  it('a step waits too, and gives up waiting after the limit rather than hanging', async () => {
+    mountFilesPage({ files: [{ path: 'src/a.ts' }, { path: 'src/b.ts' }], containers: true, hydrated: false })
+    const api = install({ post: () => {}, readyTimeoutMs: 120 })
+    api.setSettings({})
+    layoutPage(['src/a.ts', 'src/b.ts'], [600, 600], {}, 700)
+    const started = Date.now()
+    const report = await api.stepFile(1)          // never hydrated: proceeds after the limit
+    expect(Date.now() - started).toBeGreaterThanOrEqual(100)
+    expect(report.moved).toBe(true)
+  })
+})

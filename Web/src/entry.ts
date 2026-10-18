@@ -9,8 +9,14 @@ import { createTreeSync } from '@/features/tree/hide-viewed'
 /** `ready` is whether this document's script has received the app's settings: a fresh document says no. */
 export interface Context { kind: 'pull' | 'compare' | 'other'; basePath: string; key: string | null; ready: boolean }
 export interface Counts { total: number; viewed: number; matching: number; partial: boolean; perRule: Record<string, number> }
-export interface MarkResult { marked: number; failed: number; skipped: number; unknown: number; canUndo: boolean }
-export interface Deps { post(event: { name: string; payload: unknown }): void; adapter?: GitHubAdapter }
+export interface MarkResult {
+  marked: number; failed: number; skipped: number; unknown: number; canUndo: boolean
+  /** For the app's log: how many files the rules picked, why each failure failed, and how long the page took to be ready. */
+  targets: number; failures: Array<{ path: string; error: string }>; completeness: 'full' | 'partial'; waitedForPage: number
+}
+export interface Deps { post(event: { name: string; payload: unknown }): void; adapter?: GitHubAdapter; readyTimeoutMs?: number }
+/** How long a write waits for the page to be ready before going ahead anyway. */
+const READY_TIMEOUT_MS = 5000
 /** The file the reader is on: the last header that crossed the cursor line, else the first on the page. */
 export interface FileCursor { id: string; path: string; index: number; total: number; viewed: boolean; via?: string }
 
@@ -27,6 +33,8 @@ const LISTING_MIN_INTERVAL_MS = 1000
 
 export function install(deps: Deps) {
   const adapter = deps.adapter ?? createGitHubAdapter()
+  // Everything that writes to the page or moves it goes through here first (see `PageReadiness`).
+  const pageReady = (signal?: AbortSignal) => adapter.whenPageReady(deps.readyTimeoutMs ?? READY_TIMEOUT_MS, signal)
   // The file tree sidebar follows the listing: viewed files leave it while the setting says so.
   const treeSync = createTreeSync(document, () => adapter.fileTree())
   let settings: Settings = DEFAULT_SETTINGS
@@ -66,17 +74,23 @@ export function install(deps: Deps) {
 
   async function mark(ruleIds: string[] | null): Promise<MarkResult> {
     return lock.run(async (signal) => {
+      const waitedForPage = await pageReady(signal)
       if (settings.loadBeforeMark && (await adapter.listFiles()).completeness === 'partial') await loadAll(adapter, undefined, signal)
       const receipt = await markMatching(adapter, selectRules(ruleIds), { signal, verify: settings.verify && adapter.pageKind() === 'pull' })
       lastReceipt = receipt.marked.length > 0 || receipt.unknown.length > 0 ? receipt : null
       invalidateListing()
-      return { marked: receipt.marked.length, failed: receipt.failed.length, skipped: receipt.skipped.length, unknown: receipt.unknown.length, canUndo: lastReceipt !== null }
+      return {
+        marked: receipt.marked.length, failed: receipt.failed.length, skipped: receipt.skipped.length, unknown: receipt.unknown.length, canUndo: lastReceipt !== null,
+        targets: receipt.marked.length + receipt.failed.length + receipt.unknown.length + receipt.skipped.length,
+        failures: receipt.failed.map((f) => ({ path: f.file.path, error: f.error })), completeness: receipt.completeness, waitedForPage,
+      }
     })
   }
 
   async function undo(): Promise<{ marked: number; failed: number }> {
     if (!lastReceipt) throw new Error('nothing to undo')
     return lock.run(async (signal) => {
+      await pageReady(signal)
       const r = await undoAction(adapter, lastReceipt!, { signal })
       lastReceipt = null
       invalidateListing()
@@ -86,6 +100,7 @@ export function install(deps: Deps) {
 
   async function unmarkAll(): Promise<{ marked: number; failed: number }> {
     return lock.run(async (signal) => {
+      await pageReady(signal)
       const listing = await adapter.listFiles()
       let marked = 0, failed = 0
       for (const f of listing.files.filter((x) => x.viewed)) {
@@ -343,6 +358,7 @@ export function install(deps: Deps) {
 
   /** Next (+1) or previous (-1) file in page order, viewed or not. */
   async function stepFile(delta: number): Promise<StepReport> {
+    await pageReady()
     const listing = await files()
     const from = await cursorIndex(listing)
     const to = from + delta
@@ -356,6 +372,7 @@ export function install(deps: Deps) {
 
   /** Next or previous file not yet viewed, from where the reader is. */
   async function scrollToUnviewed(direction: 'next' | 'previous', fromIndex?: number, keep: 'anchor' | 'hold' = 'anchor'): Promise<boolean> {
+    await pageReady()
     const listing = await files()
     const from = fromIndex ?? await cursorIndex(listing)
     const target = direction === 'next'
@@ -373,6 +390,7 @@ export function install(deps: Deps) {
    * decides whether to open it; the page is left as they arranged it.
    */
   async function stepAmong(paths: string[], delta: number): Promise<{ moved: boolean; collapsed: boolean }> {
+    await pageReady()
     const listing = await files()
     const wanted = new Set(paths)
     const indices = listing.files.map((f, i) => i).filter((i) => wanted.has(listing.files[i]!.path))
@@ -392,6 +410,7 @@ export function install(deps: Deps) {
 
   /** Marks or unmarks the file under the cursor without moving. */
   async function setCurrentViewed(viewed: boolean): Promise<boolean> {
+    await pageReady()
     return lock.run(async (signal) => {
       const cursor = await currentFile()
       if (!cursor || cursor.viewed === viewed) return false
@@ -407,6 +426,7 @@ export function install(deps: Deps) {
 
   /** Marks the current file as viewed (when it is not) and moves to the next unviewed one. */
   async function markCurrentAndNext(): Promise<{ marked: boolean; moved: boolean }> {
+    await pageReady()
     return lock.run(async (signal) => {
       const cursor = await currentFile()
       let marked = false
@@ -495,6 +515,7 @@ export function install(deps: Deps) {
       currentBoxOutline: outline(box, 7, 80),
       currentBoxAncestors: ancestors(box),
       path: location.pathname.replace(/^\/[^/]+\/[^/]+/, '/owner/repo').replace(/\/pull\/\d+/, '/pull/N'),
+      pageReady: adapter.isPageReady(),
       files: listing?.files.length ?? null,
       viewed: listing?.files.filter((f) => f.viewed).length ?? null,
       cursor: cursor ? { index: cursor.index, total: cursor.total, viewed: cursor.viewed } : noCursorReason,
@@ -529,6 +550,7 @@ export function install(deps: Deps) {
       disposed = true
       unwatchContext()
       listingWatch?.stop()
+      adapter.stopWatching()
       treeSync.dispose()
       for (const t of timers) clearTimeout(t)
       timers.clear()

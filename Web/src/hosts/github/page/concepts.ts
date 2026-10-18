@@ -36,6 +36,8 @@ export interface ViewedControl {
   el: Element
   isViewed(): boolean
   toggle(): void
+  /** False while the page has not finished taking the control over (React hydration): a click then is lost to a redraw. Absent: always ready. */
+  isReady?(): boolean
 }
 
 export interface ViewedControlLocator {
@@ -67,12 +69,21 @@ export interface FileTreeSource {
   items(): FileTreeItem[]
 }
 
+/**
+ * Whether the page is done taking itself over, so that a click or a scroll of ours sticks. Every feature that
+ * writes to the page or moves it waits on this one answer (`adapter.whenPageReady`); reads do not.
+ */
+export interface PageReadiness {
+  isReady(): boolean
+}
+
 export interface StrategyRegistry {
   fileList: Strategy<FileListSource>[]
   fileHeader: Strategy<FileHeaderLocator>[]
   viewedControl: Strategy<ViewedControlLocator>[]
   toolbarSlot: Strategy<ToolbarSlotSource>[]
   fileTree: Strategy<FileTreeSource>[]
+  pageReady: Strategy<PageReadiness>[]
 }
 
 export class UnsupportedPage extends Error {

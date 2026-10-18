@@ -1,5 +1,11 @@
 import { AbortedInFlight } from '@/core/host'
-import { createGitHubAdapter } from './adapter'
+import { createGitHubAdapter as createAdapter, type GitHubAdapter } from './adapter'
+
+// Every adapter is told to stop watching after its test: a mark's stick watcher outlives the call, and the
+// document is shared, so one left behind would click the next test's button.
+const adapters: GitHubAdapter[] = []
+const createGitHubAdapter: typeof createAdapter = (deps) => { const a = createAdapter(deps); adapters.push(a); return a }
+afterEach(() => { for (const a of adapters.splice(0)) a.stopWatching() })
 import { UnsupportedPage } from './page/concepts'
 import { digestOf, mountFilesPage, buildFilesPageHtml, replaceEmbeddedJson } from '@@/tests/fixtures/github/build'
 import { mountComparePage } from '@@/tests/fixtures/github/compare'
@@ -62,6 +68,60 @@ describe('createGitHubAdapter', () => {
     mountFilesPage({ files: [{ path: 'a.ts' }], simulateToggle: false })
     const a = createGitHubAdapter({ domTimeoutMs: 20 })
     await expect(a.setViewed(file('a.ts'), true)).rejects.toThrow(/didn't confirm/)
+  })
+
+  // The new Files UI is server-rendered and then hydrated by React: a click on the Viewed button before the
+  // app has mounted reaches the server, but the hydration redraws the button from the initial payload and the
+  // page shows the file unviewed (seen live on 2026-10-17: auto-mark 50 ms after load). GitHub's <react-app>
+  // gets the class `loaded` once mounted; the control waits for it.
+  it('setViewed via DOM: espera o app do GitHub montar quando a página é React (hidratação)', async () => {
+    mountFilesPage({ files: [{ path: 'a.ts' }], hydrated: false })
+    const button = document.querySelector('button[aria-label="Not Viewed"]') as any
+    const a = createGitHubAdapter({ domTimeoutMs: 500 })
+    const pending = a.setViewed(file('a.ts'), true)
+    await new Promise((r) => setTimeout(r, 60))
+    expect(button.getAttribute('aria-pressed')).toBe('false')   // not clicked yet: the page is still the server's
+    document.querySelector('react-app')!.classList.add('loaded')  // mounted
+    expect(await pending).toBe('dom')
+    expect(button.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('setViewed via DOM: desiste se a hidratação não chega', async () => {
+    mountFilesPage({ files: [{ path: 'a.ts' }], hydrated: false })
+    const a = createGitHubAdapter({ domTimeoutMs: 30 })
+    await expect(a.setViewed(file('a.ts'), true)).rejects.toThrow(/still loading/)
+    expect(document.querySelector('button[aria-label="Not Viewed"]')).not.toBeNull()   // never clicked
+  })
+
+  // Seen live on 2026-10-17: the new Files UI renders the file list again after load, from data it fetched
+  // (`page_data/diff_entries`), replacing the nodes. A mark confirmed in the DOM and on the server came back
+  // unviewed on the page when that render used data older than the click. GitHub's state is then stale, so
+  // clicking the fresh button sends "viewed" again and the page catches up.
+  it('setViewed via DOM: reaplica quando o GitHub troca o nó por um desatualizado', async () => {
+    mountFilesPage({ files: [{ path: 'a.ts' }] })
+    const a = createGitHubAdapter({ domTimeoutMs: 500, stickMs: 800, stickEveryMs: 20 })
+    expect(await a.setViewed(file('a.ts'), true)).toBe('dom')
+    const header = document.querySelector('[data-diff-header-wrapper="true"]')!
+    const stale = header.cloneNode(true) as HTMLElement
+    const button = stale.querySelector('button[aria-pressed]')!
+    button.setAttribute('aria-pressed', 'false'); button.setAttribute('aria-label', 'Not Viewed')
+    button.classList.remove('MarkAsViewedButton-module__viewed__k8dzo')   // an unviewed button, as the server renders it
+    await new Promise((r) => setTimeout(r, 60))
+    header.replaceWith(stale)                       // GitHub's late render, from data older than the click
+    await vi.waitFor(() => expect(button.getAttribute('aria-pressed')).toBe('true'))
+    a.stopWatching()
+  })
+
+  it('setViewed via DOM: não desfaz o que o usuário clicou no mesmo nó', async () => {
+    mountFilesPage({ files: [{ path: 'a.ts' }] })
+    const a = createGitHubAdapter({ domTimeoutMs: 500, stickMs: 300, stickEveryMs: 20 })
+    expect(await a.setViewed(file('a.ts'), true)).toBe('dom')
+    const button = document.querySelector('button[aria-pressed]') as HTMLButtonElement
+    button.click()                                  // the user changes their mind: same node, their click
+    expect(button.getAttribute('aria-pressed')).toBe('false')
+    await new Promise((r) => setTimeout(r, 400))
+    expect(button.getAttribute('aria-pressed')).toBe('false')
+    a.stopWatching()
   })
 
   it('setViewed via API quando não há controle, e overlay reflete na listagem', async () => {
