@@ -3,8 +3,8 @@
 #   brew install --cask andersonba/pullglance/pullglance
 # `version` and `sha256` are written by Scripts/release.sh from the zip it uploads to the release.
 cask "pullglance" do
-  version "0.4.0"
-  sha256 "ceb16697fa6972c30addc5f6fe7041c4d2e707f47bf74092e9d257defdc4bb29"
+  version "0.5.0"
+  sha256 "31080382b14bce6953e75d6baaa1366baf4ea340460e470c18af79011ca0bf09"
 
   url "https://github.com/andersonba/pullglance/releases/download/v#{version}/Pullglance.zip"
   name "Pullglance"

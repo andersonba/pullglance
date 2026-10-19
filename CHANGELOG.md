@@ -6,6 +6,8 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-19
+
 ### Added
 - Pull requests assigned to you that someone else opened (a bot, a coding agent, a teammate) now show in My PRs: same sections by state, same number next to the clock, the author on the row so you can tell them apart, and an **Assigned** quick filter. A click on the author's avatar narrows the list to that bot or person, as before. Settings › Sections turns it off. Asked for in [#3](https://github.com/andersonba/pullglance/issues/3).
 
