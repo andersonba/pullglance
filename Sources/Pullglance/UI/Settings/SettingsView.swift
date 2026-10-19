@@ -420,6 +420,13 @@ struct SectionsSettingsView: View {
             SwiftUI.Section {
                 ReorderSectionGroup(store: store, tab: .mine)
                 SnoozedSectionRow(section: .snoozedMine, store: store)
+                Toggle(isOn: $store.includesAssigned) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Count pull requests assigned to you as yours", bundle: .app)
+                        Text("Opened by a bot or a teammate with you as assignee. They join these sections by state and show their author.", bundle: .app)
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
+                }
             } header: {
                 ReorderSectionGroup.header(Text("My PRs", bundle: .app))
             }

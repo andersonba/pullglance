@@ -16,19 +16,23 @@ enum Section: String, CaseIterable, Sendable, Identifiable {
     /// from (pinning is a view preference, not a state change), never a chip.
     case pinnedMine
     case pinnedReview
+    /// Not a bucket: the quick filter that keeps only the pull requests assigned to the user (opened by a bot,
+    /// an agent, a teammate). Those rows live in the state sections above; never ordered, counted or hidden.
+    case assignedMine
 
     var id: String { rawValue }
 
     var isSnoozed: Bool { self == .snoozedMine || self == .snoozedReview }
     var isPinned: Bool { self == .pinnedMine || self == .pinnedReview }
+    var isAssignedFilter: Bool { self == .assignedMine }
     /// Sections that sit at a fixed edge of the tab, outside the user's section order.
-    var isFixed: Bool { isSnoozed || isPinned }
+    var isFixed: Bool { isSnoozed || isPinned || isAssignedFilter }
 
     enum Tab: Sendable { case mine, review }
 
     var tab: Tab {
         switch self {
-        case .needsAction, .readyToMerge, .waitingForReview, .drafts, .snoozedMine, .pinnedMine: .mine
+        case .needsAction, .readyToMerge, .waitingForReview, .drafts, .snoozedMine, .pinnedMine, .assignedMine: .mine
         case .needsYourReview, .needsTeamsReview, .snoozedReview, .pinnedReview: .review
         }
     }
@@ -56,6 +60,7 @@ enum Section: String, CaseIterable, Sendable, Identifiable {
         case .needsTeamsReview: String(localized: "Needs your teams' review", bundle: .app)
         case .snoozedMine, .snoozedReview: String(localized: "Snoozed", bundle: .app)
         case .pinnedMine, .pinnedReview: String(localized: "Pinned", bundle: .app)
+        case .assignedMine: String(localized: "Assigned to you", bundle: .app)
         }
     }
 
@@ -69,6 +74,7 @@ enum Section: String, CaseIterable, Sendable, Identifiable {
         case .needsTeamsReview: String(localized: "Requested from a team you belong to", bundle: .app)
         case .snoozedMine, .snoozedReview: String(localized: "Snoozed here until a new commit, review decision or CI result", bundle: .app)
         case .pinnedMine, .pinnedReview: String(localized: "Pinned by you, always on top", bundle: .app)
+        case .assignedMine: String(localized: "Opened by someone else with you as assignee", bundle: .app)
         }
     }
 }

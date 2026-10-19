@@ -7,6 +7,9 @@ import Testing
         #expect(SearchQuery.mine(hiding: []) == SearchQuery.mine)
         #expect(SearchQuery.direct(hiding: []) == SearchQuery.direct)
         #expect(SearchQuery.viaTeam(hiding: []) == SearchQuery.viaTeam)
+        #expect(SearchQuery.assigned(hiding: []) == SearchQuery.assigned)
+        #expect(SearchQuery.assigned == "is:pr is:open assignee:@me -author:@me archived:false sort:updated-desc")
+        #expect(SearchQuery.assigned(hiding: ["acme"]).hasSuffix(" -user:acme"))
     }
 
     @Test func hiddenOwnersBecomeNegatedUserQualifiersInStableOrder() {

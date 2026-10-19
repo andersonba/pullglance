@@ -130,7 +130,7 @@ import Testing
         await store.refresh()
         await first.value
         try await Task.sleep(for: .milliseconds(700))
-        #expect(await gh.calls.count == 4)
+        #expect(await gh.calls.count == 6)   // two refreshes of three searches each
     }
 
     @Test func filterChangeDuringACycleIsAppliedAfterwards() async throws {
@@ -268,6 +268,47 @@ import Testing
         #expect(roll.from == "0 · \(second - 1)" && roll.to == store.badgeText && roll.up)
     }
 
+    /// Pull requests assigned to the user but authored by someone else (a bot, an agent, a teammate) are
+    /// theirs to drive: they join My PRs by state, once each, flagged so the row can show their author.
+    @Test func assignedPullRequestsJoinMineOnce() async throws {
+        let gh = try await happyGH()
+        let bot = try JSONSerialization.jsonObject(with: Data(node(number: 500, ci: "FAILURE", author: "renovate[bot]").utf8))
+        // One of the user's own, returned again by the assigned search (assigned to themselves): never twice.
+        let mineAgain = try JSONSerialization.jsonObject(with: try fixture("search-mine.json")) as! [String: Any]
+        let own = (((mineAgain["data"] as! [String: Any])["search"] as! [String: Any])["nodes"] as! [Any]).first!
+        await gh.set(.success(envelopeFrom(nodes: [bot, own], issueCount: 2)), for: SearchQuery.assigned)
+        let store = makeStore(gh)
+        await store.refresh()
+        #expect(store.mine.value.filter { $0.id == "acme/web#500" }.count == 1)
+        #expect(store.mine.value.filter { $0.id == (store.mine.value.first { $0.author != "renovate[bot]" }!.id) }.count == 1)
+        #expect(store.isAssigned("acme/web#500"))
+        #expect(!store.isAssigned(store.mine.value.first { $0.author != "renovate[bot]" }!.id))
+        #expect(store.mine.value.count == 6)
+        #expect(store.mineGroups.needsAction.contains { $0.id == "acme/web#500" })
+    }
+
+    @Test func assignedSearchIsOptionalAndBestEffort() async throws {
+        let gh = try await happyGH()
+        let bot = try JSONSerialization.jsonObject(with: Data(node(number: 500, ci: "SUCCESS", author: "copilot[bot]").utf8))
+        await gh.set(.success(envelopeFrom(nodes: [bot], issueCount: 1)), for: SearchQuery.assigned)
+        let store = makeStore(gh)
+        await store.refresh()
+        #expect(store.isAssigned("acme/web#500"))
+        // Off: the search is not even issued, and the row is gone.
+        store.includesAssigned = false
+        let calls = await gh.callCount(for: SearchQuery.assigned)
+        await store.refresh()
+        #expect(await gh.callCount(for: SearchQuery.assigned) == calls)
+        #expect(!store.mine.value.contains { $0.id == "acme/web#500" })
+        #expect(!store.isAssigned("acme/web#500"))
+        // A failing assigned search never blocks the user's own list.
+        store.includesAssigned = true
+        await gh.set(.failure("boom"), for: SearchQuery.assigned)
+        await store.refresh()
+        #expect(store.mine.value.count == 5)
+        #expect(store.blockingError == nil)
+    }
+
     @Test func sectionPreferencesDefaultAndPersist() async throws {
         let defaults = testDefaults()
         let store = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })
@@ -287,7 +328,7 @@ import Testing
         let defaults = testDefaults()
         defaults.set(["needsAction", "needsYourReview"], forKey: "visibleSections")
         let store = PRStore(client: try await happyGH(), defaults: defaults, now: { Date() })
-        #expect(store.visibleSections == [.needsAction, .needsYourReview, .snoozedMine, .snoozedReview, .pinnedMine, .pinnedReview])
+        #expect(store.visibleSections == [.needsAction, .needsYourReview, .snoozedMine, .snoozedReview, .pinnedMine, .pinnedReview, .assignedMine])
         #expect(defaults.object(forKey: "visibleSections") == nil)
         #expect(Set(defaults.stringArray(forKey: PRStore.hiddenSectionsKey) ?? []) == ["drafts", "needsTeamsReview", "readyToMerge", "waitingForReview"])
         store.visibleSections.remove(.snoozedMine)
@@ -303,7 +344,7 @@ import Testing
         #expect(store.badgeCount == 6)
         store.badgeSections = [.needsYourReview]
         #expect(store.badgeCount == 3)
-        #expect(await gh.calls.count == 2)
+        #expect(await gh.calls.count == 3)   // mine, direct, assigned: one refresh
     }
 
     @Test func countingTeamsInBadgeFetchesTeamEveryCycle() async throws {

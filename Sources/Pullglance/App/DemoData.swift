@@ -6,6 +6,7 @@ struct DemoGH: GHRunning {
     private let now = Date()
 
     func search(_ query: String, includeMergeState: Bool, first: Int) async -> GHOutcome {
+        if query.contains("assignee:@me") { return .success(envelope([], total: 0)) }
         if query.contains("author:@me") { return .success(envelope(mine, total: mine.count)) }
         if query.contains(" user-review-requested:@me") { return .success(envelope(direct, total: direct.count)) }
         return .success(envelope(team, total: team.count + 98))

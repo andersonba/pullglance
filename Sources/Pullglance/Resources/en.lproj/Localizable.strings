@@ -214,7 +214,12 @@
 "Copy link" = "Copy link";
 "Not allowed by this repository" = "Not allowed by this repository";
 "Snoozed" = "Snoozed";
+"Assigned to you" = "Assigned to you";
+"Assigned" = "Assigned";
+"Count pull requests assigned to you as yours" = "Count pull requests assigned to you as yours";
+"Opened by a bot or a teammate with you as assignee. They join these sections by state and show their author." = "Opened by a bot or a teammate with you as assignee. They join these sections by state and show their author.";
 "Pinned" = "Pinned";
+"Opened by someone else with you as assignee" = "Opened by someone else with you as assignee";
 "Pinned by you, always on top" = "Pinned by you, always on top";
 "Pin to top" = "Pin to top";
 "Unpin" = "Unpin";

@@ -31,7 +31,7 @@ struct MineGroups: Sendable, Equatable {
         case .drafts: drafts
         case .snoozedMine: snoozed
         case .pinnedMine: pinned
-        case .needsYourReview, .needsTeamsReview, .snoozedReview, .pinnedReview: []
+        case .needsYourReview, .needsTeamsReview, .snoozedReview, .pinnedReview, .assignedMine: []
         }
     }
 }
@@ -51,7 +51,7 @@ func groupMine(_ prs: [PullRequest], dormant: Set<String> = [], pinned: Set<Stri
         case .readyToMerge: groups.readyToMerge.append(pr)
         case .waitingForReview: groups.waitingForReview.append(pr)
         case .drafts: groups.drafts.append(pr)
-        case .needsYourReview, .needsTeamsReview, .snoozedMine, .snoozedReview, .pinnedMine, .pinnedReview: break
+        case .needsYourReview, .needsTeamsReview, .snoozedMine, .snoozedReview, .pinnedMine, .pinnedReview, .assignedMine: break
         }
     }
     return groups

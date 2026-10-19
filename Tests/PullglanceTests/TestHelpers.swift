@@ -62,6 +62,12 @@ func makePR(
 }
 
 /// Builds a minimal GraphQL envelope around hand-written PR nodes.
+/// `envelope` for nodes that are already JSON objects (a fixture's node reused next to a built one).
+func envelopeFrom(nodes: [Any], issueCount: Int) -> Data {
+    let strings = nodes.map { String(data: try! JSONSerialization.data(withJSONObject: $0), encoding: .utf8)! }
+    return envelope(nodes: strings, issueCount: issueCount)
+}
+
 func envelope(nodes: [String], issueCount: Int? = nil, viewer: String = "octocat") -> Data {
     let body = """
     {"data":{"viewer":{"login":"\(viewer)"},"search":{"issueCount":\(issueCount ?? nodes.count),"nodes":[\(nodes.joined(separator: ","))]}}}

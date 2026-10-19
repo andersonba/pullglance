@@ -86,7 +86,8 @@ struct PopoverView: View {
                     mine: store.mineGroups,
                     directTotal: store.direct.total,
                     teamTotal: store.viaTeamTotal,
-                    snoozedReview: store.snoozedReviewList.count
+                    snoozedReview: store.snoozedReviewList.count,
+                    assigned: store.includesAssigned ? store.assignedIDs.count : nil
                 )
                 if !items.isEmpty {
                     QuickFilterBar(items: items, selection: tab == .mine ? $mineFilter : $reviewFilter)
@@ -578,6 +579,8 @@ struct PopoverView: View {
     private func row(_ pr: PullRequest, section: Section, showAuthor: Bool = false, teamLabel: String? = nil, among: [PullRequest] = []) -> some View {
         let dormant = store.isDormant(pr)
         let pinnedRow = store.isPinned(pr)
+        // A pull request assigned to the user is someone else's: its author says so on the row.
+        let showAuthor = showAuthor || store.isAssigned(pr.id)
         let reorderable = Self.isReorderable(section) && !dormant
         let lifted = rowDrag?.id == pr.id
         let focused = focus.id == pr.id
@@ -762,16 +765,19 @@ struct PopoverView: View {
 
     @ViewBuilder private var mineList: some View {
         let groups = store.mineGroups
-        let shown = store.orderedSections(.mine).filter { store.visibleSections.contains($0) && (mineFilter == nil || mineFilter == $0) }
-        if shown.allSatisfy({ groups[$0].isEmpty }), groups.snoozed.isEmpty, groups.pinned.isEmpty {
+        // The Assigned chip is not a section: every section stays, with only the assigned rows in each.
+        let assignedOnly = mineFilter == .assignedMine
+        let only = { (prs: [PullRequest]) in assignedOnly ? prs.filter { store.isAssigned($0.id) } : prs }
+        let shown = store.orderedSections(.mine).filter { store.visibleSections.contains($0) && (mineFilter == nil || assignedOnly || mineFilter == $0) }
+        if shown.allSatisfy({ only(groups[$0]).isEmpty }), only(groups.snoozed).isEmpty, only(groups.pinned).isEmpty {
             EmptyStateView(kind: .allClear)
         } else {
-            pinnedSection(.pinnedMine, groups.pinned, filter: mineFilter, showAuthor: false)
+            pinnedSection(.pinnedMine, only(groups.pinned), filter: assignedOnly ? nil : mineFilter, showAuthor: false)
             ForEach(shown) { section in
-                mineSection(section, groups[section])
+                mineSection(section, only(groups[section]))
             }
-            if mineFilter == nil || mineFilter == .snoozedMine {
-                snoozedSection(.snoozedMine, groups.snoozed, showAuthor: false)
+            if mineFilter == nil || assignedOnly || mineFilter == .snoozedMine {
+                snoozedSection(.snoozedMine, only(groups.snoozed), showAuthor: false)
             }
         }
     }

@@ -10,10 +10,14 @@ enum SearchQuery {
     /// Team requests only: the direct ones are already in `direct`, and leaving them out here is what
     /// makes `issueCount` the number the section header should show.
     static let viaTeam = "is:pr is:open review-requested:@me -user-review-requested:@me \(suffix)"
+    /// Assigned to the user but opened by someone else (a bot, an agent, a teammate): theirs to drive, so they
+    /// join My PRs. `-author:@me` keeps the user's own out, which `mine` already has.
+    static let assigned = "is:pr is:open assignee:@me -author:@me \(suffix)"
 
     static func mine(hiding owners: Set<String>, repos: Set<String> = []) -> String { mine + exclusions(owners, repos) }
     static func direct(hiding owners: Set<String>, repos: Set<String> = []) -> String { direct + exclusions(owners, repos) }
     static func viaTeam(hiding owners: Set<String>, repos: Set<String> = []) -> String { viaTeam + exclusions(owners, repos) }
+    static func assigned(hiding owners: Set<String>, repos: Set<String> = []) -> String { assigned + exclusions(owners, repos) }
 
     /// `-user:` works for organizations and personal accounts alike; `-repo:` for single repositories.
     /// Several of them AND together.
@@ -75,6 +79,7 @@ final class PRStore {
     static let sectionSortsKey = "sectionSorts"
     static let verboseLoggingKey = "verboseLogging"
     static let notifySnoozeEndKey = "notifySnoozeEnd"
+    static let includesAssignedKey = "includesAssigned"
     static let hiddenSectionsKey = "hiddenSections"
     static let badgeSectionsKey = "badgeSections"
     static let dualBadgeFirstKey = "dualBadgeFirst"
@@ -84,6 +89,24 @@ final class PRStore {
     static let sectionOrderKey = "sectionOrder"
 
     private(set) var mine = Snapshot<[PullRequest]>(value: [], total: 0, fetchedAt: nil)
+    /// Among `mine`, the pull requests that are the user's by assignment, not authorship: their rows show the
+    /// author, and the Assigned chip keeps only them.
+    private(set) var assignedIDs: Set<String> = []
+    func isAssigned(_ id: String) -> Bool { assignedIDs.contains(id) }
+    /// Settings › Sections: whether pull requests assigned to the user join My PRs. On by default: whoever
+    /// has none sees no difference, whoever has them (agents and bots opening pull requests) sees them.
+    var includesAssigned: Bool {
+        didSet {
+            guard includesAssigned != oldValue else { return }
+            defaults.set(includesAssigned, forKey: Self.includesAssignedKey)
+            if !includesAssigned {
+                mine.value.removeAll { assignedIDs.contains($0.id) }
+                assignedIDs = []
+                recomputeBadge()
+            }
+            Task { await refresh() }
+        }
+    }
     private(set) var direct = Snapshot<[PullRequest]>(value: [], total: 0, fetchedAt: nil)
     /// nil until the "Via team" section is expanded for the first time.
     private(set) var viaTeam: Snapshot<[PullRequest]>? = nil
@@ -421,6 +444,7 @@ final class PRStore {
         self.badgeRollDuration = badgeRollDuration
         self.rollsBadge = defaults.object(forKey: Self.badgeRollKey) as? Bool ?? true
         self.notifiesSnoozeEnd = defaults.bool(forKey: Self.notifySnoozeEndKey)
+        self.includesAssigned = defaults.object(forKey: Self.includesAssignedKey) as? Bool ?? true
         self.notifier = notifier
         self.client = client
         self.defaults = defaults
@@ -669,13 +693,15 @@ final class PRStore {
         func pinnedRows(_ prs: [PullRequest], _ section: Section) {
             rows += prs.filter { filter == nil || originSection(of: $0) == filter }.map { (section, $0) }
         }
-        let sections = orderedSections(tab).filter { visibleSections.contains($0) && (filter == nil || filter == $0) }
+        let assignedOnly = filter == .assignedMine
+        let sections = orderedSections(tab).filter { visibleSections.contains($0) && (filter == nil || assignedOnly || filter == $0) }
         switch tab {
         case .mine:
             let groups = mineGroups
-            pinnedRows(groups.pinned, .pinnedMine)
-            for section in sections { rows += groups[section].map { (section, $0) } }
-            if filter == nil || filter == .snoozedMine, visibleSections.contains(.snoozedMine) { rows += groups.snoozed.map { (.snoozedMine, $0) } }
+            let only = { (prs: [PullRequest]) in assignedOnly ? prs.filter { self.isAssigned($0.id) } : prs }
+            if assignedOnly { rows += only(groups.pinned).map { (.pinnedMine, $0) } } else { pinnedRows(groups.pinned, .pinnedMine) }
+            for section in sections { rows += only(groups[section]).map { (section, $0) } }
+            if filter == nil || assignedOnly || filter == .snoozedMine, visibleSections.contains(.snoozedMine) { rows += only(groups.snoozed).map { (.snoozedMine, $0) } }
         case .review:
             pinnedRows(pinnedReviewList, .pinnedReview)
             for section in sections {
@@ -1171,15 +1197,24 @@ final class PRStore {
 
         // All three at once: the team search no longer needs the direct list to exclude anything.
         let wantsTeam = wantsTeamFetch
+        let wantsAssigned = includesAssigned
         async let mineOutcome = client.search(SearchQuery.mine(hiding: hiddenOwners, repos: excludedRepos), includeMergeState: true, first: Self.pageSize)
         async let directOutcome = client.search(SearchQuery.direct(hiding: hiddenOwners, repos: excludedRepos), includeMergeState: false, first: Self.pageSize)
         async let teamOutcome: GHOutcome? = wantsTeam
             ? client.search(SearchQuery.viaTeam(hiding: hiddenOwners, repos: excludedRepos), includeMergeState: false, first: Self.teamPageSize)
             : nil
-        let (m, d, t) = await (mineOutcome, directOutcome, teamOutcome)
+        async let assignedOutcome: GHOutcome? = wantsAssigned
+            ? client.search(SearchQuery.assigned(hiding: hiddenOwners, repos: excludedRepos), includeMergeState: true, first: Self.pageSize)
+            : nil
+        let (m, d, t, a) = await (mineOutcome, directOutcome, teamOutcome, assignedOutcome)
 
         var errors: [ErrorKind] = []
-        if let error = apply(m, to: &mine, search: .mine) { errors.append(error) } else { await reconcileMine() }
+        if let error = apply(m, to: &mine, search: .mine) {
+            errors.append(error)
+        } else {
+            mergeAssigned(a)
+            await reconcileMine()
+        }
         if let error = apply(d, to: &direct, search: .direct) { errors.append(error) }
 
         if let t {
@@ -1196,6 +1231,25 @@ final class PRStore {
         // After every snapshot is in place (no inout borrow left): snoozed PRs with new activity wake up.
         wakeChanged(in: mine.value + direct.value + (viaTeam?.value ?? []))
         finish(errors: errors)
+    }
+
+    /// The assigned search joins the user's own list, once each (a user assigned to their own pull request is
+    /// already in `mine`), newest first as the searches sort. Best effort: a failure keeps the list the user's
+    /// own, logged, never an error in the bar; the next refresh tries again.
+    private func mergeAssigned(_ outcome: GHOutcome?) {
+        assignedIDs = []
+        guard let outcome else { return }
+        var snapshot = Snapshot<[PullRequest]>(value: [], total: 0, fetchedAt: nil)
+        if let error = applyOutcome(outcome, to: &snapshot) {
+            appLog.info("search assigned failed: \(error); keeping the user's own list")
+            return
+        }
+        let own = Set(mine.value.map(\.id))
+        let added = snapshot.value.filter { !own.contains($0.id) }
+        guard !added.isEmpty else { return }
+        assignedIDs = Set(added.map(\.id))
+        mine.value = (mine.value + added).sorted { $0.updatedAt > $1.updatedAt }
+        mine.total += added.count
     }
 
     /// The search index lags the repository by minutes (an approval showed up five refreshes late). The

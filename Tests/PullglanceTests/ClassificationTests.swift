@@ -121,8 +121,8 @@ import Testing
         #expect(Section.snoozedMine.tab == .mine)
         #expect(Section.snoozedReview.tab == .review)
         #expect(Section.snoozedMine.isSnoozed && Section.snoozedReview.isSnoozed)
-        // Fixed sections (Pinned first, Snoozed last) are outside the user's section order.
-        #expect(Section.allCases.filter(\.isFixed) == [.snoozedMine, .snoozedReview, .pinnedMine, .pinnedReview])
+        // Fixed sections (Pinned first, Snoozed last, Assigned a filter) are outside the user's section order.
+        #expect(Section.allCases.filter(\.isFixed) == [.snoozedMine, .snoozedReview, .pinnedMine, .pinnedReview, .assignedMine])
         #expect(Section.reorderable(in: .mine).allSatisfy { !$0.isFixed })
         #expect(Section.defaultBadge.contains(.snoozedMine) == false)
         #expect(Section.reviewSections == [.needsYourReview, .needsTeamsReview])

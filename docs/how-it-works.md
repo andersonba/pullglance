@@ -30,7 +30,7 @@ Releases are cut by `Scripts/release.sh`, which writes the version and the zip's
 
 ## My PRs
 
-Four sections, in the order you choose in Settings › Sections:
+Your own pull requests, plus the ones assigned to you that someone else opened (a bot, a coding agent, a teammate): those are yours to drive, so they join the same sections by state, with their author on the row, and the **Assigned** quick filter keeps only them. Settings › Sections turns that off. Four sections, in the order you choose in Settings › Sections:
 
 - **Needs action**: failing checks, requested changes, merge conflicts, branch behind base.
 - **Ready to merge**: approved, checks green, no conflicts.
@@ -74,7 +74,7 @@ Off by default; Settings › Review Desk turns it on. With it on, a click on a r
 ## Settings (⌘,)
 
 - **General**: launch at login, refresh interval, the menu bar roll, the global shortcut.
-- **Sections**: show or hide sections, drag to reorder them, choose what the badge counts, one number or two.
+- **Sections**: show or hide sections, drag to reorder them, choose what the badge counts, one number or two. Also whether pull requests assigned to you count as yours.
 - **Filters**: hidden owners and per-owner repository rules.
 - **Review**: which files count as tests, by preset or your own globs; how marking behaves; where the file pill sits; compare memory.
 - **Diagnostics**: the failures of the last refreshes, the avatar cache, a verbose log toggle and *Export diagnostics…*, which zips a summary, the log and optional screenshots for a bug report.

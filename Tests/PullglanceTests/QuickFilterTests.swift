@@ -52,3 +52,17 @@ import Testing
         #expect(items.isEmpty)
     }
 }
+
+@Suite struct AssignedQuickFilterTests {
+    @Test func assignedChipFollowsTheCount() {
+        let prs = [makePR(repo: "acme/web", number: 1), makePR(repo: "acme/web", number: 2)]
+        let base = quickFilterItems(sections: [Section.needsAction, .readyToMerge, .waitingForReview, .drafts], visible: Set(Section.allCases), mine: groupMine(prs), directTotal: 0, teamTotal: nil, snoozedReview: 0)
+        #expect(!base.contains { $0.section == .assignedMine })
+        let withAssigned = quickFilterItems(sections: [Section.needsAction, .readyToMerge, .waitingForReview, .drafts], visible: Set(Section.allCases), mine: groupMine(prs), directTotal: 0, teamTotal: nil, snoozedReview: 0, assigned: 1)
+        let chip = withAssigned.first { $0.section == .assignedMine }
+        #expect(chip?.count == 1)
+        #expect(withAssigned.last?.section == .assignedMine)   // after the sections, before nothing (no snoozed)
+        #expect(Section.assignedMine.isFixed)                   // never in the reorderable list, never a badge section
+        #expect(!Section.reorderable(in: .mine).contains(.assignedMine))
+    }
+}

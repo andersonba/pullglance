@@ -47,7 +47,7 @@ import Testing
         #expect(store.availableRepos.map(\.fullName) == ["acme/web"])
         // Only mode never touches the searches.
         await store.refresh()
-        #expect(await gh.calls.allSatisfy { $0 == SearchQuery.mine || $0 == SearchQuery.direct })
+        #expect(await gh.calls.allSatisfy { $0 == SearchQuery.mine || $0 == SearchQuery.direct || $0 == SearchQuery.assigned })
     }
 
     @Test func aRuleWithoutReposFallsBackToAllRepositories() async throws {

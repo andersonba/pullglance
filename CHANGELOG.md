@@ -6,6 +6,9 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+### Added
+- Pull requests assigned to you that someone else opened (a bot, a coding agent, a teammate) now show in My PRs: same sections by state, same number next to the clock, the author on the row so you can tell them apart, and an **Assigned** quick filter. A click on the author's avatar narrows the list to that bot or person, as before. Settings › Sections turns it off. Asked for in [#3](https://github.com/andersonba/pullglance/issues/3).
+
 ### Fixed
 - In the Review Desk, marking right after a page load sometimes left the file unmarked on the page while GitHub had it as viewed: GitHub's new Files UI finishes taking the page over, and renders the file list again from data it fetches, after the page looks ready, and a click before that is drawn over. Every mark, step or jump now waits for the page to be ready, and a mark that the page draws over is applied again. "Mark automatically" was the usual victim.
 
