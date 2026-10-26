@@ -260,6 +260,8 @@
 "Open on GitHub · Copy link" = "Abrir no GitHub · Copiar link";
 "Mark viewed · Mark tests" = "Marcar visto · Marcar testes";
 "Previous · Next file" = "Arquivo anterior · próximo";
+"Top · End of page" = "Topo · Fim da página";
+"Page up · down" = "Página acima · abaixo";
 "Approve · Comment · Merge" = "Aprovar · Comentar · Mergear";
 "Review bar" = "Barra de review";
 "Find · Address bar · Open in browser" = "Buscar · Endereço · Abrir no navegador";
@@ -478,14 +480,14 @@
 "act on it" = "agem nela";
 "Welcome…" = "Boas-vindas…";
 "%lld left" = "faltam %lld";
-"Previous unviewed file (⌘↑)" = "Arquivo não visto anterior (⌘↑)";
-"Next unviewed file (⌘↓)" = "Próximo arquivo não visto (⌘↓)";
+"Previous unviewed file (⌘K)" = "Arquivo não visto anterior (⌘K)";
+"Next unviewed file (⌘J)" = "Próximo arquivo não visto (⌘J)";
 "Capture now" = "Capturar agora";
 "Review Desk picture" = "Foto do Review Desk";
 "A picture of the page and a summary of its structure, into the log folder. Also ⇧⌘P in the window." = "Uma imagem da página e um resumo da estrutura dela, na pasta do log. Também ⇧⌘P na janela.";
 "All viewed" = "Tudo visto";
-"Previous file (⌘↑)" = "Arquivo anterior (⌘↑)";
-"Next file (⌘↓)" = "Próximo arquivo (⌘↓)";
+"Previous file (⌘K)" = "Arquivo anterior (⌘K)";
+"Next file (⌘J)" = "Próximo arquivo (⌘J)";
 "Next file with an open thread · ⌥ previous" = "Próximo arquivo com thread aberta · ⌥ anterior";
 "The thread is inside a collapsed file. Expand it to read it." = "A thread está num arquivo recolhido. Expanda para ler.";
 "Every key of a focused row" = "Todas as teclas da linha focada";

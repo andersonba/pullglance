@@ -160,7 +160,9 @@ struct ShortcutsCard: View {
             if ReviewSettingsStore.shared.settings.windowEnabled {
                 group(Text("Review Desk", bundle: .app)) {
                     line(Text("Mark viewed · Mark tests", bundle: .app), ["⌘↩", "⇧⌘V"])
-                    line(Text("Previous · Next file", bundle: .app), ["⌘↑", "⌘↓"])
+                    line(Text("Previous · Next file", bundle: .app), ["⌘K", "⌘J"])
+                    line(Text("Top · End of page", bundle: .app), ["⌘↑", "⌘↓"])
+                    line(Text("Page up · down", bundle: .app), ["⇧space", "space"])
                     line(Text("Approve · Comment · Merge", bundle: .app), ["⇧⌘A", "⇧⌘C", "⇧⌘M"])
                     line(Text("Review bar", bundle: .app), ["⌥⌘B"])
                     line(Text("Find · Address bar · Open in browser", bundle: .app), ["⌘F", "⌘L", "⇧⌘O"])

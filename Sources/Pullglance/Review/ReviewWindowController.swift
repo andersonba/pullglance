@@ -226,20 +226,17 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
             case (.command, "0"): self.zoomReset()
             case ([.command, .shift], "O"), ([.command, .shift], "o"): self.openInBrowser()
             case ([.command, .shift], "P"), ([.command, .shift], "p"): self.capture()
-            // Review keys act only when the page has focus and no modal is up (text fields keep ⌘↓ etc.), and only
-            // on review pages; elsewhere the page keeps them (⌘↓ scrolls to the end, etc.).
+            // Review keys act only when the page has focus and no modal is up (a GitHub comment box keeps ⌘K,
+            // its insert-link key), and only on review pages; elsewhere the page keeps them.
             case ([.command, .shift], "V"), ([.command, .shift], "v"):
                 guard reviewKeys, self.session.page.showsBar else { return event }
                 self.markTests()
             case (.command, "\r"), ([.command, .numericPad, .function], "\u{3}"):
                 guard reviewKeys, self.session.showsFilePill else { return event }
                 self.markViewedAndNext()
-            case (.command, "\u{F701}"), ([.command, .function], "\u{F701}"), ([.command, .numericPad, .function], "\u{F701}"):
-                guard reviewKeys, self.session.page.showsBar else { return event }
-                self.nextUnviewed()
-            case (.command, "\u{F700}"), ([.command, .function], "\u{F700}"), ([.command, .numericPad, .function], "\u{F700}"):
-                guard reviewKeys, self.session.page.showsBar else { return event }
-                self.previousUnviewed()
+            case (.command, "j"), (.command, "k"):
+                guard reviewKeys, self.session.page.showsBar, let step = Self.fileStep(flags: flags, key: key) else { return event }
+                Task { await self.session.stepUnviewed(step) }
             case ([.command, .shift], "A"), ([.command, .shift], "a"):
                 guard reviewKeys, self.session.pullRequest != nil else { return event }
                 self.approvePR()
@@ -262,9 +259,20 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     }
 
     /// The review shortcuts belong to the page: never while typing in the address, find or modal fields, nor in
-    /// the page's own fields (a GitHub comment box keeps ⇧⌘V Paste and Match Style and ⌘↑/⌘↓).
+    /// the page's own fields (a GitHub comment box keeps ⇧⌘V Paste and Match Style and ⌘K, its insert-link key).
     nonisolated static func handlesReviewShortcut(focusInWebView: Bool, modalPresented: Bool, editingInPage: Bool) -> Bool {
         focusInWebView && !modalPresented && !editingInPage
+    }
+
+    /// The keys that step through files: ⌘J next, ⌘K previous, the popover's J/K with the modifier the page
+    /// needs. ⌘↑ and ⌘↓ are the page's scroll to the top and to the end, as in any browser, and are never taken.
+    nonisolated static func fileStep(flags: NSEvent.ModifierFlags, key: String) -> Int? {
+        guard flags == .command else { return nil }
+        switch key {
+        case "j": return 1
+        case "k": return -1
+        default: return nil
+        }
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {

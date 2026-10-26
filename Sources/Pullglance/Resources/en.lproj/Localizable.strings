@@ -260,6 +260,8 @@
 "Open on GitHub · Copy link" = "Open on GitHub · Copy link";
 "Mark viewed · Mark tests" = "Mark viewed · Mark tests";
 "Previous · Next file" = "Previous · Next file";
+"Top · End of page" = "Top · End of page";
+"Page up · down" = "Page up · down";
 "Approve · Comment · Merge" = "Approve · Comment · Merge";
 "Review bar" = "Review bar";
 "Find · Address bar · Open in browser" = "Find · Address bar · Open in browser";
@@ -478,14 +480,14 @@
 "act on it" = "act on it";
 "Welcome…" = "Welcome…";
 "%lld left" = "%lld left";
-"Previous unviewed file (⌘↑)" = "Previous unviewed file (⌘↑)";
-"Next unviewed file (⌘↓)" = "Next unviewed file (⌘↓)";
+"Previous unviewed file (⌘K)" = "Previous unviewed file (⌘K)";
+"Next unviewed file (⌘J)" = "Next unviewed file (⌘J)";
 "Capture now" = "Capture now";
 "Review Desk picture" = "Review Desk picture";
 "A picture of the page and a summary of its structure, into the log folder. Also ⇧⌘P in the window." = "A picture of the page and a summary of its structure, into the log folder. Also ⇧⌘P in the window.";
 "All viewed" = "All viewed";
-"Previous file (⌘↑)" = "Previous file (⌘↑)";
-"Next file (⌘↓)" = "Next file (⌘↓)";
+"Previous file (⌘K)" = "Previous file (⌘K)";
+"Next file (⌘J)" = "Next file (⌘J)";
 "Next file with an open thread · ⌥ previous" = "Next file with an open thread · ⌥ previous";
 "The thread is inside a collapsed file. Expand it to read it." = "The thread is inside a collapsed file. Expand it to read it.";
 "Every key of a focused row" = "Every key of a focused row";

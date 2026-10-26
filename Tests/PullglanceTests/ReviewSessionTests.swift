@@ -383,7 +383,17 @@ final class FakeScripting: ReviewScripting {
         #expect(ReviewWindowController.handlesReviewShortcut(focusInWebView: true, modalPresented: false, editingInPage: false))
         #expect(!ReviewWindowController.handlesReviewShortcut(focusInWebView: false, modalPresented: false, editingInPage: false))
         #expect(!ReviewWindowController.handlesReviewShortcut(focusInWebView: true, modalPresented: true, editingInPage: false))
-        // A GitHub textarea keeps ⇧⌘V (Paste and Match Style) and ⌘↑/⌘↓.
+        // A GitHub textarea keeps ⇧⌘V (Paste and Match Style) and ⌘K (insert link).
         #expect(!ReviewWindowController.handlesReviewShortcut(focusInWebView: true, modalPresented: false, editingInPage: true))
+    }
+
+    @Test func fileStepIsCommandJAndKAndTheArrowsStayThePages() {
+        #expect(ReviewWindowController.fileStep(flags: .command, key: "j") == 1)
+        #expect(ReviewWindowController.fileStep(flags: .command, key: "k") == -1)
+        // ⌘↓ and ⌘↑ are the page's scroll to the end and to the top, as in any browser: never taken.
+        #expect(ReviewWindowController.fileStep(flags: .command, key: "\u{F701}") == nil)
+        #expect(ReviewWindowController.fileStep(flags: [.command, .function], key: "\u{F700}") == nil)
+        #expect(ReviewWindowController.fileStep(flags: [.command, .shift], key: "J") == nil)
+        #expect(ReviewWindowController.fileStep(flags: [], key: "j") == nil)
     }
 }

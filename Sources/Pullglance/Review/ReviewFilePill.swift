@@ -4,7 +4,7 @@ import SwiftUI
 /// A small capsule floating over the page on Files and compare pages: how many files are still unviewed,
 /// ▲▼ to the previous and next unviewed one, and one check. The check marks the current file and moves
 /// to the next unviewed; on a file already viewed it is filled and unmarks instead. No path: the current
-/// file is the outlined one on the page. ⌘↑ ⌘↓ still walk every file. The tests combo lives in the bar.
+/// file is the outlined one on the page. ⌘K ⌘J do the same from the keyboard. The tests combo lives in the bar.
 struct ReviewFilePill: View {
     let session: ReviewSession
     /// The moment the last file got viewed: a green pulse on the capsule and a bounce of the seal.
@@ -31,9 +31,9 @@ struct ReviewFilePill: View {
                 // the group becomes one segmented control and drops its children's tooltips.
                 HStack(spacing: 2) {
                     Button { Task { await session.stepUnviewed(-1) } } label: { Image(systemName: "chevron.up").frame(width: 14) }
-                        .help(left == 0 ? Text("Previous file (⌘↑)", bundle: .app) : Text("Previous unviewed file (⌘↑)", bundle: .app))
+                        .help(left == 0 ? Text("Previous file (⌘K)", bundle: .app) : Text("Previous unviewed file (⌘K)", bundle: .app))
                     Button { Task { await session.stepUnviewed(1) } } label: { Image(systemName: "chevron.down").frame(width: 14) }
-                        .help(left == 0 ? Text("Next file (⌘↓)", bundle: .app) : Text("Next unviewed file (⌘↓)", bundle: .app))
+                        .help(left == 0 ? Text("Next file (⌘J)", bundle: .app) : Text("Next unviewed file (⌘J)", bundle: .app))
                 }
                 .buttonStyle(.bordered)
                 .fixedSize()
