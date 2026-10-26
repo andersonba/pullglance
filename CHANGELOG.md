@@ -6,6 +6,9 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+### Added
+- The Review Desk answers to three more browser keys: `⌘←` / `⌘→` go back and forward (outside a text field, where they stay the line's start and end), `⌘E` takes the selected text as the find term and finds the next match, and `esc` stops a page still loading when no find bar or dialog is up.
+
 ### Changed
 - In the Review Desk, the previous and next file are now `⌘K` and `⌘J` (the popover's J and K, with the modifier the page needs), and `⌘↑` / `⌘↓` are the page's again: top and end, as in any browser, on the diff and on the conversation. The `⌘/` card lists both, plus `space` / `⇧space`.
 - A pull request in the merge queue, or with auto-merge on, shows a purple dot at the left (a queue glyph, or a bolt) instead of the green of its checks: GitHub will merge it, it has left your hands. The checks moved to the dot's tooltip, and the click still opens them.

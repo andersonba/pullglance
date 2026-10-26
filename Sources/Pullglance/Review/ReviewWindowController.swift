@@ -204,13 +204,29 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     private func installKeyMonitor() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, let window = self.window, NSApp.keyWindow === window else { return event }
-            if event.keyCode == 53, self.modalHost != nil { self.dismissModal(); return nil }   // Escape
-            if event.keyCode == 53, !self.findBar.isHidden { self.hideFind(); return nil }   // Escape
+            if event.keyCode == 53 {   // Escape
+                switch Self.escapeAction(modalPresented: self.modalHost != nil, findShown: !self.findBar.isHidden, isLoading: self.activeWebView.isLoading) {
+                case .dismissModal: self.dismissModal(); return nil
+                case .hideFind: self.hideFind(); return nil
+                case .stop: self.stop(); return event   // the page gets its esc too, as in a browser
+                case nil: return event
+                }
+            }
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             let focusInWebView = window.firstResponder is WKWebView || (window.firstResponder as? NSView)?.superview is WKWebView
             guard focusInWebView || flags.contains(.command) else { return event }
             let key = event.charactersIgnoringModifiers ?? ""
             let reviewKeys = Self.handlesReviewShortcut(focusInWebView: focusInWebView, modalPresented: self.modalHost != nil, editingInPage: self.session.isEditingInPage)
+            // The browser's own keys: ⌘←/⌘→ are back and forward outside the page's text fields (inside, the
+            // line's start and end), ⌘E takes the selection as the find term wherever the page has focus.
+            if let browserKey = Self.browserKey(flags: flags, key: key), focusInWebView, self.modalHost == nil {
+                switch browserKey {
+                case .back: guard !self.session.isEditingInPage else { return event }; self.goBack()
+                case .forward: guard !self.session.isEditingInPage else { return event }; self.goForward()
+                case .useSelectionForFind: self.useSelectionForFind()
+                }
+                return nil
+            }
             switch (flags, key) {
             case (.command, "r"): self.reload()
             case (.command, "l"): self.focusAddress()
@@ -262,6 +278,30 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     /// the page's own fields (a GitHub comment box keeps ⇧⌘V Paste and Match Style and ⌘K, its insert-link key).
     nonisolated static func handlesReviewShortcut(focusInWebView: Bool, modalPresented: Bool, editingInPage: Bool) -> Bool {
         focusInWebView && !modalPresented && !editingInPage
+    }
+
+    enum BrowserKey: Equatable { case back, forward, useSelectionForFind }
+
+    /// Chrome's and Safari's keys that the key monitor answers to on top of the menu's: ⌘← and ⌘→ as the
+    /// other back and forward, ⌘E as Use Selection for Find. Plain or shifted arrows stay the page's.
+    nonisolated static func browserKey(flags: NSEvent.ModifierFlags, key: String) -> BrowserKey? {
+        guard flags.contains(.command), flags.isDisjoint(with: [.shift, .option, .control]) else { return nil }
+        switch key {
+        case "\u{F702}": return .back
+        case "\u{F703}": return .forward
+        case "e": return .useSelectionForFind
+        default: return nil
+        }
+    }
+
+    enum EscapeAction: Equatable { case dismissModal, hideFind, stop }
+
+    /// Esc closes what the window put up first, the modal, then the find bar; with nothing up it stops a
+    /// page still loading, as in a browser, and the page sees the key as well.
+    nonisolated static func escapeAction(modalPresented: Bool, findShown: Bool, isLoading: Bool) -> EscapeAction? {
+        if modalPresented { return .dismissModal }
+        if findShown { return .hideFind }
+        return isLoading ? .stop : nil
     }
 
     /// The keys that step through files: ⌘J next, ⌘K previous, the popover's J/K with the modifier the page
@@ -845,6 +885,28 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     @objc func findNext() { find(backwards: false) }
     @objc func findPrevious() { find(backwards: true) }
+
+    /// ⌘E: the page's selection becomes the find term and the next match is found right away, with the focus
+    /// left on the page so ⌘G and ⇧⌘G carry on. A selection inside a text field counts too (the page world's
+    /// `getSelection` is empty there, the field's own range is not). Nothing selected changes nothing.
+    @objc func useSelectionForFind() {
+        let script = """
+        (() => {
+          const a = document.activeElement;
+          if (a && (a.tagName === 'TEXTAREA' || a.tagName === 'INPUT') && a.selectionStart != null && a.selectionEnd > a.selectionStart) {
+            return a.value.substring(a.selectionStart, a.selectionEnd);
+          }
+          return String(window.getSelection?.() ?? '');
+        })()
+        """
+        host.webView.evaluateJavaScript(script) { [weak self] value, _ in
+            Task { @MainActor in
+                guard let self, let text = (value as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return }
+                self.findField.stringValue = text
+                self.find(backwards: false)
+            }
+        }
+    }
 
     private func find(backwards: Bool) {
         let text = findField.stringValue

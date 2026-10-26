@@ -396,4 +396,20 @@ final class FakeScripting: ReviewScripting {
         #expect(ReviewWindowController.fileStep(flags: [.command, .shift], key: "J") == nil)
         #expect(ReviewWindowController.fileStep(flags: [], key: "j") == nil)
     }
+
+    @Test func browserKeysAreCommandArrowsForHistoryAndCommandEForTheSelection() {
+        #expect(ReviewWindowController.browserKey(flags: .command, key: "\u{F702}") == .back)
+        #expect(ReviewWindowController.browserKey(flags: [.command, .function, .numericPad], key: "\u{F703}") == .forward)
+        #expect(ReviewWindowController.browserKey(flags: .command, key: "e") == .useSelectionForFind)
+        #expect(ReviewWindowController.browserKey(flags: [], key: "\u{F702}") == nil)
+        #expect(ReviewWindowController.browserKey(flags: [.command, .shift], key: "\u{F702}") == nil)
+        #expect(ReviewWindowController.browserKey(flags: [.command, .shift], key: "E") == nil)
+    }
+
+    @Test func escapeDismissesTheModalThenTheFindBarThenStopsALoad() {
+        #expect(ReviewWindowController.escapeAction(modalPresented: true, findShown: true, isLoading: true) == .dismissModal)
+        #expect(ReviewWindowController.escapeAction(modalPresented: false, findShown: true, isLoading: true) == .hideFind)
+        #expect(ReviewWindowController.escapeAction(modalPresented: false, findShown: false, isLoading: true) == .stop)
+        #expect(ReviewWindowController.escapeAction(modalPresented: false, findShown: false, isLoading: false) == nil)
+    }
 }

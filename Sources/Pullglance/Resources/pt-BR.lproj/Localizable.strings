@@ -264,7 +264,9 @@
 "Page up · down" = "Página acima · abaixo";
 "Approve · Comment · Merge" = "Aprovar · Comentar · Mergear";
 "Review bar" = "Barra de review";
-"Find · Address bar · Open in browser" = "Buscar · Endereço · Abrir no navegador";
+"Back · Forward" = "Voltar · Avançar";
+"Find · Find the selection" = "Buscar · Buscar a seleção";
+"Address bar · Open in browser" = "Barra de endereço · Abrir no navegador";
 "Snoozed here until a new commit, review decision or CI result" = "Ficam aqui até um novo commit, decisão de review ou resultado de CI";
 "Merging… " = "Mergeando… ";
 "Posting comment… " = "Publicando comentário… ";

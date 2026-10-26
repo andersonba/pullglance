@@ -264,7 +264,9 @@
 "Page up · down" = "Page up · down";
 "Approve · Comment · Merge" = "Approve · Comment · Merge";
 "Review bar" = "Review bar";
-"Find · Address bar · Open in browser" = "Find · Address bar · Open in browser";
+"Back · Forward" = "Back · Forward";
+"Find · Find the selection" = "Find · Find the selection";
+"Address bar · Open in browser" = "Address bar · Open in browser";
 "Snoozed here until a new commit, review decision or CI result" = "Snoozed here until a new commit, review decision or CI result";
 "Merging… " = "Merging… ";
 "Posting comment… " = "Posting comment… ";

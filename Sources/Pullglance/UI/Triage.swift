@@ -165,7 +165,9 @@ struct ShortcutsCard: View {
                     line(Text("Page up · down", bundle: .app), ["⇧space", "space"])
                     line(Text("Approve · Comment · Merge", bundle: .app), ["⇧⌘A", "⇧⌘C", "⇧⌘M"])
                     line(Text("Review bar", bundle: .app), ["⌥⌘B"])
-                    line(Text("Find · Address bar · Open in browser", bundle: .app), ["⌘F", "⌘L", "⇧⌘O"])
+                    line(Text("Back · Forward", bundle: .app), ["⌘[", "⌘]", "⌘←", "⌘→"])
+                    line(Text("Find · Find the selection", bundle: .app), ["⌘F", "⌘E"])
+                    line(Text("Address bar · Open in browser", bundle: .app), ["⌘L", "⇧⌘O"])
                 }
             }
         }
