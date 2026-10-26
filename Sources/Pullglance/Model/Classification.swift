@@ -112,3 +112,19 @@ func computeBadgeCount(mine: [PullRequest], direct: [PullRequest], viaTeam: [Pul
     }
     return total
 }
+
+/// What the row's leading dot stands for. The checks, unless the pull request has left the user's hands:
+/// in the merge queue, or with auto-merge on, GitHub merges by itself, and the dot says so in the purple of
+/// the pill, with the checks kept for the tooltip. Checks that fail take the pull request out of the queue,
+/// and the dot turns red with them. Queued wins over auto-merge: it is the later, more specific fact.
+enum RowIndicator: Equatable, Sendable {
+    case checks(CIState)
+    case queued(position: Int, checks: CIState)
+    case autoMerge(checks: CIState)
+
+    static func of(_ pr: PullRequest) -> RowIndicator {
+        if let position = pr.mergeQueuePosition { return .queued(position: position, checks: pr.ciState) }
+        if pr.autoMergeMethod != nil { return .autoMerge(checks: pr.ciState) }
+        return .checks(pr.ciState)
+    }
+}

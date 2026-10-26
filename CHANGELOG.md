@@ -6,6 +6,9 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+### Changed
+- A pull request in the merge queue, or with auto-merge on, shows a purple dot at the left (a queue glyph, or a bolt) instead of the green of its checks: GitHub will merge it, it has left your hands. The checks moved to the dot's tooltip, and the click still opens them.
+
 ## [0.5.0] - 2026-10-19
 
 ### Added

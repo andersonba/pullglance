@@ -128,7 +128,14 @@ struct PRRow: View {
             if isDormant {
                 Image(systemName: "moon.zzz").font(.system(size: 11)).foregroundStyle(.secondary).frame(width: 16, height: 16).padding(.top, 3)
             } else {
-                CIDot(state: pr.ciState, url: pr.checksURL)
+                switch RowIndicator.of(pr) {
+                case .checks(let state): CIDot(state: state, url: pr.checksURL)
+                case .queued(let position, let checks):
+                    HandoffDot(symbol: "line.3.horizontal", url: pr.checksURL,
+                               help: Text("In the merge queue, position \(position) · \(checksWord(checks))", bundle: .app))
+                case .autoMerge(let checks):
+                    HandoffDot(symbol: "bolt.fill", url: pr.checksURL, help: Text("Auto-merge on · \(checksWord(checks))", bundle: .app))
+                }
             }
         }
     }
@@ -253,6 +260,36 @@ struct StatusDot: View {
             Image(systemName: symbol).font(.system(size: 7.5, weight: .bold)).foregroundStyle(.white)
         }
         .padding(.top, 3)
+    }
+}
+
+/// The checks in a word, for the tooltip of a dot that no longer shows them.
+private func checksWord(_ state: CIState) -> String {
+    switch state {
+    case .success: String(localized: "checks green", bundle: .app)
+    case .failure: String(localized: "checks failed", bundle: .app)
+    case .pending: String(localized: "checks running", bundle: .app)
+    case .none: String(localized: "no checks", bundle: .app)
+    }
+}
+
+/// The dot of a pull request GitHub will merge by itself (queued, or auto-merge on): the pill's purple, a
+/// glyph for which, and the checks' page one click away as with `CIDot`.
+struct HandoffDot: View {
+    let symbol: String
+    let url: URL
+    let help: Text
+
+    var body: some View {
+        Button { PopoverDismissal.open(url) } label: {
+            ZStack {
+                Circle().fill(.purple).frame(width: 14, height: 14)
+                Image(systemName: symbol).font(.system(size: 7.5, weight: .bold)).foregroundStyle(.white)
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 3)
+        .help(help)
     }
 }
 

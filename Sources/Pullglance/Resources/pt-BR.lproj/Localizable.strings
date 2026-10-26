@@ -18,6 +18,12 @@
 "Awaiting review" = "Aguardando review";
 
 /* Row */
+"In the merge queue, position %lld · %@" = "Na fila de merge, posição %lld · %@";
+"Auto-merge on · %@" = "Auto-merge ligado · %@";
+"checks green" = "checks verdes";
+"checks failed" = "checks falharam";
+"checks running" = "checks rodando";
+"no checks" = "sem checks";
 "Open checks" = "Abrir checks";
 
 /* Footer */

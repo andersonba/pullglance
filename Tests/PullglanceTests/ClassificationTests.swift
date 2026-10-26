@@ -156,3 +156,15 @@ import Testing
         #expect(computeBadgeCount(mine: mine, direct: [], viaTeam: [], counting: [.needsAction, .readyToMerge]) == 0)
     }
 }
+
+/// The row's leading dot: the merge queue and auto-merge take over from the checks, in the pill's purple,
+/// because the pull request has left the user's hands; the checks keep speaking everywhere else.
+@Suite struct RowIndicatorTests {
+    @Test func queueAndAutoMergeTakeOverFromTheChecks() {
+        #expect(RowIndicator.of(makePR(ciState: .success)) == .checks(.success))
+        #expect(RowIndicator.of(makePR(ciState: .success, mergeQueuePosition: 2)) == .queued(position: 2, checks: .success))
+        #expect(RowIndicator.of(makePR(ciState: .pending, autoMergeMethod: .squash)) == .autoMerge(checks: .pending))
+        // Both set: the queue is the later, more specific fact.
+        #expect(RowIndicator.of(makePR(ciState: .success, mergeQueuePosition: 1, autoMergeMethod: .squash)) == .queued(position: 1, checks: .success))
+    }
+}
