@@ -16,6 +16,8 @@ enum Pill: Hashable, Sendable {
     case openThreads(Int)
     /// A timed snooze ended at the last refresh; the row is back where it belongs.
     case woke
+    /// A watched pull request moved, and why; the watch ended with the notification.
+    case moved(WatchMovement)
 }
 
 /// Ordered left to right as they appear in a row.

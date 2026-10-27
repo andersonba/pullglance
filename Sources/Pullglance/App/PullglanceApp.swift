@@ -21,19 +21,23 @@ struct PullglanceApp: App {
         // Tooltips are the way to read truncated titles here, so show them faster than the 1 s system default.
         UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 250])
         snapshot = SnapshotOptions.parse(CommandLine.arguments)
+        // `--demo` without `--snapshot`: the app lives in the menu bar on the fictional data, to try a
+        // feature by hand without a real pull request (watching, notifications). Nothing of the user's.
+        let liveDemo = snapshot == nil && CommandLine.arguments.contains("--demo")
+        let notifier: SnoozeNotifier? = Bundle.main.bundleIdentifier == nil ? nil : SnoozeNotifier()
         let store: PRStore
-        if snapshot?.demo == true {
+        if snapshot?.demo == true || liveDemo {
             // Fictional data in a throwaway defaults suite: nothing of the user's is read or written.
             let demoDefaults = UserDefaults(suiteName: "pullglance.demo")!
             demoDefaults.removePersistentDomain(forName: "pullglance.demo")
             // Its own log too: the demo's pins and snoozes must not land in the user's file.
-            store = PRStore(client: DemoGH(), defaults: demoDefaults, log: AppLog(directory: FileManager.default.temporaryDirectory.appending(path: "pullglance-demo")))
+            store = PRStore(client: DemoGH(), defaults: demoDefaults, log: AppLog(directory: FileManager.default.temporaryDirectory.appending(path: "pullglance-demo")), notifier: liveDemo ? notifier : nil)
         } else {
-            store = PRStore(client: GHClient(), notifier: Bundle.main.bundleIdentifier == nil ? nil : SnoozeNotifier())
+            store = PRStore(client: GHClient(), notifier: notifier)
         }
         _store = State(initialValue: store)
-        // Sparkle starts only in the packaged app (its Info.plist has the feed); never in a snapshot run.
-        let updates = snapshot == nil ? SparkleUpdater.makeIfConfigured() : nil
+        // Sparkle starts only in the packaged app (its Info.plist has the feed); never in a snapshot or demo run.
+        let updates = snapshot == nil && !liveDemo ? SparkleUpdater.makeIfConfigured() : nil
         _updates = State(initialValue: updates)
         if let snapshot {
             // Debug run: render to files and leave; no menu bar item, no timer.
@@ -44,11 +48,14 @@ struct PullglanceApp: App {
         } else {
             store.start()
             ReviewWindowController.configure(store: store)
-            OnboardingWindowController.configure(store: store)
-            // After the menu bar item exists, so the window can be placed and the dot has an icon to land on.
-            DispatchQueue.main.async { OnboardingWindowController.showIfDue() }
             _statusItemMenu = State(initialValue: StatusItemMenu(store: store, updates: updates))
-            PopoverHotKey.install()
+            if !liveDemo {
+                OnboardingWindowController.configure(store: store)
+                // After the menu bar item exists, so the window can be placed and the dot has an icon to land on.
+                DispatchQueue.main.async { OnboardingWindowController.showIfDue() }
+                // The installed copy keeps the global shortcut; a demo next to it must not fight for it.
+                PopoverHotKey.install()
+            }
         }
         Task { await AvatarCache.shared.pruneDisk() }
     }

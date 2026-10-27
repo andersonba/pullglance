@@ -11,6 +11,10 @@ user reads (strings, docs, changelog); in code it keeps its `Review*` names.
   quitting and replacing the copy that is there. This is how the app runs day to day on the author's Mac
   (no Homebrew copy here). It uses the real identity, `com.andersonba.pullglance`, and the version in
   `version.env`, so it offers newer GitHub releases; `git pull && Scripts/make-app.sh --install` is the update.
+- `open -n build/Pullglance.app --args --demo` (after `Scripts/make-app.sh`) runs a second copy live on `DemoGH`'s
+  fictional data, with its own defaults suite and log, no hotkey, no Sparkle, no welcome window: the way to try
+  by hand what needs a pull request in a given state (watching, notifications). `DemoGH` scripts one pull
+  request's story per lookup. Quit it from its own menu bar item.
 - `swift run` starts a debug build for iterating; it ends with the terminal. The debug executable embeds
   `Scripts/Info-debug.plist` (linker `-sectcreate`, debug only): it is a UI element from the first instant and
   has its own identity, `com.andersonba.pullglance.debug`, so its defaults never touch the installed app's.

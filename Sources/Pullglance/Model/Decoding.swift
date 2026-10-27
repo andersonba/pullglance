@@ -47,7 +47,7 @@ func parseSearchResponse(_ data: Data) throws -> SearchPage {
 enum PullRequestLookup: Equatable, Sendable {
     case open(PullRequest)
     /// Merged or closed since it was shown.
-    case closed
+    case closed(merged: Bool)
     /// Deleted, or the repository is gone or no longer visible.
     case notFound
 }
@@ -71,7 +71,7 @@ func parsePullRequestResponse(_ data: Data) throws -> PullRequestLookup {
         if !errors.isEmpty, !unresolved { throw DecodingFailure.noData(errors: errors) }
         return .notFound
     }
-    if let state = node.state, state != "OPEN" { return .closed }
+    if let state = node.state, state != "OPEN" { return .closed(merged: state == "MERGED") }
     guard let pullRequest = node.pullRequest else { throw DecodingFailure.malformed("pull request without its required fields") }
     return .open(pullRequest)
 }
@@ -98,7 +98,7 @@ func parsePullRequestsResponse(_ data: Data) throws -> [String: PullRequestLooku
             if onlyUnresolved { result[alias] = .notFound }
             continue
         }
-        if let state = node.state, state != "OPEN" { result[alias] = .closed; continue }
+        if let state = node.state, state != "OPEN" { result[alias] = .closed(merged: state == "MERGED"); continue }
         if let pullRequest = node.pullRequest { result[alias] = .open(pullRequest) }
     }
     return result

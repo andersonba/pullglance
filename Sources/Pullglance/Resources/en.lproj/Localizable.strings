@@ -255,7 +255,6 @@
 "Start · Move" = "Start · Move";
 "Open in Desk" = "Open in Desk";
 "Desk" = "Desk";
-"Pin · Snooze · Refresh" = "Pin · Snooze · Refresh";
 "Comment · Merge" = "Comment · Merge";
 "Open on GitHub · Copy link" = "Open on GitHub · Copy link";
 "Mark viewed · Mark tests" = "Mark viewed · Mark tests";
@@ -498,3 +497,19 @@
 "Update to %@…" = "Update to %@…";
 "Check for updates…" = "Check for updates…";
 "Update available" = "Update available";
+/* Watching */
+"Watch" = "Watch";
+"Stop watching" = "Stop watching";
+"Unwatch" = "Unwatch";
+"Watching: a notification when it moves (W stops)" = "Watching: a notification when it moves (W stops)";
+"Pin · Watch · Snooze · Refresh" = "Pin · Watch · Snooze · Refresh";
+"Watch until it merges, and notify" = "Watch until it merges, and notify";
+"Up to %lld pull requests can be watched at a time" = "Up to %lld pull requests can be watched at a time";
+"Moved · %@" = "Moved · %@";
+"Merged" = "Merged";
+"Closed" = "Closed";
+"Checks failed" = "Checks failed";
+"Checks passed" = "Checks passed";
+"Conflicts with the base branch" = "Conflicts with the base branch";
+"Behind the base branch" = "Behind the base branch";
+"Position %lld in the merge queue" = "Position %lld in the merge queue";

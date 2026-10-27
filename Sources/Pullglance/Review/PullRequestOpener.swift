@@ -14,4 +14,16 @@ enum PullRequestOpener {
             PopoverDismissal.open(ReviewAddress.url(for: pr, landing: landing))
         }
     }
+
+    /// A click on a "moved" notification: the row when it is still listed (the same as a click on it), else
+    /// the pull request's page by URL, since a merged one has left the lists.
+    static func open(watched id: String, url: URL) {
+        if let store = ReviewWindowController.shared?.store, let pr = store.listed(id) {
+            open(pr, from: store.direct.value.contains { $0.id == id } ? .review : .mine)
+        } else if ReviewSettingsStore.shared.settings.windowEnabled, let review = ReviewWindowController.shared {
+            review.open(url: url)
+        } else {
+            PopoverDismissal.open(url)
+        }
+    }
 }

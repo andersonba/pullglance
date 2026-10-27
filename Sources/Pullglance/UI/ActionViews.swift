@@ -7,13 +7,15 @@ struct MergeConfirmView: View {
     @Bindable var store: PRStore
     /// Called with the chosen options to start the merge, or nil on cancel. The modal closes either way;
     /// the row shows the progress and the outcome.
-    let onDone: ((method: MergeMethod, deleteBranch: Bool)?) -> Void
+    /// `watch`: a deferred merge (queue, auto-merge) the user wants to be told about when it lands.
+    let onDone: ((method: MergeMethod, deleteBranch: Bool, watch: Bool)?) -> Void
 
     @State private var method: MergeMethod
     @State private var deleteBranch: Bool
+    @State private var watchAfter = true
     @State private var failure: MergeFailure?
 
-    init(pr: PullRequest, store: PRStore, previousFailure: String? = nil, onDone: @escaping ((method: MergeMethod, deleteBranch: Bool)?) -> Void) {
+    init(pr: PullRequest, store: PRStore, previousFailure: String? = nil, onDone: @escaping ((method: MergeMethod, deleteBranch: Bool, watch: Bool)?) -> Void) {
         self.pr = pr
         self.store = store
         self.onDone = onDone
@@ -75,6 +77,13 @@ struct MergeConfirmView: View {
                     .disabled(running)
             }
 
+            if pr.usesMergeQueue || pr.offersAutoMerge {
+                // The merge happens later, out of sight: watching it is the way to hear when it lands (or fails).
+                Toggle(isOn: $watchAfter) { Text("Watch until it merges, and notify", bundle: .app) }
+                    .toggleStyle(.checkbox)
+                    .disabled(running)
+            }
+
             if let failure {
                 Label {
                     Text(verbatim: describe(failure))
@@ -90,7 +99,7 @@ struct MergeConfirmView: View {
                 Spacer()
                 Button { onDone(nil) } label: { Text("Cancel", bundle: .app) }
                     .keyboardShortcut(.cancelAction)
-                Button { onDone((method, requestedBranchDeletion(options: pr.mergeOptions, toggle: deleteBranch))) } label: { Text(verbatim: confirmLabel) }
+                Button { onDone((method, requestedBranchDeletion(options: pr.mergeOptions, toggle: deleteBranch), watchAfter && (pr.usesMergeQueue || pr.offersAutoMerge))) } label: { Text(verbatim: confirmLabel) }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
                     .tint(.green)

@@ -55,6 +55,8 @@ enum PRAction: Equatable, Sendable {
     case disableAutoMerge
     /// Pin to the top of the tab, or unpin when already there.
     case pin
+    /// Watch for movement (a notification), or stop watching.
+    case watch
     /// `gh pr ready`: only on the viewer's own drafts.
     case markReady
 }
@@ -76,7 +78,7 @@ func quickActions(for section: Section, dormant: Bool = false) -> [PRAction] {
 func allActions(for section: Section, dormant: Bool = false, offersMerge: Bool = false, autoMergeOn: Bool = false) -> [PRAction] {
     // A draft merges nowhere and takes no auto-merge: its one action is to be marked ready.
     let merge: [PRAction] = section == .drafts ? [.markReady] : autoMergeOn ? [.disableAutoMerge] : (section == .readyToMerge || offersMerge) ? [.merge] : []
-    return (dormant ? [.snooze, .pin] + merge + [.comment, .open, .copyLink] : [.pin] + merge + [.comment, .snooze, .open, .copyLink]) + [.refresh]
+    return (dormant ? [.snooze, .pin, .watch] + merge + [.comment, .open, .copyLink] : [.pin, .watch] + merge + [.comment, .snooze, .open, .copyLink]) + [.refresh]
 }
 
 /// Why a merge did not happen, in words a person can act on. Built from `gh pr merge` output.
@@ -225,9 +227,11 @@ struct DormantMark: Equatable, Sendable, Codable {
     }
 }
 
-/// Told when timed snoozes end, so the user can hear about it away from the popover.
+/// Told when timed snoozes end and when a watched pull request moves, so the user can hear about it away
+/// from the popover.
 protocol SnoozeNotifying: Sendable {
     func snoozeEnded(count: Int)
+    func pullRequestMoved(_ mark: WatchMark, _ movement: WatchMovement)
 }
 
 /// How long a timed snooze lasts, in the order the menu offers them.

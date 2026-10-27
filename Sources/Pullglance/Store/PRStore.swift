@@ -75,6 +75,7 @@ final class PRStore {
     static let repoRulesKey = "repoRules"
     static let dormantKey = "dormant"
     static let pinnedKey = "pinned"
+    static let watchedKey = "watched"
     static let manualOrdersKey = "manualOrders"
     static let sectionSortsKey = "sectionSorts"
     static let verboseLoggingKey = "verboseLogging"
@@ -206,6 +207,21 @@ final class PRStore {
             defaults.set(pinned.sorted(), forKey: Self.pinnedKey)
         }
     }
+
+    /// Pull requests the user asked to be told about (`WatchMark`): looked up on their own while the set is
+    /// not empty, a notification when one moves, and the watch ends with it. Stored per machine.
+    private(set) var watched: [String: WatchMark] = [:] {
+        didSet {
+            guard watched != oldValue else { return }
+            defaults.set(try? JSONEncoder().encode(watched), forKey: Self.watchedKey)
+            if watched.isEmpty { stopWatchPolling() } else { startWatchPolling() }
+        }
+    }
+    static let watchLimit = 10
+    /// Watched pull requests that moved, with the reason: the "Moved" pill, through one opening of the
+    /// popover like `woke`.
+    private(set) var moved: [String: WatchMovement] = [:]
+    private var seenMoved: Set<String> = []
 
     /// Per-PR action state, so a row can show its own spinner, "merged", or a failure.
     private(set) var actionStates: [String: ActionState] = [:]
@@ -440,7 +456,7 @@ final class PRStore {
     private var pendingRefresh = false
     private var timerTask: Task<Void, Never>?
 
-    init(client: any GHRunning, defaults: UserDefaults = .standard, now: @escaping @Sendable () -> Date = { Date() }, successLinger: Duration = .seconds(1), log: AppLog = .shared, ciPollInterval: Duration = .seconds(20), badgeRollDuration: Duration = .milliseconds(360), notifier: (any SnoozeNotifying)? = nil) {
+    init(client: any GHRunning, defaults: UserDefaults = .standard, now: @escaping @Sendable () -> Date = { Date() }, successLinger: Duration = .seconds(1), log: AppLog = .shared, ciPollInterval: Duration = .seconds(20), watchPollInterval: Duration = .seconds(30), badgeRollDuration: Duration = .milliseconds(360), notifier: (any SnoozeNotifying)? = nil) {
         self.badgeRollDuration = badgeRollDuration
         self.rollsBadge = defaults.object(forKey: Self.badgeRollKey) as? Bool ?? true
         self.notifiesSnoozeEnd = defaults.bool(forKey: Self.notifySnoozeEndKey)
@@ -451,6 +467,7 @@ final class PRStore {
         self.now = now
         self.successLinger = successLinger
         self.ciPollInterval = ciPollInterval
+        self.watchPollInterval = watchPollInterval
         self.appLog = log
         let verbose = defaults.bool(forKey: Self.verboseLoggingKey)
         self.verboseLogging = verbose
@@ -472,6 +489,7 @@ final class PRStore {
         self.repoRules = rules
         self.dormant = defaults.data(forKey: Self.dormantKey).flatMap { try? JSONDecoder().decode([String: DormantMark].self, from: $0) } ?? [:]
         self.pinned = Set(defaults.stringArray(forKey: Self.pinnedKey) ?? [])
+        self.watched = defaults.data(forKey: Self.watchedKey).flatMap { try? JSONDecoder().decode([String: WatchMark].self, from: $0) } ?? [:]
         self.sectionSorts = defaults.data(forKey: Self.sectionSortsKey).flatMap { try? JSONDecoder().decode([String: ListSort].self, from: $0) } ?? [:]
         self.manualOrders = defaults.data(forKey: Self.manualOrdersKey).flatMap { try? JSONDecoder().decode([String: [String]].self, from: $0) } ?? [:]
         if let legacyVisible = Self.sections(in: defaults, key: "visibleSections") {
@@ -640,11 +658,13 @@ final class PRStore {
 
     /// The popover closed: whatever "Woke" it showed has been seen, and goes at the next opening. Split in
     /// two so that a second appear or disappear in a row (MenuBarExtra sends them) changes nothing.
-    func popoverDidClose() { seenWoke = woke }
+    func popoverDidClose() { seenWoke = woke; seenMoved = Set(moved.keys) }
 
     func popoverDidOpen() {
         woke.subtract(seenWoke)
         seenWoke = []
+        for id in seenMoved { moved[id] = nil }
+        seenMoved = []
         hasUnseenWoke = false
     }
 
@@ -717,6 +737,126 @@ final class PRStore {
         return rows
     }
 
+    // MARK: Watching
+
+    func isWatched(_ pr: PullRequest) -> Bool { watched[pr.id] != nil }
+
+    /// The pull request with this id in any list, else nil.
+    func listed(_ id: String) -> PullRequest? {
+        (mine.value + direct.value + (viaTeam?.value ?? [])).first { $0.id == id }
+    }
+
+    /// "Tell me when this one moves." False when `watchLimit` are watched already; the caller says so.
+    @discardableResult
+    func watch(_ pr: PullRequest) -> Bool {
+        if watched[pr.id] != nil { return true }
+        guard watched.count < Self.watchLimit else {
+            appLog.info("watch \(pr.id): refused, \(Self.watchLimit) watched already")
+            return false
+        }
+        appLog.info("watch \(pr.id): head=\(pr.headRefOid.prefix(7)) ci=\(pr.ciState.rawValue) review=\(pr.reviewDecision?.rawValue ?? "none")")
+        var marks = watched
+        marks[pr.id] = WatchMark(pr, since: now())
+        watched = marks
+        if moved[pr.id] != nil { moved[pr.id] = nil }
+        return true
+    }
+
+    func unwatch(_ pr: PullRequest) {
+        guard watched[pr.id] != nil else { return }
+        appLog.info("unwatch \(pr.id)")
+        var marks = watched
+        marks[pr.id] = nil
+        watched = marks
+    }
+
+    /// Every fresh pull request against its mark: a movement ends the watch with a notification; a new
+    /// head alone takes a fresh mark and the watch goes on. Called after every full cycle and every lookup.
+    private func checkWatched(in prs: [PullRequest]) {
+        for pr in prs {
+            guard let mark = watched[pr.id] else { continue }
+            if let movement = mark.movement(for: pr) {
+                didMove(mark, movement)
+            } else if mark.needsRebase(for: pr) {
+                appLog.info("watch \(pr.id): new head \(pr.headRefOid.prefix(7)), watching on")
+                var marks = watched
+                marks[pr.id] = WatchMark(pr, since: mark.since)
+                watched = marks
+            }
+        }
+    }
+
+    private func didMove(_ mark: WatchMark, _ movement: WatchMovement) {
+        appLog.info("watch \(mark.id): \(movement), notified, watch ended")
+        var marks = watched
+        marks[mark.id] = nil
+        watched = marks
+        moved[mark.id] = movement
+        hasUnseenWoke = true
+        notifier?.pullRequestMoved(mark, movement)
+    }
+
+    /// While something is watched, every `watchPollInterval` each watched pull request is looked up on its
+    /// own, popover open or not: that is the point of watching. Not a setting. Yields exactly as the CI poll
+    /// does: never during or right before a full cycle, never while reorder mode holds the list, never on a
+    /// row with an action in flight.
+    let watchPollInterval: Duration
+    private var watchPollTask: Task<Void, Never>?
+
+    private func startWatchPolling() {
+        guard watchPollTask == nil else { return }
+        watchPollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                try? await Task.sleep(for: self.watchPollInterval)
+                guard !Task.isCancelled else { return }
+                _ = await self.pollWatched()
+            }
+        }
+    }
+
+    private func stopWatchPolling() {
+        watchPollTask?.cancel()
+        watchPollTask = nil
+    }
+
+    /// One round. Returns how many pull requests were looked up. A failed lookup keeps the watch: the next
+    /// round, or the next full cycle, tries again.
+    @discardableResult
+    func pollWatched() async -> Int {
+        guard !inFlight, !holdsAutoRefresh else { return 0 }
+        if let nextRefreshAt, nextRefreshAt.timeIntervalSince(now()) < Self.ciPollYieldWindow { return 0 }
+        var checked = 0
+        for mark in watched.values.sorted(by: { $0.since < $1.since }) {
+            guard !Task.isCancelled else { break }
+            guard !inFlight, !holdsAutoRefresh, actionStates[mark.id] == nil, watched[mark.id] != nil else { continue }
+            guard let ref = PullRequestRef(repo: mark.repo, number: mark.number) else { continue }
+            checked += 1
+            let outcome = await client.pullRequest(owner: ref.owner, name: ref.name, number: ref.number, includeMergeState: true)
+            guard case .success(let data) = outcome, let lookup = try? parsePullRequestResponse(data) else {
+                appLog.info("watch \(mark.id): lookup failed, still watching")
+                continue
+            }
+            let listed = listed(mark.id)
+            switch lookup {
+            case .open(let fresh):
+                if listed != nil {
+                    replaceLocally(fresh)
+                    wakeChanged(in: [fresh])
+                    recomputeBadge(source: .data)
+                }
+                checkWatched(in: [fresh])
+            case .closed(let merged):
+                if let listed { withAnimation(.easeInOut(duration: 0.3)) { removeLocally(listed) } }
+                didMove(mark, merged ? .merged : .closed)
+            case .notFound:
+                if let listed { withAnimation(.easeInOut(duration: 0.3)) { removeLocally(listed) } }
+                didMove(mark, .closed)
+            }
+        }
+        return checked
+    }
+
     // MARK: Pinning
 
     func isPinned(_ pr: PullRequest) -> Bool { pinned.contains(pr.id) }
@@ -764,7 +904,7 @@ final class PRStore {
         actionStates = states
     }
 
-    private func setActionState(_ state: ActionState?, for pr: PullRequest) {
+    func setActionState(_ state: ActionState?, for pr: PullRequest) {
         var states = actionStates
         states[pr.id] = state
         actionStates = states
@@ -959,11 +1099,17 @@ final class PRStore {
                 case .open(let fresh):
                     replaceLocally(fresh)
                     wakeChanged(in: [fresh])
+                    checkWatched(in: [fresh])
                     recomputeBadge(source: .data)
                     appLog.info("refresh \(pr.id): ok")
-                case .closed, .notFound:
+                case .closed(let merged):
                     appLog.info("refresh \(pr.id): gone")
                     withAnimation(.easeInOut(duration: 0.3)) { removeLocally(pr) }
+                    if let mark = watched[pr.id] { didMove(mark, merged ? .merged : .closed) }
+                case .notFound:
+                    appLog.info("refresh \(pr.id): gone")
+                    withAnimation(.easeInOut(duration: 0.3)) { removeLocally(pr) }
+                    if let mark = watched[pr.id] { didMove(mark, .closed) }
                 }
                 if !quiet { clearActionState(for: pr) }
                 return .success()
@@ -1153,6 +1299,7 @@ final class PRStore {
     func start() {
         restartTimer()
         scheduleWake()   // marks loaded at init have no didSet
+        if !watched.isEmpty { startWatchPolling() }
     }
 
     private func restartTimer() {
@@ -1228,8 +1375,10 @@ final class PRStore {
             }
         }
 
-        // After every snapshot is in place (no inout borrow left): snoozed PRs with new activity wake up.
+        // After every snapshot is in place (no inout borrow left): snoozed PRs with new activity wake up,
+        // and watched ones that moved say so.
         wakeChanged(in: mine.value + direct.value + (viaTeam?.value ?? []))
+        checkWatched(in: mine.value + direct.value + (viaTeam?.value ?? []))
         finish(errors: errors)
     }
 
@@ -1274,9 +1423,14 @@ final class PRStore {
                 switch lookup {
                 case .open(let fresh):
                     if value[position] != fresh { value[position] = fresh; changed += 1 }
-                case .closed, .notFound:
+                case .closed(let merged):
                     value.remove(at: position)
                     changed += 1
+                    if let mark = watched["\(ref.owner)/\(ref.name)#\(ref.number)"] { didMove(mark, merged ? .merged : .closed) }
+                case .notFound:
+                    value.remove(at: position)
+                    changed += 1
+                    if let mark = watched["\(ref.owner)/\(ref.name)#\(ref.number)"] { didMove(mark, .closed) }
                 }
             }
             var snapshot = mine

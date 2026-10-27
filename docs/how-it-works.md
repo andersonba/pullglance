@@ -42,10 +42,11 @@ Your own pull requests, plus the ones assigned to you that someone else opened (
 - **Needs your review**: requests made to you directly, ordered by what asks for you first: a re-review after you already reviewed, then activity you have not read, then small diffs, then everyone else oldest first, with red CI and drafts at the bottom. A blue pill says why a row is where it is. The section header switches between *Priority*, *Recent* and *Manual* order.
 - **Needs your teams' review**: the 20 most recent requests made to teams you belong to, collapsed until you open it.
 
-## Pinned and Snoozed
+## Pinned, Snoozed and Watched
 
 - **Pin** a row (menu, swipe tile on review rows, or `P` on a focused row) to keep it at the top of its tab, in your own order. Pinning does not change the badge.
 - **Snooze** a row to move it to the bottom and out of the badge until the pull request gets a new commit, a review decision or a CI result. Pinning wakes a snoozed row; snoozing unpins.
+- **Watch** a row (menu, or `W`) when you are waiting on it: a bell appears, the app looks at that pull request every 30 seconds on its own, popover open or not, and a macOS notification says what happened the moment it moves: checks passed or failed, approved or changes requested, conflicts, a new place in the merge queue, merged, closed. A comment is not movement, and a new commit of yours only restarts the watch on the new head. The notification ends the watch; a click on it opens the pull request, and the row shows *Moved · why* until the popover has been opened and closed. Up to 10 at a time. When you merge from the app and the merge is deferred (merge queue, or "Merge when checks pass"), the confirmation offers to watch until it lands, checked by default.
 
 ## The menu bar number
 
@@ -56,11 +57,11 @@ By default the badge adds up *Needs action*, *Ready to merge* and *Needs your re
 Swipe a row to the left, right-click it, or focus it with the keyboard:
 
 - **Merge**: a confirmation with the merge method, defaulting to what you used last in that repository, and the branch deletion policy of the repository. Where the base branch has a merge queue the pull request is added to the queue instead; where the pull request is blocked on checks and the repository allows auto-merge, the button reads *Merge when checks pass*. GitHub refuses a merge if the branch moved since the row was shown. When the repository deletes merged branches itself the app never asks `gh` to, because deleting right after the merge makes GitHub close pull requests stacked on that branch instead of retargeting them.
-- **Comment**, **Open on GitHub**, **Copy link**, **Refresh** this one pull request, **Pin**, **Snooze**.
+- **Comment**, **Open on GitHub**, **Copy link**, **Refresh** this one pull request, **Pin**, **Watch**, **Snooze**.
 
 ## Keyboard
 
-`⌥⌘P` opens and closes the popover from any app (Settings › General changes or removes the shortcut). With the popover open, `↓` (or `J`) focuses the first row; `↑↓` move, `←→` switch tabs, and Vim's `H J K L` do the same as the arrows, `F` opens the repository/author filter with its search ready, `↩` opens the pull request in the Review Desk, `P` pins, `S` snoozes, `O` opens on GitHub, `R` refreshes, `C` comments, `M` merges where offered, `⌘C` copies the link, `esc` leaves. With the pointer on a row and no focus, `↩` and `⌘C` act on that row and `space` makes it the focus; with a focus, `space` opens the focused row's menu, the same one a right-click shows. `0`–`9` pick the quick filter chips. `⌘/` opens the full list of shortcuts, including the Review Desk's.
+`⌥⌘P` opens and closes the popover from any app (Settings › General changes or removes the shortcut). With the popover open, `↓` (or `J`) focuses the first row; `↑↓` move, `←→` switch tabs, and Vim's `H J K L` do the same as the arrows, `F` opens the repository/author filter with its search ready, `↩` opens the pull request in the Review Desk, `P` pins, `W` watches, `S` snoozes, `O` opens on GitHub, `R` refreshes, `C` comments, `M` merges where offered, `⌘C` copies the link, `esc` leaves. With the pointer on a row and no focus, `↩` and `⌘C` act on that row and `space` makes it the focus; with a focus, `space` opens the focused row's menu, the same one a right-click shows. `0`–`9` pick the quick filter chips. `⌘/` opens the full list of shortcuts, including the Review Desk's.
 
 In the Review Desk, with the page focused: `⌘J` and `⌘K` go to the next and the previous unviewed file (every file once all are viewed), `⌘↩` marks the current file viewed and goes to the next, `⇧⌘V` marks the test files, `⇧⌘A` `⇧⌘C` `⇧⌘M` approve, comment and merge, `⌥⌘B` hides the bar. The page keeps the browser's keys: `⌘↑` and `⌘↓` go to the top and the end, `space` and `⇧space` page down and up, `⌘F` finds and `⌘E` finds the selected text, `⌘L` focuses the address, `⌘[` `⌘]` or `⌘←` `⌘→` go back and forward, `esc` stops a page still loading, `⇧⌘O` opens the page in your browser.
 
@@ -87,4 +88,4 @@ Preferences in `UserDefaults`, author avatars in `~/Library/Caches`, a small rol
 
 ## Screenshots
 
-`Scripts/snapshot.sh --demo` renders the popover, the Settings tabs and the README hero from fictional data, so the images can be regenerated whenever the UI changes.
+`Scripts/snapshot.sh --demo` renders the popover, the Settings tabs and the README hero from fictional data, so the images can be regenerated whenever the UI changes. The same data runs live with `open -n build/Pullglance.app --args --demo` after `Scripts/make-app.sh`: a second menu bar item on its own defaults, where a watched pull request moves a step at each lookup (checks pass, approved, merged), for trying the notifications by hand.

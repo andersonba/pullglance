@@ -245,5 +245,7 @@ final class Clock: @unchecked Sendable {
 
 final class FakeSnoozeNotifier: SnoozeNotifying, @unchecked Sendable {
     private(set) var counts: [Int] = []
+    private(set) var moves: [(mark: WatchMark, movement: WatchMovement)] = []
     func snoozeEnded(count: Int) { counts.append(count) }
+    func pullRequestMoved(_ mark: WatchMark, _ movement: WatchMovement) { moves.append((mark, movement)) }
 }

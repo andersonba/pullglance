@@ -126,8 +126,10 @@ struct PopoverView: View {
                         store.clearActionState(for: pr)
                         guard let options else { return }
                         Task {
-                            if case .success(let note?) = await store.merge(pr, method: options.method, deleteBranch: options.deleteBranch) {
-                                show(toast: note)
+                            let result = await store.merge(pr, method: options.method, deleteBranch: options.deleteBranch)
+                            if case .success(let note) = result {
+                                if options.watch { store.watch(pr) }
+                                if let note { show(toast: note) }
                             }
                         }
                     }
@@ -162,7 +164,7 @@ struct PopoverView: View {
                 ZStack {
                     FooterView(store: store, showShortcuts: { showingShortcuts = true }, updates: updates).opacity(focusedPR == nil ? 1 : 0)
                     if let focusedPR {
-                        TriageFooter(isPinned: store.isPinned(focusedPR), isDormant: store.isDormant(focusedPR))
+                        TriageFooter(isPinned: store.isPinned(focusedPR), isDormant: store.isDormant(focusedPR), isWatched: store.isWatched(focusedPR))
                     }
                 }
             }
@@ -393,7 +395,7 @@ struct PopoverView: View {
             snoozeChoice = current.map { $0 + 1 } ?? 0
             snoozing = pr
             return true
-        case .pin, .snooze, .open, .review, .refresh, .comment, .merge, .copyLink:
+        case .pin, .watch, .snooze, .open, .review, .refresh, .comment, .merge, .copyLink:
             // The focused row, else the one under the pointer: the same keys, every one of them. Nothing here
             // is destructive without its own confirmation (Comment and Merge open cards; Pin and Snooze undo
             // with the same key). The focus bookkeeping only applies when a focus exists.
@@ -406,6 +408,8 @@ struct PopoverView: View {
                 let next = viaFocus ? TriageFocus.successor(of: row.pr.id, in: ids) : nil
                 handle(key == .pin ? .pin : .snooze, for: row.pr)
                 if viaFocus { focus.set(next) }
+            case .watch:
+                handle(.watch, for: row.pr)
             case .open:
                 focus.clear()
                 handle(.open, for: row.pr)
@@ -556,6 +560,12 @@ struct PopoverView: View {
             }
         case .pin:
             withAnimation(.easeInOut(duration: 0.3)) { store.isPinned(pr) ? store.unpin(pr) : store.pin(pr) }
+        case .watch:
+            if store.isWatched(pr) {
+                store.unwatch(pr)
+            } else if !store.watch(pr) {
+                show(toast: String(localized: "Up to \(PRStore.watchLimit) pull requests can be watched at a time", bundle: .app))
+            }
         }
     }
 
@@ -585,7 +595,7 @@ struct PopoverView: View {
         let lifted = rowDrag?.id == pr.id
         let focused = focus.id == pr.id
         let glowing = glowingRow == pr.id
-        let woke = store.woke.contains(pr.id)
+        let woke = store.woke.contains(pr.id) || store.moved[pr.id] != nil
         return rowView(pr, section: section, showAuthor: showAuthor, teamLabel: teamLabel, dormant: dormant, pinned: pinnedRow, reorderable: reorderable, among: among)
             .onHover { inside in
                 if inside { hoveredRow = pr.id } else if hoveredRow == pr.id { hoveredRow = nil }
@@ -687,6 +697,7 @@ struct PopoverView: View {
         let running: Bool = { if case .running = actionState { return true }; return false }()
         let snoozeLength = dormant ? store.dormantMark(for: pr)?.nearestLength() : nil
         let isWoke = store.woke.contains(pr.id)
+        let watched = store.isWatched(pr)
         return SwipeActionsRow(
             id: pr.id,
             actions: quickActions(for: actionSection, dormant: dormant),
@@ -696,7 +707,7 @@ struct PopoverView: View {
             isRunning: running,
             isLocked: reordering,
             onAction: { handle($0, for: pr) },
-            menu: { PRRowMenu(section: actionSection, isDormant: dormant, isPinned: pinned, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, snoozeLength: snoozeLength, onAction: { handle($0, for: pr) }, onSnoozeFor: { snooze(pr, for: $0) }) }
+            menu: { PRRowMenu(section: actionSection, isDormant: dormant, isPinned: pinned, isWatched: watched, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, snoozeLength: snoozeLength, onAction: { handle($0, for: pr) }, onSnoozeFor: { snooze(pr, for: $0) }) }
         ) {
             PRRow(
                 pr: pr,
@@ -706,6 +717,8 @@ struct PopoverView: View {
                 isDormant: dormant,
                 snoozedUntil: dormant ? store.dormantMark(for: pr)?.until : nil,
                 isWoke: isWoke,
+                isWatched: watched,
+                moved: store.moved[pr.id],
                 snoozeLength: snoozeLength,
                 isPinned: pinned,
                 actionState: actionState,

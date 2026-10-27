@@ -12,6 +12,10 @@ struct PRRow: View {
     var snoozedUntil: Date? = nil
     /// Back from a timed snooze since the last refresh.
     var isWoke = false
+    /// Watched: a bell by the time, and a notification when it moves.
+    var isWatched = false
+    /// A watched row that moved since the popover was last opened, and why.
+    var moved: WatchMovement? = nil
     /// For the menu: the length a snoozed row sleeps for.
     var snoozeLength: SnoozeDuration? = nil
     /// Pinned rows carry a small pin before the title: the section says it, the mark travels with the row.
@@ -61,6 +65,12 @@ struct PRRow: View {
                         DiffSizeText(text: size)
                         Text(verbatim: "·").foregroundStyle(.tertiary)
                     }
+                    if isWatched {
+                        Image(systemName: "bell.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.orange)
+                            .help(Text("Watching: a notification when it moves (W stops)", bundle: .app))
+                    }
                     Text(pr.updatedAt, format: .relative(presentation: .numeric, unitsStyle: .narrow))
                         .foregroundStyle(.tertiary)
                         .fixedSize()
@@ -70,7 +80,7 @@ struct PRRow: View {
                 .lineLimit(1)
                 // Review rows lead with why they are where they are (see `reviewSignal`).
                 let reason: [Pill] = section.tab == .review ? reviewSignal(for: pr, now: Date()).map { [.reason($0)] } ?? [] : []
-                let rowPills = (isWoke ? [Pill.woke] : []) + reason + pills(for: pr)
+                let rowPills = (isWoke ? [Pill.woke] : []) + (moved.map { [Pill.moved($0)] } ?? []) + reason + pills(for: pr)
                 // Kept in place while an action runs or has failed, only dimmed: dropping them changed the
                 // row's height and shifted everything below for the duration of a refresh.
                 if !rowPills.isEmpty, !isDormant {
@@ -111,7 +121,7 @@ struct PRRow: View {
             if case .failed(let action, _) = actionState { onAction(action); return }
             PullRequestOpener.open(pr, from: section.tab)
         }
-        .contextMenu { PRRowMenu(section: section, isDormant: isDormant, isPinned: isPinned, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, snoozeLength: snoozeLength, onAction: onAction, onSnoozeFor: onSnoozeFor) }
+        .contextMenu { PRRowMenu(section: section, isDormant: isDormant, isPinned: isPinned, isWatched: isWatched, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, snoozeLength: snoozeLength, onAction: onAction, onSnoozeFor: onSnoozeFor) }
     }
 
     /// Left column: CI dot normally; spinner, merged check or failure mark while an action is in play;
@@ -181,6 +191,7 @@ struct PRRowMenu: View {
     let section: Section
     var isDormant = false
     var isPinned = false
+    var isWatched = false
     /// "Merge when checks pass" outside Ready to merge (see `PullRequest.offersAutoMerge`).
     var offersMerge = false
     var autoMergeOn = false
@@ -199,6 +210,7 @@ struct PRRowMenu: View {
                 case .merge: Label { Text(offersMerge ? "Merge when checks pass…" : "Merge…", bundle: .app) } icon: { Image(systemName: "arrow.triangle.merge") }
                 case .disableAutoMerge: Label { Text("Disable auto-merge", bundle: .app) } icon: { Image(systemName: "arrow.triangle.merge") }
                 case .pin: Label { Text(isPinned ? "Unpin" : "Pin to top", bundle: .app) } icon: { Image(systemName: isPinned ? "pin.slash" : "pin") }
+                case .watch: Label { Text(isWatched ? "Stop watching" : "Watch", bundle: .app) } icon: { Image(systemName: isWatched ? "bell.slash" : "bell") }
                 case .comment: Label { Text("Comment…", bundle: .app) } icon: { Image(systemName: "text.bubble") }
                 case .approve: Label { Text("Approve…", bundle: .app) } icon: { Image(systemName: "checkmark.circle") }
                 case .snooze: Label { Text(isDormant ? "Wake" : "Snooze", bundle: .app) } icon: { Image(systemName: isDormant ? "sun.max" : "moon.zzz") }
@@ -233,6 +245,7 @@ struct PRRowMenu: View {
     private static func shortcut(for action: PRAction) -> KeyboardShortcut? {
         switch action {
         case .pin: KeyboardShortcut("p", modifiers: [])
+        case .watch: KeyboardShortcut("w", modifiers: [])
         case .snooze: KeyboardShortcut("s", modifiers: [])
         case .comment: KeyboardShortcut("c", modifiers: [])
         case .merge: KeyboardShortcut("m", modifiers: [])
@@ -505,6 +518,7 @@ struct PillView: View {
         case .behindBase: String(localized: "Behind base", bundle: .app)
         case .openThreads(let count): String(localized: "\(count) open threads", bundle: .app)
         case .woke: String(localized: "Woke", bundle: .app)
+        case .moved(let movement): String(localized: "Moved · \(movement.title)", bundle: .app)
         }
     }
 
@@ -514,7 +528,7 @@ struct PillView: View {
         case .ciFailed, .changesRequested, .conflicts: .red
         case .ciRunning: .yellow
         case .approved, .readyToMerge: .green
-        case .woke: .orange
+        case .woke, .moved: .orange
         case .inMergeQueue, .autoMerge: .purple
         case .awaitingReview: .orange
         case .behindBase, .openThreads: .gray

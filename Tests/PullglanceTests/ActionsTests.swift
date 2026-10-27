@@ -139,8 +139,8 @@ import Testing
     }
 
     @Test func mergeWhenChecksPassReachesTheMenuOutsideReadyToMerge() {
-        #expect(allActions(for: .waitingForReview, offersMerge: true) == [.pin, .merge, .comment, .snooze, .open, .copyLink, .refresh])
-        #expect(allActions(for: .waitingForReview, autoMergeOn: true) == [.pin, .disableAutoMerge, .comment, .snooze, .open, .copyLink, .refresh])
+        #expect(allActions(for: .waitingForReview, offersMerge: true) == [.pin, .watch, .merge, .comment, .snooze, .open, .copyLink, .refresh])
+        #expect(allActions(for: .waitingForReview, autoMergeOn: true) == [.pin, .watch, .disableAutoMerge, .comment, .snooze, .open, .copyLink, .refresh])
         #expect(quickActions(for: .waitingForReview) == [.open, .comment], "swipe tiles do not change")
     }
 
@@ -154,16 +154,16 @@ import Testing
         #expect(quickActions(for: .readyToMerge, dormant: true) == [.snooze, .open])
         #expect(quickActions(for: .needsAction, dormant: true) == [.snooze, .open])
         // Pin is the first item of every menu; a snoozed row still leads with Wake.
-        #expect(allActions(for: .readyToMerge) == [.pin, .merge, .comment, .snooze, .open, .copyLink, .refresh])
-        #expect(allActions(for: .needsYourReview) == [.pin, .comment, .snooze, .open, .copyLink, .refresh])
+        #expect(allActions(for: .readyToMerge) == [.pin, .watch, .merge, .comment, .snooze, .open, .copyLink, .refresh])
+        #expect(allActions(for: .needsYourReview) == [.pin, .watch, .comment, .snooze, .open, .copyLink, .refresh])
         #expect(allActions(for: .drafts).contains(.merge) == false)
         // A draft of yours: the one thing it wants is to be marked ready. No merge, no auto-merge.
         #expect(quickActions(for: .drafts) == [.markReady, .comment])
-        #expect(allActions(for: .drafts) == [.pin, .markReady, .comment, .snooze, .open, .copyLink, .refresh])
-        #expect(allActions(for: .drafts, offersMerge: true) == [.pin, .markReady, .comment, .snooze, .open, .copyLink, .refresh])
-        #expect(allActions(for: .drafts, dormant: true) == [.snooze, .pin, .markReady, .comment, .open, .copyLink, .refresh])
-        #expect(allActions(for: .readyToMerge, dormant: true) == [.snooze, .pin, .merge, .comment, .open, .copyLink, .refresh])
-        #expect(allActions(for: .needsAction, dormant: true) == [.snooze, .pin, .comment, .open, .copyLink, .refresh])
+        #expect(allActions(for: .drafts) == [.pin, .watch, .markReady, .comment, .snooze, .open, .copyLink, .refresh])
+        #expect(allActions(for: .drafts, offersMerge: true) == [.pin, .watch, .markReady, .comment, .snooze, .open, .copyLink, .refresh])
+        #expect(allActions(for: .drafts, dormant: true) == [.snooze, .pin, .watch, .markReady, .comment, .open, .copyLink, .refresh])
+        #expect(allActions(for: .readyToMerge, dormant: true) == [.snooze, .pin, .watch, .merge, .comment, .open, .copyLink, .refresh])
+        #expect(allActions(for: .needsAction, dormant: true) == [.snooze, .pin, .watch, .comment, .open, .copyLink, .refresh])
     }
 }
 
@@ -700,8 +700,8 @@ private extension Data {
     }
 
     @Test func mergedClosedAndMissingAreNotOpen() throws {
-        #expect(try parsePullRequestResponse(pullRequestEnvelope(node(number: 7, ci: nil), state: "MERGED")) == .closed)
-        #expect(try parsePullRequestResponse(pullRequestEnvelope(node(number: 7, ci: nil), state: "CLOSED")) == .closed)
+        #expect(try parsePullRequestResponse(pullRequestEnvelope(node(number: 7, ci: nil), state: "MERGED")) == .closed(merged: true))
+        #expect(try parsePullRequestResponse(pullRequestEnvelope(node(number: 7, ci: nil), state: "CLOSED")) == .closed(merged: false))
         #expect(try parsePullRequestResponse(pullRequestEnvelope(nil)) == .notFound)
         let gone = Data(#"{"data":{"repository":null},"errors":[{"message":"Could not resolve to a Repository with the name 'acme/web'."}]}"#.utf8)
         #expect(try parsePullRequestResponse(gone) == .notFound)

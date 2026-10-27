@@ -2,8 +2,13 @@ import Foundation
 
 /// A `GHRunning` that answers the searches with fictional pull requests, for `--snapshot --demo`: the README
 /// screenshots come out of the real UI without anyone's real data, and can be regenerated when the UI moves.
-struct DemoGH: GHRunning {
+/// Run live (`--demo` alone) it also plays GitHub for a watched pull request: each lookup of one moves the
+/// story a step (checks pass, approved, merged), so a watch and its notification can be tried without a
+/// real pull request. Merging, queueing and auto-merge succeed here.
+actor DemoGH: GHRunning {
     private let now = Date()
+    /// Lookups per pull request number, the script's clock.
+    private var lookups: [Int: Int] = [:]
 
     func search(_ query: String, includeMergeState: Bool, first: Int) async -> GHOutcome {
         if query.contains("assignee:@me") { return .success(envelope([], total: 0)) }
@@ -13,15 +18,40 @@ struct DemoGH: GHRunning {
     }
 
     func searchRepos(query: String) async -> GHOutcome { .failure("demo") }
-    func merge(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?) async -> GHOutcome { .failure("demo") }
-    func enqueue(pullRequestID: String, expectedHeadOid: String) async -> GHOutcome { .failure("demo") }
-    func enableAutoMerge(pullRequestID: String, method: MergeMethod, expectedHeadOid: String) async -> GHOutcome { .failure("demo") }
-    func disableAutoMerge(pullRequestID: String) async -> GHOutcome { .failure("demo") }
-    func comment(url: URL, body: String) async -> GHOutcome { .failure("demo") }
-    func markReady(url: URL) async -> GHOutcome { .failure("demo") }
-    func approve(url: URL, body: String?) async -> GHOutcome { .failure("demo") }
+    func merge(url: URL, method: MergeMethod, deleteBranch: Bool, matchHeadCommit: String?) async -> GHOutcome { .success(Data()) }
+    func enqueue(pullRequestID: String, expectedHeadOid: String) async -> GHOutcome {
+        .success(Data("{\"data\":{\"enqueuePullRequest\":{\"mergeQueueEntry\":{\"position\":3}}}}".utf8))
+    }
+    func enableAutoMerge(pullRequestID: String, method: MergeMethod, expectedHeadOid: String) async -> GHOutcome {
+        .success(Data("{\"data\":{\"enablePullRequestAutoMerge\":{\"clientMutationId\":null}}}".utf8))
+    }
+    func disableAutoMerge(pullRequestID: String) async -> GHOutcome {
+        .success(Data("{\"data\":{\"disablePullRequestAutoMerge\":{\"clientMutationId\":null}}}".utf8))
+    }
+    func comment(url: URL, body: String) async -> GHOutcome { .success(Data()) }
+    func markReady(url: URL) async -> GHOutcome { .success(Data()) }
+    func approve(url: URL, body: String?) async -> GHOutcome { .success(Data()) }
     func openPullRequests(repo: String, base: String) async -> GHOutcome { .success(Data("[]".utf8)) }
-    func pullRequest(owner: String, name: String, number: Int, includeMergeState: Bool) async -> GHOutcome { .failure("demo") }
+    /// The story of one pull request, a step per lookup: as listed, then checks pass, then approved, then
+    /// merged (one already green and approved goes straight to merged). The watch poll and the CI poll both
+    /// read it, so a step can land before a watch is on; the next one still tells.
+    func pullRequest(owner: String, name: String, number: Int, includeMergeState: Bool) async -> GHOutcome {
+        guard var pr = (mine + direct + team).first(where: { $0.number == number && $0.repo == "\(owner)/\(name)" }) else { return .failure("demo: no such pull request") }
+        let step = (lookups[number] ?? 0) + 1
+        lookups[number] = step
+        var state = "OPEN"
+        let settled = pr.ci == "SUCCESS" && pr.decision == "APPROVED"
+        switch step {
+        case 1: break
+        case 2 where !settled: pr.ci = "SUCCESS"; pr.state = pr.decision == "APPROVED" ? "CLEAN" : "BLOCKED"
+        case 3 where !settled: pr.ci = "SUCCESS"; pr.decision = "APPROVED"; pr.state = "CLEAN"
+        default: state = "MERGED"
+        }
+        var n = node(pr)
+        n["state"] = state
+        let body: [String: Any] = ["data": ["repository": ["pullRequest": n]]]
+        return .success((try? JSONSerialization.data(withJSONObject: body)) ?? Data())
+    }
     func pullRequests(_ refs: [PullRequestRef], includeMergeState: Bool) async -> GHOutcome { .failure("demo") }
     func pullRequestFiles(owner: String, name: String, number: Int, after: String?) async -> GHOutcome { .failure("demo") }
 
@@ -48,12 +78,13 @@ struct DemoGH: GHRunning {
         var requested = false
         var team: String? = nil
         var queuePosition: Int? = nil
+        var canAutoMerge = false
     }
 
     private var mine: [PR] {[
         PR(number: 388, title: "Split the billing worker from the API", hoursAgo: 5 * 24, ageDays: 6, decision: "APPROVED", files: 14, add: 210, del: 96),
         PR(number: 401, title: "Keep webpack's filesystem cache out of CI", hoursAgo: 20 * 24, ageDays: 21, ci: "FAILURE", decision: "CHANGES_REQUESTED", mergeable: "CONFLICTING", state: "DIRTY", threads: 5, files: 3, add: 31, del: 4),
-        PR(repo: "acme/api", number: 1042, title: "Retry webhook deliveries with jitter", hoursAgo: 3, ageDays: 0.2, ci: "PENDING", decision: "REVIEW_REQUIRED", state: "BLOCKED", files: 4, add: 88, del: 20),
+        PR(repo: "acme/api", number: 1042, title: "Retry webhook deliveries with jitter", hoursAgo: 3, ageDays: 0.2, ci: "PENDING", decision: "REVIEW_REQUIRED", state: "BLOCKED", files: 4, add: 88, del: 20, canAutoMerge: true),
         PR(number: 405, title: "Draft: redesign the settings window", hoursAgo: 26, ageDays: 2, ci: nil, draft: true, files: 22, add: 640, del: 410),
         PR(repo: "acme/web", number: 377, title: "Bump the uploader to the new SDK", hoursAgo: 2 * 24, ageDays: 3, decision: "APPROVED", files: 2, add: 12, del: 12, queuePosition: 2),
     ]}
@@ -91,7 +122,7 @@ struct DemoGH: GHRunning {
             "isMergeQueueEnabled": pr.queuePosition != nil,
             "mergeQueueEntry": pr.queuePosition.map { ["position": $0, "state": "AWAITING_CHECKS"] as [String: Any] } ?? NSNull(),
             "mergeQueue": pr.queuePosition != nil ? ["configuration": ["mergeMethod": "SQUASH"]] : NSNull(),
-            "viewerCanEnableAutoMerge": false, "autoMergeRequest": NSNull(),
+            "viewerCanEnableAutoMerge": pr.canAutoMerge, "autoMergeRequest": NSNull(),
             "repository": repository,
             // Generated faces (DiceBear, free), seeded by the login so they are stable between renders.
             "author": ["login": pr.author, "avatarUrl": "https://api.dicebear.com/9.x/avataaars/png?seed=\(pr.author)&size=80&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf"],

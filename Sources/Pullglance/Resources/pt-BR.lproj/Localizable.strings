@@ -255,7 +255,6 @@
 "Start · Move" = "Começar · Mover";
 "Open in Desk" = "Abrir no Desk";
 "Desk" = "Desk";
-"Pin · Snooze · Refresh" = "Fixar · Adormecer · Atualizar";
 "Comment · Merge" = "Comentar · Mergear";
 "Open on GitHub · Copy link" = "Abrir no GitHub · Copiar link";
 "Mark viewed · Mark tests" = "Marcar visto · Marcar testes";
@@ -498,3 +497,19 @@
 "Update to %@…" = "Atualizar para %@…";
 "Check for updates…" = "Buscar atualizações…";
 "Update available" = "Atualização disponível";
+/* Watching */
+"Watch" = "Observar";
+"Stop watching" = "Parar de observar";
+"Unwatch" = "Parar";
+"Watching: a notification when it moves (W stops)" = "Observando: uma notificação quando se mover (W para)";
+"Pin · Watch · Snooze · Refresh" = "Fixar · Observar · Adormecer · Atualizar";
+"Watch until it merges, and notify" = "Observar até o merge e avisar";
+"Up to %lld pull requests can be watched at a time" = "Até %lld pull requests observados por vez";
+"Moved · %@" = "Moveu · %@";
+"Merged" = "Merged";
+"Closed" = "Fechado";
+"Checks failed" = "Checks falharam";
+"Checks passed" = "Checks passaram";
+"Conflicts with the base branch" = "Conflito com a branch base";
+"Behind the base branch" = "Atrás da branch base";
+"Position %lld in the merge queue" = "Posição %lld na fila de merge";

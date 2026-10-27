@@ -690,6 +690,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
                 guard let options else { return }
                 Task {
                     let result = await store.merge(pr, method: options.method, deleteBranch: options.deleteBranch)
+                    if case .success = result, options.watch { store.watch(pr) }
                     await self?.session.report(result)
                 }
             })

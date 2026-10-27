@@ -32,7 +32,7 @@ struct TriageFocus: Equatable {
 /// The keys triage answers to: plain keys, plus ⌘C (copy link) and ⌘/ (the shortcuts card), the two whose
 /// plain letters are taken. Anything else with ⌘, ⌥ or ⌃ belongs to the menus.
 enum TriageKey: Equatable {
-    case up, down, left, right, space, pin, snooze, snoozeFor, open, review, refresh, comment, merge, copyLink, shortcuts, filter, escape
+    case up, down, left, right, space, pin, watch, snooze, snoozeFor, open, review, refresh, comment, merge, copyLink, shortcuts, filter, escape
 
     init?(characters: String?, keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
         let held = modifiers.intersection([.command, .option, .control])
@@ -64,6 +64,7 @@ enum TriageKey: Equatable {
         case "h": self = .left
         case "l": self = .right
         case "p": self = .pin
+        case "w": self = .watch
         case "s": self = .snooze
         case "o": self = .open
         case "r": self = .refresh
@@ -82,12 +83,14 @@ enum TriageKey: Equatable {
 struct TriageFooter: View {
     var isPinned = false
     var isDormant = false
+    var isWatched = false
 
     var body: some View {
         HStack(spacing: 8) {
             HStack(spacing: 2) { key("↑↓"); key("←→") }.layoutPriority(1)
             hint("↩", Text(ReviewSettingsStore.shared.settings.windowEnabled ? "Desk" : "Open", bundle: .app))
             hint("P", Text(isPinned ? "Unpin" : "Pin", bundle: .app))
+            hint("W", Text(isWatched ? "Unwatch" : "Watch", bundle: .app))
             hint("S", Text(isDormant ? "Wake" : "Snooze", bundle: .app))
             hint("O", Text(verbatim: "GitHub"))
             Spacer(minLength: 0)
@@ -144,14 +147,14 @@ struct ShortcutsCard: View {
                 line(Text("Settings…", bundle: .app), ["⌘,"])
             }
             group(Text("Row under the pointer", bundle: .app)) {
-                line(Text("Every key of a focused row", bundle: .app), ["↩", "P", "S", "R", "C", "M", "O", "⌘C"])
+                line(Text("Every key of a focused row", bundle: .app), ["↩", "P", "W", "S", "R", "C", "M", "O", "⌘C"])
                 line(Text("Keyboard from here", bundle: .app), ["space"])
             }
             group(Text("Focused row", bundle: .app)) {
                 line(Text("Start · Move", bundle: .app), ["↓", "↑", "J", "K"])
                 line(Text("Open in Desk", bundle: .app), ["↩"])
                 line(Text("Row menu", bundle: .app), ["space"])
-                line(Text("Pin · Snooze · Refresh", bundle: .app), ["P", "S", "R"])
+                line(Text("Pin · Watch · Snooze · Refresh", bundle: .app), ["P", "W", "S", "R"])
                 line(Text("Snooze for…", bundle: .app), ["⇧S"])
                 line(Text("Comment · Merge", bundle: .app), ["C", "M"])
                 line(Text("Open on GitHub · Copy link", bundle: .app), ["O", "⌘C"])
