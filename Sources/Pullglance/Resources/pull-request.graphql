@@ -1,4 +1,5 @@
 query($owner: String!, $name: String!, $number: Int!, $withMerge: Boolean!) {
+  rateLimit { remaining resetAt }
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) { ...PullRequestFields }
   }

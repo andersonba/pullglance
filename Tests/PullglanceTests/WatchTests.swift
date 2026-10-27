@@ -203,3 +203,23 @@ import Testing
         #expect(store.actionStates.isEmpty)
     }
 }
+
+@Suite struct RateLimitTests {
+    @Test func theLookupAsksForTheRateLimit() {
+        // So the log can say what the watch poll costs; the search query stays as it is.
+        #expect(GHClient.pullRequestQuery.contains("rateLimit { remaining resetAt }"))
+        #expect(!GHClient.pullRequestFragment.contains("rateLimit"))
+    }
+
+    @Test func theRateLimitIsReadNextToTheData() throws {
+        let data = Data(#"{"data":{"rateLimit":{"remaining":4987,"resetAt":"2026-10-27T15:00:00Z"},"repository":{"pullRequest":null}}}"#.utf8)
+        let status = try #require(parseRateLimit(data))
+        #expect(status.remaining == 4987)
+        #expect(status.resetAt == ISO8601DateFormatter().date(from: "2026-10-27T15:00:00Z"))
+    }
+
+    @Test func aResponseWithoutItIsNotAnError() {
+        #expect(parseRateLimit(pullRequestEnvelope(nil)) == nil)
+        #expect(parseRateLimit(Data("not json".utf8)) == nil)
+    }
+}

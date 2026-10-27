@@ -365,6 +365,25 @@ func parseEnqueueResponse(_ data: Data) throws -> Int? {
     return entry.position
 }
 
+/// GitHub's hourly GraphQL budget as of one response, when the query asked for it (`pull-request.graphql`
+/// does, for the watch poll's log). Never an error: a response without it is just quiet about the cost.
+struct RateLimitStatus: Equatable, Sendable {
+    let remaining: Int
+    let resetAt: Date
+}
+
+func parseRateLimit(_ data: Data) -> RateLimitStatus? {
+    struct Envelope: Decodable {
+        struct Payload: Decodable { let rateLimit: Limit? }
+        struct Limit: Decodable { let remaining: Int; let resetAt: Date }
+        let data: Payload?
+    }
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    guard let limit = (try? decoder.decode(Envelope.self, from: data))?.data?.rateLimit else { return nil }
+    return RateLimitStatus(remaining: limit.remaining, resetAt: limit.resetAt)
+}
+
 /// A mutation that only acknowledges: `data.<field>` must be there, and no `errors` next to it.
 func parseMutationAck(_ data: Data, field: String) throws {
     guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
