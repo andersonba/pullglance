@@ -837,10 +837,10 @@ final class PRStore {
                 appLog.info("watch \(mark.id): lookup failed, still watching")
                 continue
             }
-            // The cost of watching, in the log: how much of the hourly budget is left after this lookup.
-            if let limit = parseRateLimit(data) {
+            // The cost of watching, for whoever turned verbose logging on: the hourly budget left after this lookup.
+            if appLog.isVerbose, let limit = parseRateLimit(data) {
                 let minutes = max(0, Int(limit.resetAt.timeIntervalSince(now()) / 60))
-                appLog.info("watch \(mark.id): checked, rate limit \(limit.remaining) left, resets in \(minutes) min")
+                appLog.debug("watch \(mark.id): checked, rate limit \(limit.remaining) left, resets in \(minutes) min")
             }
             let listed = listed(mark.id)
             switch lookup {
