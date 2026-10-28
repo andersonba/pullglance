@@ -20,6 +20,7 @@ publishes it as the release notes.
 - The guard against a popover that keeps re-opening on its own (ten openings in two seconds) now holds for the whole two seconds once it trips, instead of letting the very next opening through.
 - A `gh` call that ignores the stop signal after its time is up is now killed outright two seconds later, and output left in a pipe by a process `gh` spawned no longer holds a refresh until that process ends.
 - Holding `R` (or any action key) on a row fires once, not once per key repeat, and a row already being looked up is not looked up again until the answer is in.
+- The viewed-files count stops following a file listing past 30 pages (GitHub lists at most 3000 files), and a closed sign-in popup takes its observers with it.
 
 ## [0.5.0] - 2026-10-19
 

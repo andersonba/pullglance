@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import WebKit
 @testable import Pullglance
 
 /// What the host does with the page when nobody is looking at it: the window closing lets the page go,
@@ -31,5 +32,17 @@ struct ReviewWebHostLifecycleTests {
         #expect(host.isParked)
         host.park()
         #expect(host.contentProcessTerminated(now: Date(), onScreen: true) == .pageGone, "a parked page has nothing to bring back")
+    }
+
+    /// A sign-in popup closing takes its observers with it: a day of SSO prompts must not leave a trail
+    /// of title watchers and close listeners behind in the host.
+    @Test func aClosedPopupLeavesNothingBehind() {
+        let host = ReviewWebHost()
+        let popup = host.openPopup(configuration: WKWebViewConfiguration(), url: URL(string: "https://example.okta.com/login"), requested: NSSize(width: 400, height: 300))
+        #expect(host.popups.count == 1)
+        #expect(host.popupObservationCount == 1)
+        popup.window?.close()
+        #expect(host.popups.isEmpty)
+        #expect(host.popupObservationCount == 0)
     }
 }

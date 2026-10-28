@@ -324,14 +324,21 @@ func parsePullRequestFilesResponse(_ data: Data) throws -> FileCountsPage {
                           nextCursor: pr.files.pageInfo.hasNextPage ? pr.files.pageInfo.endCursor : nil)
 }
 
+/// Pages of 100; GitHub lists at most 3000 files on a pull request, so a cursor still coming back after
+/// this many pages is not a listing worth following.
+let fileCountsPageLimit = 30
+
 /// Every page, or nothing: a partial count would look final.
 func fetchFileCounts(_ client: GHRunning, ref: PullRequestRef) async -> FileCounts? {
     var viewed = 0
     var total = 0
     var cursor: String? = nil
+    var pages = 0
     repeat {
-        guard case .success(let data) = await client.pullRequestFiles(owner: ref.owner, name: ref.name, number: ref.number, after: cursor),
+        guard pages < fileCountsPageLimit,
+              case .success(let data) = await client.pullRequestFiles(owner: ref.owner, name: ref.name, number: ref.number, after: cursor),
               let page = try? parsePullRequestFilesResponse(data) else { return nil }
+        pages += 1
         total = page.total
         viewed += page.viewedOnPage
         cursor = page.nextCursor

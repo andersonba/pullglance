@@ -328,12 +328,16 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
             }
             return nil
         }
-        // The popup MUST be created with the configuration WebKit hands us (shares the data store + opener
-        // relationship), but with a clean user content controller: our handlers and shim have no business
-        // in an identity provider's page.
+        return openPopup(configuration: configuration, url: navigationAction.request.url,
+                         requested: NSSize(width: windowFeatures.width?.doubleValue ?? 980, height: windowFeatures.height?.doubleValue ?? 760))
+    }
+
+    /// A popup in its own window, owned here until it closes. The popup MUST be created with the
+    /// configuration WebKit hands us (shares the data store + opener relationship), but with a clean user
+    /// content controller: our handlers and shim have no business in an identity provider's page.
+    func openPopup(configuration: WKWebViewConfiguration, url: URL?, requested: NSSize) -> WKWebView {
         configuration.userContentController = WKUserContentController()
         let screen = (self.webView.window?.screen ?? NSScreen.main)?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let requested = NSSize(width: windowFeatures.width?.doubleValue ?? 980, height: windowFeatures.height?.doubleValue ?? 760)
         let size = NSSize(width: min(screen.width, max(360, requested.width)), height: min(screen.height, max(280, requested.height)))
         let popup = WKWebView(frame: NSRect(origin: .zero, size: size), configuration: configuration)
         popup.navigationDelegate = self
@@ -342,7 +346,7 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
         window.isReleasedWhenClosed = false   // ARC owns it through `popups`; AppKit must not release it too
         window.isRestorable = false
         window.tabbingMode = .disallowed
-        window.title = navigationAction.request.url?.host ?? String(localized: "Sign in", bundle: .app)
+        window.title = url?.host ?? String(localized: "Sign in", bundle: .app)
         window.contentView = popup
         // Centred over the review window, clamped to its screen.
         if let parent = self.webView.window?.frame {
@@ -352,7 +356,7 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
         } else {
             window.center()
         }
-        popupObservations[ObjectIdentifier(popup)] = [
+        popupObservations[ObjectIdentifier(window)] = [
             popup.observe(\.title, options: [.new]) { [weak window] w, _ in Task { @MainActor in
                 let origin = w.url?.host ?? ""
                 window?.title = [origin, w.title ?? ""].filter { !$0.isEmpty }.joined(separator: " — ")
@@ -361,12 +365,19 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
         ]
         window.makeKeyAndOrderFront(nil)
         popups.append(window)
-        // One teardown path for the red button, ⌘W and window.close(): the close notification.
-        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] note in
+        // One teardown path for the red button, ⌘W and window.close(): the close notification, which
+        // takes the window's observers and this listener with it.
+        popupCloseTokens[ObjectIdentifier(window)] = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] note in
             guard let closing = note.object as? NSWindow else { return }
-            Task { @MainActor in self?.popups.removeAll { $0 === closing } }
+            MainActor.assumeIsolated { self?.popupClosed(closing) }
         }
         return popup
+    }
+
+    private func popupClosed(_ window: NSWindow) {
+        popups.removeAll { $0 === window }
+        popupObservations[ObjectIdentifier(window)] = nil
+        if let token = popupCloseTokens.removeValue(forKey: ObjectIdentifier(window)) { NotificationCenter.default.removeObserver(token) }
     }
 
     func webViewDidClose(_ webView: WKWebView) {
@@ -374,12 +385,17 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
     }
 
     private var popupObservations: [ObjectIdentifier: [NSKeyValueObservation]] = [:]
+    private var popupCloseTokens: [ObjectIdentifier: NSObjectProtocol] = [:]
+    /// How many popups still have their observers: zero once they are all closed.
+    var popupObservationCount: Int { popupObservations.count }
 
     /// The review window closing takes its popups with it; a sign-in window without its opener is a trap.
     func closeOwnedPopups() {
-        for window in popups { window.close() }
+        for window in popups { window.close() }   // each close runs `popupClosed`
         popups.removeAll()
         popupObservations.removeAll()
+        popupCloseTokens.values.forEach { NotificationCenter.default.removeObserver($0) }
+        popupCloseTokens.removeAll()
     }
 
     // MARK: JavaScript dialogs and file uploads (WebKit has no built-in panels on macOS: without these,
