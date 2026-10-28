@@ -18,6 +18,7 @@ publishes it as the release notes.
 ### Fixed
 - Closing the Review Desk now lets the GitHub page go instead of keeping it alive behind the hidden window, with its scripts and its web process; reopening loads the pull request again. A page WebKit drops while the window is closed is no longer reloaded in the dark.
 - The guard against a popover that keeps re-opening on its own (ten openings in two seconds) now holds for the whole two seconds once it trips, instead of letting the very next opening through.
+- A `gh` call that ignores the stop signal after its time is up is now killed outright two seconds later, and output left in a pipe by a process `gh` spawned no longer holds a refresh until that process ends.
 
 ## [0.5.0] - 2026-10-19
 
