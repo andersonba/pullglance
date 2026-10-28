@@ -45,6 +45,15 @@ import Testing
         #expect(TriageKey(characters: "j", keyCode: 38, modifiers: [.command]) == nil)
     }
 
+    /// A held key repeats: the arrows should walk the list, but an action key held down must not fire
+    /// its action once per repeat (R would start a lookup per key event).
+    @Test func onlyMovementKeysActOnARepeat() {
+        for key in [TriageKey.up, .down, .left, .right] { #expect(key.actsOnRepeat, "\(key)") }
+        for key in [TriageKey.refresh, .pin, .snooze, .snoozeFor, .watch, .open, .review, .comment, .merge, .copyLink, .space, .shortcuts, .filter, .escape] {
+            #expect(!key.actsOnRepeat, "\(key)")
+        }
+    }
+
     /// F opens the repository/author filter; ⌘F stays the review window's Find.
     @Test func fIsTheFilter() {
         #expect(TriageKey(characters: "f", keyCode: 3, modifiers: []) == .filter)

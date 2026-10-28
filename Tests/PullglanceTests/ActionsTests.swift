@@ -744,6 +744,24 @@ private extension Data {
         #expect(!store.mine.value.contains { $0.id == pr.id })
     }
 
+    /// R held down on a row, or a poll landing on a row being refreshed: one lookup, and every caller gets
+    /// its answer, instead of a `gh` process per key repeat.
+    @Test func aRefreshAlreadyInFlightIsSharedNotRepeated() async throws {
+        let (store, gh) = try await store()
+        let pr = store.mineGroups.readyToMerge[0]
+        await gh.setPullRequest(.success(pullRequestEnvelope(node(number: pr.number, ci: "SUCCESS", decision: "APPROVED"))), number: pr.number)
+        await gh.setDelay(.milliseconds(100))
+        async let first = store.refreshOne(pr)
+        async let second = store.refreshOne(pr)
+        async let third = store.refreshOne(pr, quiet: true)
+        #expect(await [first, second, third] == [.success(), .success(), .success()])
+        #expect(await gh.lookups.count == 1)
+        #expect(store.actionState(for: pr) == nil)
+        // Done is done: the next request is a new lookup.
+        #expect(await store.refreshOne(pr) == .success())
+        #expect(await gh.lookups.count == 2)
+    }
+
     @Test func aFailedLookupStaysOnTheRow() async throws {
         let (store, gh) = try await store()
         let pr = store.mineGroups.readyToMerge[0]

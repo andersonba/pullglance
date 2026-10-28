@@ -328,6 +328,8 @@ struct PopoverView: View {
         guard !reordering, merging == nil, commenting == nil else { return false }
         if event.window?.firstResponder is NSTextView { return false }
         guard let key = TriageKey(characters: event.charactersIgnoringModifiers, keyCode: event.keyCode, modifiers: event.modifierFlags.intersection(.deviceIndependentFlagsMask)) else { return false }
+        // A held action key is one press: swallowed, so the repeats reach neither the action nor the page.
+        if event.isARepeat, !key.actsOnRepeat { return true }
         // The card answers to its own two keys and swallows the rest while it is up.
         if key == .shortcuts { showingShortcuts.toggle(); return true }
         if showingShortcuts { if key == .escape { showingShortcuts = false }; return true }

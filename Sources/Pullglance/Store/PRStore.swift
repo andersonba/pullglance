@@ -1090,7 +1090,20 @@ final class PRStore {
     /// state changed, leaves if it was merged or closed, and counts follow. Much cheaper than a full
     /// refresh, which is what makes it worth a menu item ("did CI finish yet?").
     /// `quiet` is the poller: no spinner, no failure on the row (just the log).
+    /// One lookup per pull request at a time: a request made while one is in flight (R held down, a poll
+    /// landing on the row) waits for that one's answer instead of starting a `gh` of its own.
     func refreshOne(_ pr: PullRequest, quiet: Bool = false) async -> ActionResult {
+        if let running = refreshesInFlight[pr.id] { return await running.value }
+        let lookup = Task { await performRefreshOne(pr, quiet: quiet) }
+        refreshesInFlight[pr.id] = lookup
+        let result = await lookup.value
+        refreshesInFlight[pr.id] = nil
+        return result
+    }
+
+    private var refreshesInFlight: [String: Task<ActionResult, Never>] = [:]
+
+    private func performRefreshOne(_ pr: PullRequest, quiet: Bool) async -> ActionResult {
         if !quiet { setActionState(.running(.refresh), for: pr) }
         let parts = pr.repo.split(separator: "/", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { return fail(pr, "bad repository name", quiet: quiet) }
