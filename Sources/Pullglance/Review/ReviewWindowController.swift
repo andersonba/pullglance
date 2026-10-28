@@ -88,7 +88,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     /// `firstUnviewed`: a review request lands on the first file still to be viewed, not the top of the page.
     func open(_ pr: PullRequest, landing: ReviewAddress.Landing, firstUnviewed: Bool = false) {
         let url = ReviewAddress.url(for: pr, landing: landing)
-        let alreadyHere = ReviewPage.classify(host.webView.url).isSamePullRequest(as: ReviewPage.classify(url))
+        let alreadyHere = !host.isParked && ReviewPage.classify(host.webView.url).isSamePullRequest(as: ReviewPage.classify(url))
         if firstUnviewed, landing == .files {
             session.landOnFirstUnviewed = "/\(pr.repo)/pull/\(pr.number)"
             if alreadyHere { Task { await session.landIfPending() } }
@@ -108,9 +108,10 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         // key view), which opens the suggestions over the page and freezes the field's text mid-edit.
         window?.makeFirstResponder(host.webView)
         refreshSuggestions()
-        // Same pull request already on screen, whatever the tab: keep the page the user is on.
-        if ReviewPage.classify(host.webView.url).isSamePullRequest(as: ReviewPage.classify(url)) { return }
-        if host.webView.url != url { host.webView.load(URLRequest(url: url)) }
+        // Same pull request already on screen, whatever the tab: keep the page the user is on. A parked
+        // page is not on screen, whatever its URL says.
+        if !host.isParked, ReviewPage.classify(host.webView.url).isSamePullRequest(as: ReviewPage.classify(url)) { return }
+        if host.isParked || host.webView.url != url { host.load(url) }
     }
 
     /// Owners after the owner filter, repositories, and the pull requests on screen: what the app already
@@ -127,13 +128,19 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         addressBar.pullRequests = prs
     }
 
-    // MARK: window lifecycle (the window hides; the web view stays warm so reopening is instant)
+    // MARK: window lifecycle (the window hides and the web view stays, but the page is let go: a GitHub
+    // page kept alive behind a closed window is a web process and its memory for nothing)
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         saveHistory()
-        // The page script batches remembered compare state; write it before the window goes away.
+        // The page script batches remembered compare state; write it before the page goes away, and only
+        // then let the page go, unless the window came back meanwhile.
         let bridge = host.bridge
-        Task { _ = try? await bridge.call("flush", ["args": []]) }
+        let host = self.host
+        Task {
+            _ = try? await bridge.call("flush", ["args": []])
+            if !sender.isVisible { host.park() }
+        }
         host.closeOwnedPopups()
         sender.orderOut(nil)
         AppActivation.windowClosed(sender)
@@ -593,7 +600,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
             reviewFiles: { [weak self] in
                 guard let self, case .pullRequest(let repo, let number, _) = session.page,
                       let url = URL(string: "https://github.com/\(repo)/pull/\(number)/files") else { return }
-                host.webView.load(URLRequest(url: url))
+                host.load(url)
             })
     }
 
@@ -751,7 +758,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     @objc func retryFailedLoad() {
         errorOverlay.isHidden = true
-        if let errorRetryURL { host.webView.load(URLRequest(url: errorRetryURL)) } else { host.webView.reload() }
+        if let errorRetryURL { host.load(errorRetryURL) } else { host.webView.reload() }
     }
 
     @objc func openFailedInBrowser() { host.openInBrowser(errorRetryURL ?? host.webView.url) }
@@ -822,7 +829,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     private func navigate(to raw: String) {
         guard let url = ReviewAddress.normalize(raw) else { return }
-        host.webView.load(URLRequest(url: url))
+        host.load(url)
         window?.makeFirstResponder(host.webView)
     }
 

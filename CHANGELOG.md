@@ -15,6 +15,9 @@ publishes it as the release notes.
 - In the Review Desk, the previous and next file are now `⌘K` and `⌘J` (the popover's J and K, with the modifier the page needs), and `⌘↑` / `⌘↓` are the page's again: top and end, as in any browser, on the diff and on the conversation. The `⌘/` card lists both, plus `space` / `⇧space`.
 - A pull request in the merge queue, or with auto-merge on, shows a purple dot at the left (a queue glyph, or a bolt) instead of the green of its checks: GitHub will merge it, it has left your hands. The checks moved to the dot's tooltip, and the click still opens them.
 
+### Fixed
+- Closing the Review Desk now lets the GitHub page go instead of keeping it alive behind the hidden window, with its scripts and its web process; reopening loads the pull request again. A page WebKit drops while the window is closed is no longer reloaded in the dark.
+
 ## [0.5.0] - 2026-10-19
 
 ### Added

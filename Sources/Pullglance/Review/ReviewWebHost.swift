@@ -268,18 +268,48 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
         onNavigationError?(failing ?? pendingMainFrameURL, error)
     }
 
-    /// One free reload; a second crash within 10 s means the page itself is the problem, so stop and tell.
+    // MARK: the page when nobody looks at it
+
+    /// True from `park()` until the next `load`: the page was let go (the window closed, or WebKit dropped
+    /// it while hidden), so what `webView.url` says is on screen is not there, and the next open loads again.
+    private(set) var isParked = false
+
+    /// The window closed: a GitHub page with its scripts, observers and a web process is nothing to keep
+    /// around for a window nobody sees, so the page is replaced by a blank one. Reopening loads again.
+    func park() {
+        isParked = true
+        log("parked")
+        webView.load(URLRequest(url: URL(string: "about:blank")!))
+    }
+
+    func load(_ url: URL) {
+        isParked = false
+        webView.load(URLRequest(url: url))
+    }
+
+    enum CrashResponse: Equatable { case reload, loop, pageGone }
+
+    /// On screen: one free reload; a second crash within 10 s means the page itself is the problem, so stop
+    /// and tell. Off screen, or already parked: nothing to bring back, the page is just gone until the next open.
+    func contentProcessTerminated(now: Date, onScreen: Bool) -> CrashResponse {
+        guard onScreen, !isParked else { isParked = true; return .pageGone }
+        if let lastCrash, now.timeIntervalSince(lastCrash) < 10 { return .loop }
+        lastCrash = now
+        return .reload
+    }
+
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        let now = Date()
-        if let lastCrash, now.timeIntervalSince(lastCrash) < 10 {
+        switch contentProcessTerminated(now: Date(), onScreen: webView.window?.isVisible == true) {
+        case .loop:
             log("web content process terminated again within 10 s; not reloading")
             onCrashLoop?()
-            return
-        }
-        lastCrash = now
-        log("web content process terminated (memory pressure / crash); reloading once")
-        if webView.backForwardList.currentItem == nil || webView.reload() == nil, let url = pendingMainFrameURL ?? webView.url {
-            webView.load(URLRequest(url: url))
+        case .pageGone:
+            log("web content process terminated off screen; the page is gone until the next open")
+        case .reload:
+            log("web content process terminated (memory pressure / crash); reloading once")
+            if webView.backForwardList.currentItem == nil || webView.reload() == nil, let url = pendingMainFrameURL ?? webView.url {
+                webView.load(URLRequest(url: url))
+            }
         }
     }
 
