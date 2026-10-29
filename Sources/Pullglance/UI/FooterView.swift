@@ -67,6 +67,24 @@ struct FooterView: View {
                 .buttonStyle(.plain)
                 .help(Text("Clear author filter", bundle: .app))
             }
+            if let key = store.quickStackFilter {
+                Button {
+                    store.quickStackFilter = nil
+                } label: {
+                    Label {
+                        Text(verbatim: String(format: String(localized: "Stack #%lld", bundle: .app), key.number))
+                    } icon: {
+                        Image(systemName: "square.stack.3d.up")
+                    }
+                    .font(.caption2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.accentColor.opacity(0.15), in: Capsule())
+                    .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .help(Text("Clear stack filter", bundle: .app))
+            }
             if !store.hiddenOwners.isEmpty {
                 Button {
                     open(tab: .filters)

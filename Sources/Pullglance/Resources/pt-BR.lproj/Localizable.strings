@@ -520,3 +520,5 @@
 "closed" = "fechado";
 "draft" = "rascunho";
 "Stack" = "Stack";
+"Stack #%lld" = "Stack #%lld";
+"Clear stack filter" = "Limpar filtro de stack";

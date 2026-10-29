@@ -278,7 +278,9 @@ final class PRStore {
     var quickRepoFilter: Set<String> = []
     /// Same lens by author login: "what did alice ask me to review". Stacks with the repository one.
     var quickAuthorFilter: Set<String> = []
-    var hasQuickFilter: Bool { !quickRepoFilter.isEmpty || !quickAuthorFilter.isEmpty }
+    /// Same lens by stack: "show me this chain". One stack at a time; stacks with the two above.
+    var quickStackFilter: StackKey? = nil
+    var hasQuickFilter: Bool { !quickRepoFilter.isEmpty || !quickAuthorFilter.isEmpty || quickStackFilter != nil }
 
     /// A click on a row's avatar: that person only, or back to everyone when it already was only them.
     /// Several people at once are the filter panel's business.
@@ -289,6 +291,13 @@ final class PRStore {
     /// Same gesture on a row's repository name.
     func toggleQuickRepo(_ repo: String) {
         quickRepoFilter = quickRepoFilter == [repo] ? [] : [repo]
+    }
+
+    /// Same gesture on a row's stack pill (or "Show this stack" in its menu): that stack only, or back to
+    /// all when it already was. A row without a stack toggles nothing.
+    func toggleQuickStack(_ pr: PullRequest) {
+        guard let key = pr.stackKey else { return }
+        quickStackFilter = quickStackFilter == key ? nil : key
     }
 
     /// Sections shown in the popover. Missing from defaults means all.
@@ -597,26 +606,40 @@ final class PRStore {
     /// "Only" rules plus the session quick filter: what the lists show.
     private func lens(_ prs: [PullRequest]) -> [PullRequest] {
         let base = allowed(prs)
-        return base.filter { (quickRepoFilter.isEmpty || quickRepoFilter.contains($0.repo)) && (quickAuthorFilter.isEmpty || quickAuthorFilter.contains($0.author)) }
+        return base.filter {
+            (quickRepoFilter.isEmpty || quickRepoFilter.contains($0.repo))
+                && (quickAuthorFilter.isEmpty || quickAuthorFilter.contains($0.author))
+                && (quickStackFilter == nil || $0.stackKey == quickStackFilter)
+        }
+    }
+
+    /// Under the stack lens a section reads as the chain: by position, base first. Priority and recency
+    /// step aside; an order the user made by hand does not.
+    private func stackOrdered(_ prs: [PullRequest], _ section: Section) -> [PullRequest] {
+        guard quickStackFilter != nil, !isManuallyOrdered(section) else { return prs }
+        return prs.enumerated().sorted { a, b in
+            let pa = a.element.stack?.position ?? Int.max, pb = b.element.stack?.position ?? Int.max
+            return pa == pb ? a.offset < b.offset : pa < pb
+        }.map(\.element)
     }
 
     var mineGroups: MineGroups {
         var groups = groupMine(lens(mine.value), dormant: dormantIDs, pinned: pinned)
-        groups.pinned = manuallyOrdered(groups.pinned, .pinnedMine)
-        groups.needsAction = manuallyOrdered(groups.needsAction, .needsAction)
-        groups.readyToMerge = manuallyOrdered(groups.readyToMerge, .readyToMerge)
-        groups.waitingForReview = manuallyOrdered(groups.waitingForReview, .waitingForReview)
-        groups.drafts = manuallyOrdered(groups.drafts, .drafts)
+        groups.pinned = stackOrdered(manuallyOrdered(groups.pinned, .pinnedMine), .pinnedMine)
+        groups.needsAction = stackOrdered(manuallyOrdered(groups.needsAction, .needsAction), .needsAction)
+        groups.readyToMerge = stackOrdered(manuallyOrdered(groups.readyToMerge, .readyToMerge), .readyToMerge)
+        groups.waitingForReview = stackOrdered(manuallyOrdered(groups.waitingForReview, .waitingForReview), .waitingForReview)
+        groups.drafts = stackOrdered(manuallyOrdered(groups.drafts, .drafts), .drafts)
         return groups
     }
     /// Snoozed and pinned rows live in their own sections.
     private func inPlace(_ pr: PullRequest) -> Bool { !dormantIDs.contains(pr.id) && !pinned.contains(pr.id) }
     var directList: [PullRequest] {
-        ordered(lens(direct.value).filter(inPlace), .needsYourReview)
+        stackOrdered(ordered(lens(direct.value).filter(inPlace), .needsYourReview), .needsYourReview)
     }
     /// The 20 most recent team requests (the sample GitHub is asked for), then ordered like the others.
     var viaTeamList: [PullRequest] {
-        ordered(filterViaTeam(all: lens(viaTeam?.value ?? []), direct: direct.value, viewerLogin: viewerLogin).filter(inPlace), .needsTeamsReview)
+        stackOrdered(ordered(filterViaTeam(all: lens(viaTeam?.value ?? []), direct: direct.value, viewerLogin: viewerLogin).filter(inPlace), .needsTeamsReview), .needsTeamsReview)
     }
     /// Pinned review requests, direct and team, in the user's order.
     var pinnedReviewList: [PullRequest] {

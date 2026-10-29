@@ -92,7 +92,7 @@ struct RepoFilterButton: View {
             HStack {
                 Text("Applies to both tabs. Not saved.", bundle: .app).font(.caption2).foregroundStyle(.tertiary)
                 Spacer()
-                Button { store.quickRepoFilter = []; store.quickAuthorFilter = [] } label: { Text("Clear", bundle: .app) }
+                Button { store.quickRepoFilter = []; store.quickAuthorFilter = []; store.quickStackFilter = nil } label: { Text("Clear", bundle: .app) }
                     .controlSize(.small)
                     .disabled(!isActive)
             }
