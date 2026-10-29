@@ -137,8 +137,12 @@ struct OnboardingView: View {
                            detail: Text("Optional. macOS asks once; you can change it in Settings later.", bundle: .app)) {
                 Toggle(isOn: $store.notifiesSnoozeEnd) { EmptyView() }.labelsHidden().toggleStyle(.switch).controlSize(.small)
             }
-        case .watch, .deskKeys, .handoff, .stacks, .keyboard, .assigned:
-            Color.clear.frame(height: 120)
+        case .watch: if active { WatchAnimation().frame(height: 120) } else { Color.clear.frame(height: 120) }
+        case .deskKeys: if active { DeskKeysAnimation().frame(height: 120) } else { Color.clear.frame(height: 120) }
+        case .handoff: if active { HandoffAnimation().frame(height: 120) } else { Color.clear.frame(height: 120) }
+        case .stacks: if active { StacksAnimation().frame(height: 120) } else { Color.clear.frame(height: 120) }
+        case .keyboard: if active { KeyboardAnimation().frame(height: 120) } else { Color.clear.frame(height: 120) }
+        case .assigned: if active { AssignedAnimation().frame(height: 120) } else { Color.clear.frame(height: 120) }
         case .more(let bullets):
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(bullets, id: \.self) { bullet in
