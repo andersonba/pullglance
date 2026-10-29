@@ -79,13 +79,24 @@ actor DemoGH: GHRunning {
         var team: String? = nil
         var queuePosition: Int? = nil
         var canAutoMerge = false
+        /// A place in the demo's one stack (#7 in acme/web, four entries, the first already merged).
+        var stackPosition: Int? = nil
     }
 
+    /// The stack's entries, position first: a merged base that only the hover shows, then three open ones
+    /// that land in three different sections.
+    private static let stackEntries: [(Int, Int, String, String, Bool)] = [
+        (1, 380, "Extract the billing client", "MERGED", false),
+        (2, 388, "Split the billing worker from the API", "OPEN", false),
+        (3, 401, "Keep webpack's filesystem cache out of CI", "OPEN", false),
+        (4, 405, "Draft: redesign the settings window", "OPEN", true),
+    ]
+
     private var mine: [PR] {[
-        PR(number: 388, title: "Split the billing worker from the API", hoursAgo: 5 * 24, ageDays: 6, decision: "APPROVED", files: 14, add: 210, del: 96),
-        PR(number: 401, title: "Keep webpack's filesystem cache out of CI", hoursAgo: 20 * 24, ageDays: 21, ci: "FAILURE", decision: "CHANGES_REQUESTED", mergeable: "CONFLICTING", state: "DIRTY", threads: 5, files: 3, add: 31, del: 4),
+        PR(number: 388, title: "Split the billing worker from the API", hoursAgo: 5 * 24, ageDays: 6, decision: "APPROVED", files: 14, add: 210, del: 96, stackPosition: 2),
+        PR(number: 401, title: "Keep webpack's filesystem cache out of CI", hoursAgo: 20 * 24, ageDays: 21, ci: "FAILURE", decision: "CHANGES_REQUESTED", mergeable: "CONFLICTING", state: "DIRTY", threads: 5, files: 3, add: 31, del: 4, stackPosition: 3),
         PR(repo: "acme/api", number: 1042, title: "Retry webhook deliveries with jitter", hoursAgo: 3, ageDays: 0.2, ci: "PENDING", decision: "REVIEW_REQUIRED", state: "BLOCKED", files: 4, add: 88, del: 20, canAutoMerge: true),
-        PR(number: 405, title: "Draft: redesign the settings window", hoursAgo: 26, ageDays: 2, ci: nil, draft: true, files: 22, add: 640, del: 410),
+        PR(number: 405, title: "Draft: redesign the settings window", hoursAgo: 26, ageDays: 2, ci: nil, draft: true, files: 22, add: 640, del: 410, stackPosition: 4),
         PR(repo: "acme/web", number: 377, title: "Bump the uploader to the new SDK", hoursAgo: 2 * 24, ageDays: 3, decision: "APPROVED", files: 2, add: 12, del: 12, queuePosition: 2),
     ]}
 
@@ -132,6 +143,12 @@ actor DemoGH: GHRunning {
             "commits": ["nodes": [["commit": ["statusCheckRollup": pr.ci.map { ["state": $0] } ?? NSNull()]]]],
         ]
         n["state"] = "OPEN"
+        n["stackEntry"] = pr.stackPosition.map { position -> [String: Any] in
+            ["position": position, "stack": [
+                "number": 7, "size": Self.stackEntries.count, "baseRefName": "main",
+                "entries": ["nodes": Self.stackEntries.map { ["position": $0.0, "pullRequest": ["number": $0.1, "title": $0.2, "state": $0.3, "isDraft": $0.4]] }],
+            ] as [String: Any]]
+        } ?? NSNull()
         return n
     }
 

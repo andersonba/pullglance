@@ -9,6 +9,7 @@ publishes it as the release notes.
 ### Added
 - **Watch** a pull request you are waiting on (row menu, or `W`): a bell on the row, a lookup every 30 seconds popover open or not, and a macOS notification the moment it moves (checks passed or failed, approved, changes requested, conflicts, merge queue position, merged, closed). The notification ends the watch and a click on it opens the pull request; the row says *Moved · why* until the popover has been opened and closed. Up to 10 at a time. Merging from the app with a merge queue or "Merge when checks pass" offers to watch until it lands, checked by default. With verbose logging on (Settings › Advanced), each lookup logs how much of GitHub's hourly GraphQL budget is left.
 - `Pullglance --demo` runs the app on the fictional data, for trying a feature by hand without a real pull request.
+- A pull request in a GitHub stack (`gh stack`) shows its place, `2 of 3`, as a pill; hovering lists the stack, and a click on the pill (or *Show this stack* in the row menu) narrows the popover to that stack, with a line joining neighbours in a section and a `Stack #7` chip in the footer to clear it. Position and size are GitHub's and do not shift when a member merges.
 - The Review Desk answers to three more browser keys: `⌘←` / `⌘→` go back and forward (outside a text field, where they stay the line's start and end), `⌘E` takes the selected text as the find term and finds the next match, and `esc` stops a page still loading when no find bar or dialog is up.
 
 ### Changed
