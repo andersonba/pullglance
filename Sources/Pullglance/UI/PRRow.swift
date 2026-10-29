@@ -211,13 +211,16 @@ struct PRRowMenu: View {
     var actionState: ActionState? = nil
     /// On a snoozed row, which length it sleeps for (nil: until activity); the submenu checks it.
     var snoozeLength: SnoozeDuration? = nil
+    /// The row is in a GitHub stack; `stackFilterOn` while the popover is narrowed to that stack.
+    var inStack = false
+    var stackFilterOn = false
     var onAction: (PRAction) -> Void = { _ in }
     var onSnoozeFor: (SnoozeDuration?) -> Void = { _ in }
 
     private var isRunning: Bool { if case .running = actionState { return true }; return false }
 
     var body: some View {
-        ForEach(allActions(for: section, dormant: isDormant, offersMerge: offersMerge, autoMergeOn: autoMergeOn), id: \.self) { action in
+        ForEach(allActions(for: section, dormant: isDormant, offersMerge: offersMerge, autoMergeOn: autoMergeOn, inStack: inStack), id: \.self) { action in
             Button { onAction(action) } label: {
                 switch action {
                 case .merge: Label { Text(offersMerge ? "Merge when checks pass…" : "Merge…", bundle: .app) } icon: { Image(systemName: "arrow.triangle.merge") }
@@ -231,6 +234,7 @@ struct PRRowMenu: View {
                 case .copyLink: Label { Text("Copy link", bundle: .app) } icon: { Image(systemName: "link") }
                 case .refresh: Label { Text("Refresh", bundle: .app) } icon: { Image(systemName: "arrow.clockwise") }
                 case .markReady: Label { Text("Mark as ready for review", bundle: .app) } icon: { Image(systemName: "checkmark.seal") }
+                case .showStack: Label { Text(stackFilterOn ? "Show all" : "Show this stack", bundle: .app) } icon: { Image(systemName: "square.stack.3d.up") }
                 }
             }
             .disabled(isRunning && (action == .merge || action == .comment || action == .refresh || action == .disableAutoMerge || action == .markReady))
@@ -265,7 +269,7 @@ struct PRRowMenu: View {
         case .open: KeyboardShortcut("o", modifiers: [])
         case .refresh: KeyboardShortcut("r", modifiers: [])
         case .copyLink: KeyboardShortcut("c", modifiers: .command)
-        case .approve, .disableAutoMerge, .markReady: nil
+        case .approve, .disableAutoMerge, .markReady, .showStack: nil
         }
     }
 

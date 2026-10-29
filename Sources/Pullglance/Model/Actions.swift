@@ -57,6 +57,8 @@ enum PRAction: Equatable, Sendable {
     case pin
     /// Watch for movement (a notification), or stop watching.
     case watch
+    /// Narrows the popover to the row's stack, or back to all while that filter is on.
+    case showStack
     /// `gh pr ready`: only on the viewer's own drafts.
     case markReady
 }
@@ -75,10 +77,12 @@ func quickActions(for section: Section, dormant: Bool = false) -> [PRAction] {
 
 /// The full context menu, per section. `offersMerge` is "Merge when checks pass" outside Ready to merge;
 /// `autoMergeOn` replaces Merge with the way to call it off.
-func allActions(for section: Section, dormant: Bool = false, offersMerge: Bool = false, autoMergeOn: Bool = false) -> [PRAction] {
+/// `inStack`: the row belongs to a GitHub stack, so it offers to show the stack, just before Refresh.
+func allActions(for section: Section, dormant: Bool = false, offersMerge: Bool = false, autoMergeOn: Bool = false, inStack: Bool = false) -> [PRAction] {
     // A draft merges nowhere and takes no auto-merge: its one action is to be marked ready.
     let merge: [PRAction] = section == .drafts ? [.markReady] : autoMergeOn ? [.disableAutoMerge] : (section == .readyToMerge || offersMerge) ? [.merge] : []
-    return (dormant ? [.snooze, .pin, .watch] + merge + [.comment, .open, .copyLink] : [.pin, .watch] + merge + [.comment, .snooze, .open, .copyLink]) + [.refresh]
+    let stack: [PRAction] = inStack ? [.showStack] : []
+    return (dormant ? [.snooze, .pin, .watch] + merge + [.comment, .open, .copyLink] : [.pin, .watch] + merge + [.comment, .snooze, .open, .copyLink]) + stack + [.refresh]
 }
 
 /// Why a merge did not happen, in words a person can act on. Built from `gh pr merge` output.

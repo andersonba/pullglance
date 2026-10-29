@@ -554,6 +554,8 @@ struct PopoverView: View {
             show(toast: String(localized: "Link copied", bundle: .app))
         case .refresh:
             Task { _ = await store.refreshOne(pr) }
+        case .showStack:
+            withAnimation(.easeInOut(duration: 0.2)) { store.toggleQuickStack(pr) }
         case .disableAutoMerge:
             Task { _ = await store.disableAutoMerge(pr) }
         case .markReady:
@@ -700,6 +702,7 @@ struct PopoverView: View {
         let snoozeLength = dormant ? store.dormantMark(for: pr)?.nearestLength() : nil
         let isWoke = store.woke.contains(pr.id)
         let watched = store.isWatched(pr)
+        let stackFiltered = store.quickStackFilter != nil && store.quickStackFilter == pr.stackKey
         return SwipeActionsRow(
             id: pr.id,
             actions: quickActions(for: actionSection, dormant: dormant),
@@ -709,7 +712,7 @@ struct PopoverView: View {
             isRunning: running,
             isLocked: reordering,
             onAction: { handle($0, for: pr) },
-            menu: { PRRowMenu(section: actionSection, isDormant: dormant, isPinned: pinned, isWatched: watched, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, snoozeLength: snoozeLength, onAction: { handle($0, for: pr) }, onSnoozeFor: { snooze(pr, for: $0) }) }
+            menu: { PRRowMenu(section: actionSection, isDormant: dormant, isPinned: pinned, isWatched: watched, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, snoozeLength: snoozeLength, inStack: pr.stack != nil, stackFilterOn: stackFiltered, onAction: { handle($0, for: pr) }, onSnoozeFor: { snooze(pr, for: $0) }) }
         ) {
             PRRow(
                 pr: pr,
@@ -731,7 +734,9 @@ struct PopoverView: View {
                 onAuthorTap: reordering ? nil : { withAnimation(.easeInOut(duration: 0.2)) { store.toggleQuickAuthor(pr.author) } },
                 isAuthorFiltered: store.quickAuthorFilter == [pr.author],
                 onRepoTap: reordering ? nil : { withAnimation(.easeInOut(duration: 0.2)) { store.toggleQuickRepo(pr.repo) } },
-                isRepoFiltered: store.quickRepoFilter == [pr.repo]
+                isRepoFiltered: store.quickRepoFilter == [pr.repo],
+                onStackTap: reordering || pr.stack == nil ? nil : { withAnimation(.easeInOut(duration: 0.2)) { store.toggleQuickStack(pr) } },
+                isStackFiltered: stackFiltered
             )
             // In reorder mode nothing inside the row is clickable; the whole row is the drag handle.
             .allowsHitTesting(!reordering)

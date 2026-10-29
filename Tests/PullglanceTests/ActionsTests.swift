@@ -155,6 +155,14 @@ import Testing
         #expect(quickActions(for: .needsAction, dormant: true) == [.snooze, .open])
         // Pin is the first item of every menu; a snoozed row still leads with Wake.
         #expect(allActions(for: .readyToMerge) == [.pin, .watch, .merge, .comment, .snooze, .open, .copyLink, .refresh])
+    }
+
+    /// A row in a stack offers "Show this stack" just before Refresh, snoozed or not; others never do.
+    @Test func aStackedRowOffersShowStackBeforeRefresh() {
+        let actions = allActions(for: .needsAction, inStack: true)
+        #expect(actions.suffix(2) == [.showStack, .refresh])
+        #expect(!allActions(for: .needsAction).contains(.showStack))
+        #expect(allActions(for: .drafts, dormant: true, inStack: true).suffix(2) == [.showStack, .refresh])
         #expect(allActions(for: .needsYourReview) == [.pin, .watch, .comment, .snooze, .open, .copyLink, .refresh])
         #expect(allActions(for: .drafts).contains(.merge) == false)
         // A draft of yours: the one thing it wants is to be marked ready. No merge, no auto-merge.
