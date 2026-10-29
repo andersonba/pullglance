@@ -52,7 +52,11 @@ struct PullglanceApp: App {
             if !liveDemo {
                 OnboardingWindowController.configure(store: store)
                 // After the menu bar item exists, so the window can be placed and the dot has an icon to land on.
-                DispatchQueue.main.async { OnboardingWindowController.showIfDue() }
+                DispatchQueue.main.async {
+                    OnboardingWindowController.showIfDue()
+                    // Once after an update; never while the welcome is owed (the guard is inside).
+                    OnboardingWindowController.showWhatsNewIfDue()
+                }
                 // The installed copy keeps the global shortcut; a demo next to it must not fight for it.
                 PopoverHotKey.install()
             }

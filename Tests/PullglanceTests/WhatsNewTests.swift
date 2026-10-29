@@ -85,3 +85,16 @@ import Testing
         #expect(WhatsNewProgress(defaults: defaults).isDue(current: "0.6.0") == false)
     }
 }
+
+@MainActor @Suite struct WhatsNewLaunchTests {
+    /// At launch: the welcome wins on a first install, the tour opens once after an update, never on dev.
+    @Test func theWelcomeWinsAndATourOpensOnlyWhenDue() {
+        let fresh = WhatsNewProgress(defaults: testDefaults())
+        #expect(OnboardingWindowController.whatsNewSteps(welcomeDue: true, whatsNew: fresh, current: "0.6.0") == nil, "first install: the welcome")
+        #expect(OnboardingWindowController.whatsNewSteps(welcomeDue: false, whatsNew: fresh, current: "0.6.0")?.count == 7, "updated from before any tour")
+        #expect(OnboardingWindowController.whatsNewSteps(welcomeDue: false, whatsNew: fresh, current: "dev") == nil)
+        let seen = WhatsNewProgress(defaults: testDefaults()); seen.markSeen(version: "0.5.0")
+        #expect(OnboardingWindowController.whatsNewSteps(welcomeDue: false, whatsNew: seen, current: "0.6.0")?.map(\.id).first == "watch")
+        #expect(OnboardingWindowController.whatsNewSteps(welcomeDue: false, whatsNew: seen, current: "0.6.0")?.count == 5)
+    }
+}
