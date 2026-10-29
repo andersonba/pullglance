@@ -6,6 +6,9 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+### Fixed
+- Reopening the Review Desk in dark mode no longer flashes white before GitHub paints: the page it parks on between uses follows the system appearance.
+
 ## [0.6.0] - 2026-10-29
 
 ### Added

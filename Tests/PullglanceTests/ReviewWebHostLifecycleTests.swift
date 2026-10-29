@@ -16,6 +16,13 @@ struct ReviewWebHostLifecycleTests {
         #expect(!host.isParked)
     }
 
+    /// The parked page follows the system appearance: a bare about:blank paints white, a flash in dark
+    /// mode from the click on a row until GitHub's first paint.
+    @Test func theParkedPageFollowsTheAppearance() {
+        #expect(ReviewWebHost.parkedPage.contains("<meta name=\"color-scheme\" content=\"light dark\">"))
+        #expect(ReviewWebHost.parkedPage.lowercased().hasPrefix("<!doctype html>"))
+    }
+
     @Test func aCrashOnScreenReloadsOnceThenGivesUp() {
         let host = ReviewWebHost()
         let t0 = Date(timeIntervalSince1970: 1_000)

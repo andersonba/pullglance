@@ -274,12 +274,18 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
     /// it while hidden), so what `webView.url` says is on screen is not there, and the next open loads again.
     private(set) var isParked = false
 
+    /// The empty page the window parks on. Not a bare about:blank: that paints white whatever the
+    /// appearance, a flash in dark mode until GitHub's first paint; with the color-scheme meta WebKit
+    /// uses the system canvas colour, dark in dark mode. Loaded with no base URL it is still about:blank
+    /// to the classifier and the navigation policy.
+    static let parkedPage = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"color-scheme\" content=\"light dark\"><title></title></head><body></body></html>"
+
     /// The window closed: a GitHub page with its scripts, observers and a web process is nothing to keep
-    /// around for a window nobody sees, so the page is replaced by a blank one. Reopening loads again.
+    /// around for a window nobody sees, so the page is replaced by an empty one. Reopening loads again.
     func park() {
         isParked = true
         log("parked")
-        webView.load(URLRequest(url: URL(string: "about:blank")!))
+        webView.loadHTMLString(Self.parkedPage, baseURL: nil)
     }
 
     func load(_ url: URL) {
