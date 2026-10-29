@@ -328,6 +328,8 @@ struct PopoverView: View {
         guard !reordering, merging == nil, commenting == nil else { return false }
         if event.window?.firstResponder is NSTextView { return false }
         guard let key = TriageKey(characters: event.charactersIgnoringModifiers, keyCode: event.keyCode, modifiers: event.modifierFlags.intersection(.deviceIndependentFlagsMask)) else { return false }
+        // A held action key is one press: swallowed, so the repeats reach neither the action nor the page.
+        if event.isARepeat, !key.actsOnRepeat { return true }
         // The card answers to its own two keys and swallows the rest while it is up.
         if key == .shortcuts { showingShortcuts.toggle(); return true }
         if showingShortcuts { if key == .escape { showingShortcuts = false }; return true }
@@ -552,6 +554,8 @@ struct PopoverView: View {
             show(toast: String(localized: "Link copied", bundle: .app))
         case .refresh:
             Task { _ = await store.refreshOne(pr) }
+        case .showStack:
+            withAnimation(.easeInOut(duration: 0.2)) { store.toggleQuickStack(pr) }
         case .disableAutoMerge:
             Task { _ = await store.disableAutoMerge(pr) }
         case .markReady:
@@ -698,6 +702,8 @@ struct PopoverView: View {
         let snoozeLength = dormant ? store.dormantMark(for: pr)?.nearestLength() : nil
         let isWoke = store.woke.contains(pr.id)
         let watched = store.isWatched(pr)
+        let stackFiltered = store.quickStackFilter != nil && store.quickStackFilter == pr.stackKey
+        let rail: RailLinks = store.quickStackFilter == nil ? [] : railLinks(at: among.firstIndex { $0.id == pr.id } ?? -1, in: among)
         return SwipeActionsRow(
             id: pr.id,
             actions: quickActions(for: actionSection, dormant: dormant),
@@ -707,7 +713,7 @@ struct PopoverView: View {
             isRunning: running,
             isLocked: reordering,
             onAction: { handle($0, for: pr) },
-            menu: { PRRowMenu(section: actionSection, isDormant: dormant, isPinned: pinned, isWatched: watched, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, snoozeLength: snoozeLength, onAction: { handle($0, for: pr) }, onSnoozeFor: { snooze(pr, for: $0) }) }
+            menu: { PRRowMenu(section: actionSection, isDormant: dormant, isPinned: pinned, isWatched: watched, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, snoozeLength: snoozeLength, inStack: pr.stack != nil, stackFilterOn: stackFiltered, onAction: { handle($0, for: pr) }, onSnoozeFor: { snooze(pr, for: $0) }) }
         ) {
             PRRow(
                 pr: pr,
@@ -729,7 +735,10 @@ struct PopoverView: View {
                 onAuthorTap: reordering ? nil : { withAnimation(.easeInOut(duration: 0.2)) { store.toggleQuickAuthor(pr.author) } },
                 isAuthorFiltered: store.quickAuthorFilter == [pr.author],
                 onRepoTap: reordering ? nil : { withAnimation(.easeInOut(duration: 0.2)) { store.toggleQuickRepo(pr.repo) } },
-                isRepoFiltered: store.quickRepoFilter == [pr.repo]
+                isRepoFiltered: store.quickRepoFilter == [pr.repo],
+                onStackTap: reordering || pr.stack == nil ? nil : { withAnimation(.easeInOut(duration: 0.2)) { store.toggleQuickStack(pr) } },
+                isStackFiltered: stackFiltered,
+                rail: rail
             )
             // In reorder mode nothing inside the row is clickable; the whole row is the drag handle.
             .allowsHitTesting(!reordering)
@@ -861,8 +870,9 @@ struct PopoverView: View {
             } else if store.viaTeam == nil {
                 ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding()
             } else {
-                ForEach(store.viaTeamList) { pr in
-                    row(pr, section: .needsTeamsReview, showAuthor: true, teamLabel: pr.requestedTeams.first)
+                let team = store.viaTeamList
+                ForEach(team) { pr in
+                    row(pr, section: .needsTeamsReview, showAuthor: true, teamLabel: pr.requestedTeams.first, among: team)
                     Divider()
                 }
                 HStack(spacing: 4) {

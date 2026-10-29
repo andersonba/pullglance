@@ -25,6 +25,15 @@ struct OnboardingStep: Identifiable, Equatable, Sendable {
         case hotkey
         /// The "notify when a snooze ends" toggle.
         case notifications
+        /// The what's new drawings (`WhatsNewAnimations.swift`).
+        case watch, deskKeys, handoff, stacks, keyboard, assigned
+        /// The release's smaller changes as bullets (localization keys), with the release notes button.
+        case more([String])
+    }
+
+    /// What a screen's "try it" button does; the view runs it.
+    enum TryIt: Equatable, Sendable {
+        case openURL(URL)
     }
 
     let id: String
@@ -34,6 +43,19 @@ struct OnboardingStep: Identifiable, Equatable, Sendable {
     let content: Content
     /// The primary button's label.
     let button: String
+    /// The release a what's new screen belongs to; nil on the welcome's steps.
+    var version: String? = nil
+    var tryIt: TryIt? = nil
+
+    /// Every key a list of steps looks up through `LocalizedStringKey`, for the coverage test (the scan
+    /// in `LocalizationCoverageTests` only sees literals).
+    static func localizationKeys(of steps: [OnboardingStep]) -> [String] {
+        steps.flatMap { step -> [String] in
+            var keys = [step.title, step.text, step.button]
+            if case .more(let bullets) = step.content { keys += bullets }
+            return keys
+        }
+    }
 
     static let all: [OnboardingStep] = [
         OnboardingStep(id: "welcome", pose: .glance,
@@ -50,7 +72,7 @@ struct OnboardingStep: Identifiable, Equatable, Sendable {
                        content: .badgeAndTabs, button: "Continue"),
         OnboardingStep(id: "actions", pose: .neutral,
                        title: "Act from the row",
-                       text: "Swipe a row for Pin, Snooze and Comment. Press ↓ or J to drive the list from the keyboard, ⌘/ shows every key. The same keys work on the row under the pointer. Right-click the icon up there for the menu.",
+                       text: "Swipe a row for Pin, Snooze and Comment. Press ↓ or J to drive the list from the keyboard, H J K L do what the arrows do, ⌘/ shows every key. The same keys work on the row under the pointer. Right-click the icon up there for the menu.",
                        content: .rowActions, button: "Continue"),
         OnboardingStep(id: "hotkey", pose: .glance,
                        title: "Open it from anywhere",

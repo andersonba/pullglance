@@ -465,7 +465,7 @@
 "The number, and two tabs" = "The number, and two tabs";
 "The number counts what needs you: failing checks, approvals ready to merge, reviews asked of you. Pick the sections it counts in Settings › Sections. Inside, My PRs by state, To review by who asks first." = "The number counts what needs you: failing checks, approvals ready to merge, reviews asked of you. Pick the sections it counts in Settings › Sections. Inside, My PRs by state, To review by who asks first.";
 "Act from the row" = "Act from the row";
-"Swipe a row for Pin, Snooze and Comment. Press ↓ or J to drive the list from the keyboard, ⌘/ shows every key. The same keys work on the row under the pointer. Right-click the icon up there for the menu." = "Swipe a row for Pin, Snooze and Comment. Press ↓ or J to drive the list from the keyboard, ⌘/ shows every key. The same keys work on the row under the pointer. Right-click the icon up there for the menu.";
+"Swipe a row for Pin, Snooze and Comment. Press ↓ or J to drive the list from the keyboard, H J K L do what the arrows do, ⌘/ shows every key. The same keys work on the row under the pointer. Right-click the icon up there for the menu." = "Swipe a row for Pin, Snooze and Comment. Press ↓ or J to drive the list from the keyboard, H J K L do what the arrows do, ⌘/ shows every key. The same keys work on the row under the pointer. Right-click the icon up there for the menu.";
 "Open it from anywhere" = "Open it from anywhere";
 "⌥⌘P opens and closes the popover whichever app is in front, with the icon lit as for a click. Record another shortcut here, or later in Settings › General." = "⌥⌘P opens and closes the popover whichever app is in front, with the icon lit as for a click. Record another shortcut here, or later in Settings › General.";
 "Snooze what can wait" = "Snooze what can wait";
@@ -513,3 +513,40 @@
 "Conflicts with the base branch" = "Conflicts with the base branch";
 "Behind the base branch" = "Behind the base branch";
 "Position %lld in the merge queue" = "Position %lld in the merge queue";
+
+/* Stacks */
+"Stack #%lld on %@" = "Stack #%lld on %@";
+"merged" = "merged";
+"closed" = "closed";
+"draft" = "draft";
+"Stack" = "Stack";
+"Stack #%lld" = "Stack #%lld";
+"Clear stack filter" = "Clear stack filter";
+"Show this stack" = "Show this stack";
+
+/* What's new */
+"New in %@" = "New in %@";
+"Next" = "Next";
+"Release notes" = "Release notes";
+
+/* What's new screens */
+"Watch a pull request" = "Watch a pull request";
+"Press W on a row you are waiting on. The app looks at it every half minute, popover open or not, and a notification tells you the moment it moves: checks, approval, merge. One notification, then the watch ends." = "Press W on a row you are waiting on. The app looks at it every half minute, popover open or not, and a notification tells you the moment it moves: checks, approval, merge. One notification, then the watch ends.";
+"The Review Desk's keys" = "The Review Desk's keys";
+"⌘J and ⌘K step through the files, ⌘← ⌘→ go back and forward, ⌘E finds the selection, esc stops a load. ⌘/ lists them all." = "⌘J and ⌘K step through the files, ⌘← ⌘→ go back and forward, ⌘E finds the selection, esc stops a load. ⌘/ lists them all.";
+"Out of your hands" = "Out of your hands";
+"A purple dot at the left means GitHub will merge it: in the merge queue, or auto-merge on. Green is still yours to merge." = "A purple dot at the left means GitHub will merge it: in the merge queue, or auto-merge on. Green is still yours to merge.";
+"Stacks" = "Stacks";
+"A pull request in a gh stack shows its place, 2 of 3. Hover for the stack, click to see only it." = "A pull request in a gh stack shows its place, 2 of 3. Hover for the stack, click to see only it.";
+"And more" = "And more";
+"Smaller things in this release:" = "Smaller things in this release:";
+"Pullglance --demo runs the app on fictional data, to try things without a real pull request." = "Pullglance --demo runs the app on fictional data, to try things without a real pull request.";
+"Closing the Review Desk lets the page go instead of keeping it alive hidden." = "Closing the Review Desk lets the page go instead of keeping it alive hidden.";
+"Five stability fixes: a stuck gh, a held key, a popover in a loop." = "Five stability fixes: a stuck gh, a held key, a popover in a loop.";
+"Assigned to you" = "Assigned to you";
+"Pull requests assigned to you that someone else opened (a bot, an agent, a teammate) join My PRs, with the author on the row and an Assigned chip. Settings › Sections turns it off." = "Pull requests assigned to you that someone else opened (a bot, an agent, a teammate) join My PRs, with the author on the row and an Assigned chip. Settings › Sections turns it off.";
+"Drive it from the keyboard" = "Drive it from the keyboard";
+"J starts, H J K L do what the arrows do, F opens the filter, space opens the row's menu, ⌘/ lists every key." = "J starts, H J K L do what the arrows do, F opens the filter, space opens the row's menu, ⌘/ lists every key.";
+"What's new…" = "What's new…";
+"yours to merge" = "yours to merge";
+"GitHub merges it" = "GitHub merges it";

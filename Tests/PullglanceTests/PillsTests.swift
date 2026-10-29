@@ -57,4 +57,13 @@ import Testing
         let result = pills(for: makePR(reviewDecision: .approved, ciState: .success, unresolvedThreads: 0))
         #expect(result.contains { if case .openThreads = $0 { true } else { false } } == false)
     }
+
+    /// The stack marker comes last, after the state pills, and only on a stacked pull request.
+    @Test func aStackedPullRequestEndsWithItsStackPill() {
+        let stack = PullRequestStack(number: 7, size: 3, baseRefName: "main", position: 2, members: [])
+        var pr = makePR(reviewDecision: .changesRequested, ciState: .failure)
+        pr.stack = stack
+        #expect(pills(for: pr) == [.ciFailed, .changesRequested, .stack(position: 2, size: 3)])
+        #expect(pills(for: makePR()).contains { if case .stack = $0 { return true }; return false } == false)
+    }
 }

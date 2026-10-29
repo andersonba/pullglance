@@ -8,18 +8,29 @@ import Observation
 @MainActor @Observable
 final class PopoverPresenter {
     static let shared = PopoverPresenter()
+    @ObservationIgnored private let now: () -> Date
+
+    init(now: @escaping () -> Date = Date.init) { self.now = now }
+
     var isPresented = false {
         didSet {
             guard isPresented, !oldValue else { return }
             // A breaker for a presentation that feeds on itself: the library re-presents a window that loses
             // the key as soon as it appears, each time the binding flips back to true, and the main thread
-            // never comes up for air. Nobody opens the popover ten times in two seconds on purpose.
-            let now = Date()
+            // never comes up for air. Nobody opens the popover ten times in two seconds on purpose. Once
+            // tripped it stays open for a whole window: the loop is still there, and refusing a single
+            // opening would only feed it the next one.
+            let now = now()
+            if now < refusingUntil {
+                isPresented = false
+                return
+            }
             openings.removeAll { now.timeIntervalSince($0) > Self.burstWindow }
             openings.append(now)
             if openings.count > Self.burstLimit {
-                AppLog.shared.info("popover: \(openings.count) openings in \(Int(Self.burstWindow)) s, refusing this one")
+                AppLog.shared.info("popover: \(openings.count) openings in \(Int(Self.burstWindow)) s, refusing for \(Int(Self.burstWindow)) s")
                 openings.removeAll()
+                refusingUntil = now.addingTimeInterval(Self.burstWindow)
                 isPresented = false
             }
         }
@@ -28,6 +39,7 @@ final class PopoverPresenter {
     var statusItem: NSStatusItem?
     private var lastToggle = Date.distantPast
     private var openings: [Date] = []
+    private var refusingUntil = Date.distantPast
     static let burstLimit = 9
     static let burstWindow: TimeInterval = 2
 

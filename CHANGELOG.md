@@ -6,14 +6,25 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-29
+
 ### Added
 - **Watch** a pull request you are waiting on (row menu, or `W`): a bell on the row, a lookup every 30 seconds popover open or not, and a macOS notification the moment it moves (checks passed or failed, approved, changes requested, conflicts, merge queue position, merged, closed). The notification ends the watch and a click on it opens the pull request; the row says *Moved · why* until the popover has been opened and closed. Up to 10 at a time. Merging from the app with a merge queue or "Merge when checks pass" offers to watch until it lands, checked by default. With verbose logging on (Settings › Advanced), each lookup logs how much of GitHub's hourly GraphQL budget is left.
 - `Pullglance --demo` runs the app on the fictional data, for trying a feature by hand without a real pull request.
+- After an update, a short **What's new** tour opens once: the welcome window's screens, one per new thing (this release: Watch, the Review Desk's keys, the purple dot, stacks), plus a one-time catch-up of two older ones (the keyboard, Assigned). **What's new…** in the icon's menu shows the latest release's screens again.
+- A pull request in a GitHub stack (`gh stack`) shows its place, `2 of 3`, as a pill; hovering lists the stack, and a click on the pill (or *Show this stack* in the row menu) narrows the popover to that stack, with a line joining neighbours in a section and a `Stack #7` chip in the footer to clear it. Position and size are GitHub's and do not shift when a member merges.
 - The Review Desk answers to three more browser keys: `⌘←` / `⌘→` go back and forward (outside a text field, where they stay the line's start and end), `⌘E` takes the selected text as the find term and finds the next match, and `esc` stops a page still loading when no find bar or dialog is up.
 
 ### Changed
 - In the Review Desk, the previous and next file are now `⌘K` and `⌘J` (the popover's J and K, with the modifier the page needs), and `⌘↑` / `⌘↓` are the page's again: top and end, as in any browser, on the diff and on the conversation. The `⌘/` card lists both, plus `space` / `⇧space`.
 - A pull request in the merge queue, or with auto-merge on, shows a purple dot at the left (a queue glyph, or a bolt) instead of the green of its checks: GitHub will merge it, it has left your hands. The checks moved to the dot's tooltip, and the click still opens them.
+
+### Fixed
+- Closing the Review Desk now lets the GitHub page go instead of keeping it alive behind the hidden window, with its scripts and its web process; reopening loads the pull request again. A page WebKit drops while the window is closed is no longer reloaded in the dark.
+- The guard against a popover that keeps re-opening on its own (ten openings in two seconds) now holds for the whole two seconds once it trips, instead of letting the very next opening through.
+- A `gh` call that ignores the stop signal after its time is up is now killed outright two seconds later, and output left in a pipe by a process `gh` spawned no longer holds a refresh until that process ends.
+- Holding `R` (or any action key) on a row fires once, not once per key repeat, and a row already being looked up is not looked up again until the answer is in.
+- The viewed-files count stops following a file listing past 30 pages (GitHub lists at most 3000 files), and a closed sign-in popup takes its observers with it.
 
 ## [0.5.0] - 2026-10-19
 

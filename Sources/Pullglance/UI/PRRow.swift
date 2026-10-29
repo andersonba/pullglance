@@ -36,6 +36,11 @@ struct PRRow: View {
     /// A click on the repository name narrows the lists to this repository; nil keeps it plain text.
     var onRepoTap: (() -> Void)? = nil
     var isRepoFiltered = false
+    /// A click on the stack pill narrows the lists to this stack; nil keeps the pill inert.
+    var onStackTap: (() -> Void)? = nil
+    var isStackFiltered = false
+    /// Under the stack lens: a line through the dot to the neighbours that share the stack.
+    var rail: RailLinks = []
 
     private var isRunning: Bool { if case .running = actionState { return true }; return false }
 
@@ -86,7 +91,17 @@ struct PRRow: View {
                 if !rowPills.isEmpty, !isDormant {
                     // Wraps to a second line when they do not fit, rather than truncating each pill.
                     PillFlow(spacing: 4, lineSpacing: 3) {
-                        ForEach(rowPills, id: \.self) { PillView(pill: $0).fixedSize() }
+                        ForEach(rowPills, id: \.self) { pill in
+                            if case .stack = pill, let stack = pr.stack {
+                                // The one pill that does something: hover lists the stack, a click narrows to it.
+                                Button(action: { onStackTap?() }) { PillView(pill: pill, isActive: isStackFiltered).fixedSize() }
+                                    .buttonStyle(.plain)
+                                    .help(Text(verbatim: stack.hoverText()))
+                                    .accessibilityLabel(Text(verbatim: String(localized: "Stack", bundle: .app) + ": " + PillView(pill: pill).title))
+                            } else {
+                                PillView(pill: pill).fixedSize()
+                            }
+                        }
                     }
                     .opacity(actionState == nil ? 1 : 0.35)
                 } else if isDormant, let snoozedUntil {
@@ -111,6 +126,9 @@ struct PRRow: View {
             }
         }
         .padding(.vertical, 6)
+        // The rail sits behind the content, from the row's edge to the dot's centre and on to the other
+        // edge, at the dot's x; nothing is added to the layout, so the row's height and the dot stay put.
+        .background(alignment: .topLeading) { railView }
         .padding(.horizontal, 12)
         .opacity(isDormant ? 0.35 : 1)
         .contentShape(Rectangle())
@@ -121,7 +139,26 @@ struct PRRow: View {
             if case .failed(let action, _) = actionState { onAction(action); return }
             PullRequestOpener.open(pr, from: section.tab)
         }
-        .contextMenu { PRRowMenu(section: section, isDormant: isDormant, isPinned: isPinned, isWatched: isWatched, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, snoozeLength: snoozeLength, onAction: onAction, onSnoozeFor: onSnoozeFor) }
+        .contextMenu { rowMenu }
+    }
+
+    /// The row's own menu: the right-click one, which `space` on a focused row opens too. The swipe's
+    /// "more" tile builds the same menu on the popover's side.
+    var rowMenu: PRRowMenu {
+        PRRowMenu(section: section, isDormant: isDormant, isPinned: isPinned, isWatched: isWatched, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil,
+                  actionState: actionState, snoozeLength: snoozeLength, inStack: pr.stack != nil, stackFilterOn: isStackFiltered, onAction: onAction, onSnoozeFor: onSnoozeFor)
+    }
+
+    /// The dot's centre is 17pt down (6 of padding, 3 above the dot, half of its 16) and 8pt in.
+    @ViewBuilder private var railView: some View {
+        if !rail.isEmpty {
+            let color = Color.secondary.opacity(0.45)
+            VStack(spacing: 0) {
+                Rectangle().fill(rail.contains(.up) ? color : .clear).frame(width: 2, height: 17)
+                Rectangle().fill(rail.contains(.down) ? color : .clear).frame(width: 2).frame(maxHeight: .infinity)
+            }
+            .offset(x: 7)
+        }
     }
 
     /// Left column: CI dot normally; spinner, merged check or failure mark while an action is in play;
@@ -198,13 +235,16 @@ struct PRRowMenu: View {
     var actionState: ActionState? = nil
     /// On a snoozed row, which length it sleeps for (nil: until activity); the submenu checks it.
     var snoozeLength: SnoozeDuration? = nil
+    /// The row is in a GitHub stack; `stackFilterOn` while the popover is narrowed to that stack.
+    var inStack = false
+    var stackFilterOn = false
     var onAction: (PRAction) -> Void = { _ in }
     var onSnoozeFor: (SnoozeDuration?) -> Void = { _ in }
 
     private var isRunning: Bool { if case .running = actionState { return true }; return false }
 
     var body: some View {
-        ForEach(allActions(for: section, dormant: isDormant, offersMerge: offersMerge, autoMergeOn: autoMergeOn), id: \.self) { action in
+        ForEach(allActions(for: section, dormant: isDormant, offersMerge: offersMerge, autoMergeOn: autoMergeOn, inStack: inStack), id: \.self) { action in
             Button { onAction(action) } label: {
                 switch action {
                 case .merge: Label { Text(offersMerge ? "Merge when checks pass…" : "Merge…", bundle: .app) } icon: { Image(systemName: "arrow.triangle.merge") }
@@ -218,6 +258,7 @@ struct PRRowMenu: View {
                 case .copyLink: Label { Text("Copy link", bundle: .app) } icon: { Image(systemName: "link") }
                 case .refresh: Label { Text("Refresh", bundle: .app) } icon: { Image(systemName: "arrow.clockwise") }
                 case .markReady: Label { Text("Mark as ready for review", bundle: .app) } icon: { Image(systemName: "checkmark.seal") }
+                case .showStack: Label { Text(stackFilterOn ? "Show all" : "Show this stack", bundle: .app) } icon: { Image(systemName: "square.stack.3d.up") }
                 }
             }
             .disabled(isRunning && (action == .merge || action == .comment || action == .refresh || action == .disableAutoMerge || action == .markReady))
@@ -252,7 +293,7 @@ struct PRRowMenu: View {
         case .open: KeyboardShortcut("o", modifiers: [])
         case .refresh: KeyboardShortcut("r", modifiers: [])
         case .copyLink: KeyboardShortcut("c", modifiers: .command)
-        case .approve, .disableAutoMerge, .markReady: nil
+        case .approve, .disableAutoMerge, .markReady, .showStack: nil
         }
     }
 
@@ -487,9 +528,14 @@ struct DiffSizeText: View {
 
 struct PillView: View {
     let pill: Pill
+    /// The stack pill while its filter is on: the accent, as the active repository link.
+    var isActive = false
 
     var body: some View {
-        Text(verbatim: title)
+        HStack(spacing: 3) {
+            if case .stack = pill { Image(systemName: "square.stack.3d.up").font(.system(size: 8)) }
+            Text(verbatim: title)
+        }
             .font(.system(size: 9.5, weight: .regular))
             .padding(.horizontal, 6)
             .padding(.vertical, 1.5)
@@ -500,7 +546,7 @@ struct PillView: View {
             .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(tint.opacity(0.35), lineWidth: 0.5))
     }
 
-    private var title: String {
+    var title: String {
         switch pill {
         case .reason(.reReview): String(localized: "Re-review", bundle: .app)
         case .reason(.newActivity): String(localized: "New activity", bundle: .app)
@@ -519,10 +565,13 @@ struct PillView: View {
         case .openThreads(let count): String(localized: "\(count) open threads", bundle: .app)
         case .woke: String(localized: "Woke", bundle: .app)
         case .moved(let movement): String(localized: "Moved · \(movement.title)", bundle: .app)
+        case .stack(let position, let size): String(format: String(localized: "%lld of %lld", bundle: .app), position, size)
         }
     }
 
-    private var tint: Color {
+    private var tint: Color { isActive ? .accentColor : baseTint }
+
+    private var baseTint: Color {
         switch pill {
         case .reason: .blue
         case .ciFailed, .changesRequested, .conflicts: .red
@@ -531,7 +580,7 @@ struct PillView: View {
         case .woke, .moved: .orange
         case .inMergeQueue, .autoMerge: .purple
         case .awaitingReview: .orange
-        case .behindBase, .openThreads: .gray
+        case .behindBase, .openThreads, .stack: .gray
         }
     }
 }

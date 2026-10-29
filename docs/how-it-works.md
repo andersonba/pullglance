@@ -14,7 +14,7 @@ GitHub's search index lags the repository by minutes, so after each search your 
 
 ## First launch
 
-The first time it runs, Pullglance opens a short welcome window: it checks that the `gh` CLI is installed and logged in (and keeps checking while you fix either), then shows what the number counts, how the two tabs are ordered, how to act from a row, the global shortcut (⌥⌘P, with a recorder to change it), and what snooze does, with an optional switch for a notification when a timed snooze ends. Closing the window early is fine; it comes back next launch until `gh` is talking. You can reopen it any time with **Welcome…** in the icon's right-click menu.
+The first time it runs, Pullglance opens a short welcome window: it checks that the `gh` CLI is installed and logged in (and keeps checking while you fix either), then shows what the number counts, how the two tabs are ordered, how to act from a row, the global shortcut (⌥⌘P, with a recorder to change it), and what snooze does, with an optional switch for a notification when a timed snooze ends. Closing the window early is fine; it comes back next launch until `gh` is talking. You can reopen it any time with **Welcome…** in the icon's right-click menu. After an update, the same window opens once with the release's new things, a screen each, and **What's new…** in the icon's menu shows them again.
 
 ## Background App Activity (macOS 26 and later)
 
@@ -36,6 +36,8 @@ Your own pull requests, plus the ones assigned to you that someone else opened (
 - **Ready to merge**: approved, checks green, no conflicts.
 - **Waiting for review or checks**: the rest, including pull requests already in a merge queue or with auto-merge on, which GitHub will merge by itself.
 - **Drafts**.
+
+A pull request in a GitHub stack (`gh stack`) carries one more pill, `2 of 3`: its position and the stack's size, as GitHub has them; hovering it lists the stack. The row stays in the section its own state puts it in.
 
 ## To review
 
@@ -67,7 +69,7 @@ In the Review Desk, with the page focused: `⌘J` and `⌘K` go to the next and 
 
 ## Filters
 
-- The funnel next to the tabs narrows both tabs to a few repositories or a few authors, for the session. Clicking a row's avatar or repository name does the same for that author or repository.
+- The funnel next to the tabs narrows both tabs to a few repositories or a few authors, for the session. Clicking a row's avatar or repository name does the same for that author or repository. A click on a row's stack pill, or *Show this stack* in its menu, narrows both tabs to that stack: the sections stay, members in a section are listed by position with a line joining neighbours, and the chip in the footer clears it.
 - Settings › Filters hides organizations or accounts, and per owner keeps everything except a few repositories or only a chosen few. These leave the searches themselves, so lists, totals and the badge all follow.
 
 ## Review Desk (beta)

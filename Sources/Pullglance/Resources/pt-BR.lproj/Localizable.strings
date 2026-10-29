@@ -297,7 +297,7 @@
 "Added to the merge queue" = "Adicionado à fila de merge";
 "GitHub returned an unexpected answer" = "O GitHub devolveu uma resposta inesperada";
 "Retry ›" = "Tentar de novo ›";
-"draft" = "draft";
+"draft" = "rascunho";
 "conflicts" = "conflitos";
 "checks not passing" = "checks não passaram";
 "review required" = "review exigido";
@@ -465,7 +465,7 @@
 "The number, and two tabs" = "O número, e duas abas";
 "The number counts what needs you: failing checks, approvals ready to merge, reviews asked of you. Pick the sections it counts in Settings › Sections. Inside, My PRs by state, To review by who asks first." = "O número conta o que precisa de você: checks falhando, aprovações prontas para merge, reviews pedidos a você. Escolha as seções que ele conta em Ajustes › Seções. Dentro, Meus PRs por estado, Para revisar por quem pede primeiro.";
 "Act from the row" = "Aja a partir da linha";
-"Swipe a row for Pin, Snooze and Comment. Press ↓ or J to drive the list from the keyboard, ⌘/ shows every key. The same keys work on the row under the pointer. Right-click the icon up there for the menu." = "Deslize uma linha para Fixar, Adormecer e Comentar. Aperte ↓ ou J para conduzir a lista pelo teclado; ⌘/ mostra todas as teclas. As mesmas teclas valem para a linha sob o ponteiro. Botão direito no ícone lá em cima abre o menu.";
+"Swipe a row for Pin, Snooze and Comment. Press ↓ or J to drive the list from the keyboard, H J K L do what the arrows do, ⌘/ shows every key. The same keys work on the row under the pointer. Right-click the icon up there for the menu." = "Deslize uma linha para Fixar, Adormecer e Comentar. Aperte ↓ ou J para conduzir a lista pelo teclado, H J K L fazem o que as setas fazem; ⌘/ mostra todas as teclas. As mesmas teclas valem para a linha sob o ponteiro. Botão direito no ícone lá em cima abre o menu.";
 "Open it from anywhere" = "Abra de qualquer lugar";
 "⌥⌘P opens and closes the popover whichever app is in front, with the icon lit as for a click. Record another shortcut here, or later in Settings › General." = "⌥⌘P abre e fecha o popover com qualquer app na frente, com o ícone aceso como num clique. Grave outro atalho aqui, ou depois em Ajustes › Geral.";
 "Snooze what can wait" = "Adormeça o que pode esperar";
@@ -513,3 +513,39 @@
 "Conflicts with the base branch" = "Conflito com a branch base";
 "Behind the base branch" = "Atrás da branch base";
 "Position %lld in the merge queue" = "Posição %lld na fila de merge";
+
+/* Stacks */
+"Stack #%lld on %@" = "Stack #%lld sobre %@";
+"merged" = "mesclado";
+"closed" = "fechado";
+"Stack" = "Stack";
+"Stack #%lld" = "Stack #%lld";
+"Clear stack filter" = "Limpar filtro de stack";
+"Show this stack" = "Mostrar esta stack";
+
+/* What's new */
+"New in %@" = "Novo na %@";
+"Next" = "Próximo";
+"Release notes" = "Notas da versão";
+
+/* What's new screens */
+"Watch a pull request" = "Observe um pull request";
+"Press W on a row you are waiting on. The app looks at it every half minute, popover open or not, and a notification tells you the moment it moves: checks, approval, merge. One notification, then the watch ends." = "Aperte W numa linha que você está esperando. O app olha para ela a cada meio minuto, popover aberto ou não, e uma notificação avisa na hora em que ela se move: checks, aprovação, merge. Uma notificação, e a observação termina.";
+"The Review Desk's keys" = "As teclas do Review Desk";
+"⌘J and ⌘K step through the files, ⌘← ⌘→ go back and forward, ⌘E finds the selection, esc stops a load. ⌘/ lists them all." = "⌘J e ⌘K andam pelos arquivos, ⌘← ⌘→ voltam e avançam, ⌘E procura a seleção, esc para um carregamento. ⌘/ lista todas.";
+"Out of your hands" = "Saiu das suas mãos";
+"A purple dot at the left means GitHub will merge it: in the merge queue, or auto-merge on. Green is still yours to merge." = "Um ponto roxo à esquerda quer dizer que o GitHub vai fazer o merge: na fila de merge, ou com auto-merge ligado. Verde continua sendo seu para mergear.";
+"Stacks" = "Stacks";
+"A pull request in a gh stack shows its place, 2 of 3. Hover for the stack, click to see only it." = "Um pull request numa stack do gh mostra o lugar dele, 2 de 3. Passe o mouse para ver a stack, clique para ver só ela.";
+"And more" = "E mais";
+"Smaller things in this release:" = "Coisas menores desta versão:";
+"Pullglance --demo runs the app on fictional data, to try things without a real pull request." = "Pullglance --demo roda o app em dados fictícios, para experimentar sem um pull request de verdade.";
+"Closing the Review Desk lets the page go instead of keeping it alive hidden." = "Fechar o Review Desk solta a página em vez de mantê-la viva escondida.";
+"Five stability fixes: a stuck gh, a held key, a popover in a loop." = "Cinco correções de estabilidade: um gh travado, uma tecla segurada, um popover em laço.";
+"Assigned to you" = "Atribuídos a você";
+"Pull requests assigned to you that someone else opened (a bot, an agent, a teammate) join My PRs, with the author on the row and an Assigned chip. Settings › Sections turns it off." = "Pull requests atribuídos a você que outra pessoa abriu (um bot, um agente, um colega) entram em Meus PRs, com o autor na linha e um chip Atribuídos. Ajustes › Seções desliga.";
+"Drive it from the keyboard" = "Dirija pelo teclado";
+"J starts, H J K L do what the arrows do, F opens the filter, space opens the row's menu, ⌘/ lists every key." = "J começa, H J K L fazem o que as setas fazem, F abre o filtro, espaço abre o menu da linha, ⌘/ lista todas as teclas.";
+"What's new…" = "Novidades…";
+"yours to merge" = "seu para mergear";
+"GitHub merges it" = "o GitHub mergeia";

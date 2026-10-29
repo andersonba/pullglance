@@ -35,6 +35,15 @@ func filesEnvelope(total: Int, viewed: [Bool], next: String?) -> Data {
         #expect(await gh.fileLookups.map(\.after) == [nil, "c1"])
     }
 
+    /// GitHub lists at most 3000 files on a pull request; a cursor that keeps coming back past that is
+    /// not a listing worth following. The walk gives up, and no counts show, rather than page forever.
+    @Test func anEndlessListingIsGivenUp() async {
+        let gh = FakeGH()
+        await gh.setPullRequestFiles((0..<(fileCountsPageLimit + 20)).map { .success(filesEnvelope(total: 9_999, viewed: [true], next: "c\($0)")) })
+        #expect(await fetchFileCounts(gh, ref: PullRequestRef(owner: "acme", name: "web", number: 7)) == nil)
+        #expect(await gh.fileLookups.count == fileCountsPageLimit)
+    }
+
     @Test func aFailedPageMeansNoCounts() async {
         let gh = FakeGH()
         await gh.setPullRequestFiles([.success(filesEnvelope(total: 150, viewed: [true], next: "c1")), .failure("boom")])

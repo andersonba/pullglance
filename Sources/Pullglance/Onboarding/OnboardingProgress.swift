@@ -11,7 +11,11 @@ struct OnboardingProgress {
     var completedVersion: String? { defaults.string(forKey: Self.key) }
     var isDue: Bool { completedVersion == nil }
 
-    func markCompleted(version: String) { defaults.set(version, forKey: Self.key) }
+    /// A newcomer has just seen the app itself: the what's new tour has nothing to add about this version.
+    func markCompleted(version: String) {
+        defaults.set(version, forKey: Self.key)
+        WhatsNewProgress(defaults: defaults).markSeen(version: version)
+    }
 
     /// Closing early is allowed; it only counts once gh passed, because until then the app cannot work.
     static func shouldMarkCompleted(onClose ghPassed: Bool) -> Bool { ghPassed }

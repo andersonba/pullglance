@@ -92,6 +92,13 @@ func node(number: Int, ci: String?, decision: String? = nil, draft: Bool = false
     """
 }
 
+/// The `stackEntry` object as GitHub returns it, for `node(..., prExtra:)`. `members`: (position, number, title,
+/// state, isDraft). No trailing comma; `node` adds it.
+func stackEntryJSON(number: Int = 7, size: Int, position: Int, base: String = "main", members: [(Int, Int, String, String, Bool)]) -> String {
+    let nodes = members.map { "{\"position\":\($0.0),\"pullRequest\":{\"number\":\($0.1),\"title\":\"\($0.2)\",\"state\":\"\($0.3)\",\"isDraft\":\($0.4)}}" }.joined(separator: ",")
+    return "\"stackEntry\":{\"position\":\(position),\"stack\":{\"number\":\(number),\"size\":\(size),\"baseRefName\":\"\(base)\",\"entries\":{\"nodes\":[\(nodes)]}}}"
+}
+
 /// Scripted GHRunning. Outcomes are keyed by the full query string.
 actor FakeGH: GHRunning {
     private var outcomes: [String: GHOutcome] = [:]

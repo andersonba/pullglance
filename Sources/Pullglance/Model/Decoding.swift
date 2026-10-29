@@ -186,6 +186,40 @@ private struct PRNode: Decodable {
     let reviewThreads: Threads?
     let reviewRequests: Requests?
     let commits: Commits?
+    let stackEntry: StackEntryNode?
+
+    struct StackEntryNode: Decodable {
+        let position: Int?
+        let stack: StackNode?
+    }
+    struct StackNode: Decodable {
+        let number: Int?
+        let size: Int?
+        let baseRefName: String?
+        let entries: Entries?
+        struct Entries: Decodable { let nodes: [Lossy<EntryNode>] }
+    }
+    struct EntryNode: Decodable {
+        let position: Int?
+        let pullRequest: EntryPR?
+        struct EntryPR: Decodable { let number: Int?; let title: String?; let state: String?; let isDraft: Bool? }
+    }
+
+    /// The stack, when the entry carries one with its number and size; anything less is "no stack", never a
+    /// failed page (an older GitHub Enterprise, or an inconsistency on GitHub's side).
+    var stack: PullRequestStack? {
+        guard let position = stackEntry?.position, let node = stackEntry?.stack, let number = node.number, let size = node.size else { return nil }
+        let members = (node.entries?.nodes ?? []).compactMap { entry -> StackMember? in
+            guard let entry = entry.value, let at = entry.position, let pr = entry.pullRequest, let prNumber = pr.number else { return nil }
+            let state: StackMemberState = switch pr.state {
+            case "MERGED": .merged
+            case "CLOSED": .closed
+            default: pr.isDraft == true ? .draft : .open
+            }
+            return StackMember(position: at, number: prNumber, title: pr.title ?? "", state: state)
+        }.sorted { $0.position < $1.position }
+        return PullRequestStack(number: number, size: size, baseRefName: node.baseRefName ?? "", position: position, members: members)
+    }
 
     struct Repository: Decodable {
         let nameWithOwner: String
@@ -289,7 +323,8 @@ private struct PRNode: Decodable {
             additions: additions,
             deletions: deletions,
             viewerReviewedBefore: viewerLatestReview != nil,
-            viewerRequested: viewerLatestReviewRequest != nil
+            viewerRequested: viewerLatestReviewRequest != nil,
+            stack: stack
         )
     }
 }
@@ -324,14 +359,21 @@ func parsePullRequestFilesResponse(_ data: Data) throws -> FileCountsPage {
                           nextCursor: pr.files.pageInfo.hasNextPage ? pr.files.pageInfo.endCursor : nil)
 }
 
+/// Pages of 100; GitHub lists at most 3000 files on a pull request, so a cursor still coming back after
+/// this many pages is not a listing worth following.
+let fileCountsPageLimit = 30
+
 /// Every page, or nothing: a partial count would look final.
 func fetchFileCounts(_ client: GHRunning, ref: PullRequestRef) async -> FileCounts? {
     var viewed = 0
     var total = 0
     var cursor: String? = nil
+    var pages = 0
     repeat {
-        guard case .success(let data) = await client.pullRequestFiles(owner: ref.owner, name: ref.name, number: ref.number, after: cursor),
+        guard pages < fileCountsPageLimit,
+              case .success(let data) = await client.pullRequestFiles(owner: ref.owner, name: ref.name, number: ref.number, after: cursor),
               let page = try? parsePullRequestFilesResponse(data) else { return nil }
+        pages += 1
         total = page.total
         viewed += page.viewedOnPage
         cursor = page.nextCursor

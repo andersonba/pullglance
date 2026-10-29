@@ -155,6 +155,14 @@ import Testing
         #expect(quickActions(for: .needsAction, dormant: true) == [.snooze, .open])
         // Pin is the first item of every menu; a snoozed row still leads with Wake.
         #expect(allActions(for: .readyToMerge) == [.pin, .watch, .merge, .comment, .snooze, .open, .copyLink, .refresh])
+    }
+
+    /// A row in a stack offers "Show this stack" just before Refresh, snoozed or not; others never do.
+    @Test func aStackedRowOffersShowStackBeforeRefresh() {
+        let actions = allActions(for: .needsAction, inStack: true)
+        #expect(actions.suffix(2) == [.showStack, .refresh])
+        #expect(!allActions(for: .needsAction).contains(.showStack))
+        #expect(allActions(for: .drafts, dormant: true, inStack: true).suffix(2) == [.showStack, .refresh])
         #expect(allActions(for: .needsYourReview) == [.pin, .watch, .comment, .snooze, .open, .copyLink, .refresh])
         #expect(allActions(for: .drafts).contains(.merge) == false)
         // A draft of yours: the one thing it wants is to be marked ready. No merge, no auto-merge.
@@ -742,6 +750,24 @@ private extension Data {
         await gh.setPullRequest(.success(pullRequestEnvelope(node(number: pr.number, ci: nil), state: "MERGED")), number: pr.number)
         #expect(await store.refreshOne(pr) == .success())
         #expect(!store.mine.value.contains { $0.id == pr.id })
+    }
+
+    /// R held down on a row, or a poll landing on a row being refreshed: one lookup, and every caller gets
+    /// its answer, instead of a `gh` process per key repeat.
+    @Test func aRefreshAlreadyInFlightIsSharedNotRepeated() async throws {
+        let (store, gh) = try await store()
+        let pr = store.mineGroups.readyToMerge[0]
+        await gh.setPullRequest(.success(pullRequestEnvelope(node(number: pr.number, ci: "SUCCESS", decision: "APPROVED"))), number: pr.number)
+        await gh.setDelay(.milliseconds(100))
+        async let first = store.refreshOne(pr)
+        async let second = store.refreshOne(pr)
+        async let third = store.refreshOne(pr, quiet: true)
+        #expect(await [first, second, third] == [.success(), .success(), .success()])
+        #expect(await gh.lookups.count == 1)
+        #expect(store.actionState(for: pr) == nil)
+        // Done is done: the next request is a new lookup.
+        #expect(await store.refreshOne(pr) == .success())
+        #expect(await gh.lookups.count == 2)
     }
 
     @Test func aFailedLookupStaysOnTheRow() async throws {

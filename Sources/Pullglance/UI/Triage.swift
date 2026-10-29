@@ -34,6 +34,15 @@ struct TriageFocus: Equatable {
 enum TriageKey: Equatable {
     case up, down, left, right, space, pin, watch, snooze, snoozeFor, open, review, refresh, comment, merge, copyLink, shortcuts, filter, escape
 
+    /// A held key repeats. Movement should keep walking the list; an action fires once per press, or R
+    /// held down would start a lookup per repeat.
+    var actsOnRepeat: Bool {
+        switch self {
+        case .up, .down, .left, .right: true
+        default: false
+        }
+    }
+
     init?(characters: String?, keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
         let held = modifiers.intersection([.command, .option, .control])
         if held == [.command] {

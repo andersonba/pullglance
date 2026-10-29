@@ -26,6 +26,7 @@ query($q: String!, $withMerge: Boolean!, $first: Int!) {
         reviewThreads(first: 50) { nodes { isResolved path } }
         reviewRequests(first: 10) { nodes { requestedReviewer { __typename ... on Team { slug } } } }
         commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+        stackEntry { position stack { number size baseRefName entries(first: 30) { nodes { position pullRequest { number title state isDraft } } } } }
       }
     }
   }

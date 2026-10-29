@@ -99,4 +99,25 @@ import Testing
             _ = try await runProcess(executable: URL(fileURLWithPath: "/bin/sleep"), arguments: ["10"], timeout: .milliseconds(200))
         }
     }
+
+    /// A process that shrugs off SIGTERM (a `gh` stuck in a syscall, a handler that never returns) must
+    /// not keep the refresh waiting: after a grace period it is killed outright.
+    @Test(.timeLimit(.minutes(1))) func aProcessIgnoringTerminationIsKilled() async {
+        let start = ContinuousClock.now
+        await #expect(throws: ProcessFailure.timedOut) {
+            _ = try await runProcess(executable: URL(fileURLWithPath: "/bin/sh"), arguments: ["-c", "trap '' TERM; exec sleep 60"], timeout: .milliseconds(200))
+        }
+        #expect(ContinuousClock.now - start < .seconds(ProcessRunner.killGrace.components.seconds + 5))
+    }
+
+    /// A child the process leaves behind keeps the pipes open, so reading to EOF would wait for the child:
+    /// once the process has exited, what the pipes hold is the result, after a short grace for what is in flight.
+    @Test(.timeLimit(.minutes(1))) func pipesHeldOpenByAnOrphanDoNotHoldTheResult() async throws {
+        let start = ContinuousClock.now
+        let result = try await runProcess(executable: URL(fileURLWithPath: "/bin/sh"), arguments: ["-c", "sleep 20 & echo out; echo err 1>&2; exit 0"], timeout: .seconds(30))
+        #expect(result.exitCode == 0)
+        #expect(String(decoding: result.stdout, as: UTF8.self) == "out\n")
+        #expect(String(decoding: result.stderr, as: UTF8.self) == "err\n")
+        #expect(ContinuousClock.now - start < .seconds(10))
+    }
 }

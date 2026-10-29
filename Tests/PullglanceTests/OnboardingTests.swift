@@ -19,6 +19,21 @@ import Testing
         #expect(OnboardingStep.index(of: "gh") == 1)
         #expect(OnboardingStep.index(of: "nope") == nil)
     }
+
+    /// The renderer is bounded by the list it was given, not by the welcome's: the tour has other lengths.
+    @MainActor @Test func theModelIsBoundedByItsOwnList() {
+        let two = Array(OnboardingStep.all.prefix(2))
+        let model = OnboardingModel(steps: two)
+        model.go(to: 1); #expect(model.step == 1)
+        model.go(to: 2); #expect(model.step == 1, "no third step in this list")
+        model.go(to: -1); #expect(model.step == 1)
+    }
+
+    @Test func theWelcomeMentionsTheVimKeys() throws {
+        let actions = try #require(OnboardingStep.all.first { $0.id == "actions" })
+        #expect(actions.text.contains("H J K L"))
+        #expect(OnboardingStep.all.allSatisfy { $0.version == nil && $0.tryIt == nil })
+    }
 }
 
 @MainActor
