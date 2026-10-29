@@ -34,17 +34,17 @@ import Testing
     @Test func theScreensAreTaggedAndOrderedNewestReleaseFirst() {
         let all = WhatsNewStep.all
         #expect(all.allSatisfy { $0.version != nil })
-        #expect(all.map(\.id) == ["watch", "deskKeys", "handoff", "stacks", "more-0.6.0", "assigned", "keyboard"])
+        #expect(all.map(\.id) == ["watch", "stacks", "handoff", "deskKeys", "more-0.6.0", "assigned", "keyboard"])
         #expect(all.map(\.version) == ["0.6.0", "0.6.0", "0.6.0", "0.6.0", "0.6.0", "0.5.0", "0.3.0"])
         #expect(all.first { $0.id == "more-0.6.0" }?.tryIt == .openURL(URL(string: "https://github.com/andersonba/pullglance/releases/tag/v0.6.0")!))
     }
 
     @Test func dueIsEverythingNewerThanSeen() {
         #expect(WhatsNewStep.due(after: nil).count == 7)
-        #expect(WhatsNewStep.due(after: "0.5.0").map(\.id) == ["watch", "deskKeys", "handoff", "stacks", "more-0.6.0"])
+        #expect(WhatsNewStep.due(after: "0.5.0").map(\.id) == ["watch", "stacks", "handoff", "deskKeys", "more-0.6.0"])
         #expect(WhatsNewStep.due(after: "0.4.0").map(\.id).last == "assigned")
         #expect(WhatsNewStep.due(after: "0.6.0").isEmpty)
-        #expect(WhatsNewStep.latest().map(\.id) == ["watch", "deskKeys", "handoff", "stacks", "more-0.6.0"])
+        #expect(WhatsNewStep.latest().map(\.id) == ["watch", "stacks", "handoff", "deskKeys", "more-0.6.0"])
     }
 
     @Test func everyTourKeyExistsInBothLanguages() throws {
