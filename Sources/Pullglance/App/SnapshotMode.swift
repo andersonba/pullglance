@@ -119,6 +119,12 @@ enum SnapshotRunner {
                     try await ViewSnapshot.png(OnboardingView(store: store, checker: checker, model: OnboardingModel(steps: OnboardingStep.all, step: index), finish: {}, quit: {}), width: 560, appearance: .aqua, settle: .milliseconds(600))
                 }
             }
+            // The what's new tour, every screen ever written, in the same shell.
+            for index in WhatsNewStep.all.indices {
+                await write("whats-new-\(index + 1)") {
+                    try await ViewSnapshot.png(OnboardingView(store: store, checker: checker, model: OnboardingModel(steps: WhatsNewStep.all, step: index), style: .whatsNew, finish: {}, quit: {}), width: 560, appearance: .aqua, settle: .milliseconds(600))
+                }
+            }
         }
         return written
     }

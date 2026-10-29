@@ -14,7 +14,7 @@ GitHub's search index lags the repository by minutes, so after each search your 
 
 ## First launch
 
-The first time it runs, Pullglance opens a short welcome window: it checks that the `gh` CLI is installed and logged in (and keeps checking while you fix either), then shows what the number counts, how the two tabs are ordered, how to act from a row, the global shortcut (⌥⌘P, with a recorder to change it), and what snooze does, with an optional switch for a notification when a timed snooze ends. Closing the window early is fine; it comes back next launch until `gh` is talking. You can reopen it any time with **Welcome…** in the icon's right-click menu.
+The first time it runs, Pullglance opens a short welcome window: it checks that the `gh` CLI is installed and logged in (and keeps checking while you fix either), then shows what the number counts, how the two tabs are ordered, how to act from a row, the global shortcut (⌥⌘P, with a recorder to change it), and what snooze does, with an optional switch for a notification when a timed snooze ends. Closing the window early is fine; it comes back next launch until `gh` is talking. You can reopen it any time with **Welcome…** in the icon's right-click menu. After an update, the same window opens once with the release's new things, a screen each, and **What's new…** in the icon's menu shows them again.
 
 ## Background App Activity (macOS 26 and later)
 

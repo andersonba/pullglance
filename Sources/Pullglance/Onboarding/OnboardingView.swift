@@ -113,10 +113,10 @@ struct OnboardingView: View {
             Text(LocalizedStringKey(item.title), bundle: .app).font(.system(size: 21, weight: .bold))
             Text(LocalizedStringKey(item.text), bundle: .app).font(.system(size: 12.5)).foregroundStyle(.secondary).lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
-            if case .openURL(let url) = item.tryIt {
-                Button { NSWorkspace.shared.open(url) } label: { Text("Release notes", bundle: .app) }.controlSize(.small).padding(.top, 2)
-            }
             content(for: item, active: active).padding(.top, 4)
+            if case .openURL(let url) = item.tryIt {
+                Button { NSWorkspace.shared.open(url) } label: { Text("Release notes", bundle: .app) }.controlSize(.small).padding(.top, 4)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
