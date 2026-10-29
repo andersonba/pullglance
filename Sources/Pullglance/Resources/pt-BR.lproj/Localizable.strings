@@ -529,3 +529,22 @@
 "Next" = "Próximo";
 "Done" = "Pronto";
 "Release notes" = "Notas da versão";
+
+/* What's new screens */
+"Watch a pull request" = "Observe um pull request";
+"Press W on a row you are waiting on. The app looks at it every half minute, popover open or not, and a notification tells you the moment it moves: checks, approval, merge. One notification, then the watch ends." = "Aperte W numa linha que você está esperando. O app olha para ela a cada meio minuto, popover aberto ou não, e uma notificação avisa na hora em que ela se move: checks, aprovação, merge. Uma notificação, e a observação termina.";
+"The Review Desk's keys" = "As teclas do Review Desk";
+"⌘J and ⌘K step through the files, ⌘← ⌘→ go back and forward, ⌘E finds the selection, esc stops a load. ⌘/ lists them all." = "⌘J e ⌘K andam pelos arquivos, ⌘← ⌘→ voltam e avançam, ⌘E procura a seleção, esc para um carregamento. ⌘/ lista todas.";
+"Out of your hands" = "Saiu das suas mãos";
+"A purple dot at the left means GitHub will merge it: in the merge queue, or auto-merge on. Green is still yours to merge." = "Um ponto roxo à esquerda quer dizer que o GitHub vai fazer o merge: na fila de merge, ou com auto-merge ligado. Verde continua sendo seu para mergear.";
+"Stacks" = "Stacks";
+"A pull request in a gh stack shows its place, 2 of 3. Hover for the stack, click to see only it." = "Um pull request numa stack do gh mostra o lugar dele, 2 de 3. Passe o mouse para ver a stack, clique para ver só ela.";
+"And more" = "E mais";
+"Smaller things in this release:" = "Coisas menores desta versão:";
+"Pullglance --demo runs the app on fictional data, to try things without a real pull request." = "Pullglance --demo roda o app em dados fictícios, para experimentar sem um pull request de verdade.";
+"Closing the Review Desk lets the page go instead of keeping it alive hidden." = "Fechar o Review Desk solta a página em vez de mantê-la viva escondida.";
+"Five stability fixes: a stuck gh, a held key, a popover in a loop." = "Cinco correções de estabilidade: um gh travado, uma tecla segurada, um popover em laço.";
+"Assigned to you" = "Atribuídos a você";
+"Pull requests assigned to you that someone else opened (a bot, an agent, a teammate) join My PRs, with the author on the row and an Assigned chip. Settings › Sections turns it off." = "Pull requests atribuídos a você que outra pessoa abriu (um bot, um agente, um colega) entram em Meus PRs, com o autor na linha e um chip Atribuídos. Ajustes › Seções desliga.";
+"Drive it from the keyboard" = "Dirija pelo teclado";
+"J starts, H J K L do what the arrows do, F opens the filter, space opens the row's menu, ⌘/ lists every key." = "J começa, H J K L fazem o que as setas fazem, F abre o filtro, espaço abre o menu da linha, ⌘/ lista todas as teclas.";

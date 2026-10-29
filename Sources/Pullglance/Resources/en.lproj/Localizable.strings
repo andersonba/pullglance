@@ -529,3 +529,22 @@
 "Next" = "Next";
 "Done" = "Done";
 "Release notes" = "Release notes";
+
+/* What's new screens */
+"Watch a pull request" = "Watch a pull request";
+"Press W on a row you are waiting on. The app looks at it every half minute, popover open or not, and a notification tells you the moment it moves: checks, approval, merge. One notification, then the watch ends." = "Press W on a row you are waiting on. The app looks at it every half minute, popover open or not, and a notification tells you the moment it moves: checks, approval, merge. One notification, then the watch ends.";
+"The Review Desk's keys" = "The Review Desk's keys";
+"⌘J and ⌘K step through the files, ⌘← ⌘→ go back and forward, ⌘E finds the selection, esc stops a load. ⌘/ lists them all." = "⌘J and ⌘K step through the files, ⌘← ⌘→ go back and forward, ⌘E finds the selection, esc stops a load. ⌘/ lists them all.";
+"Out of your hands" = "Out of your hands";
+"A purple dot at the left means GitHub will merge it: in the merge queue, or auto-merge on. Green is still yours to merge." = "A purple dot at the left means GitHub will merge it: in the merge queue, or auto-merge on. Green is still yours to merge.";
+"Stacks" = "Stacks";
+"A pull request in a gh stack shows its place, 2 of 3. Hover for the stack, click to see only it." = "A pull request in a gh stack shows its place, 2 of 3. Hover for the stack, click to see only it.";
+"And more" = "And more";
+"Smaller things in this release:" = "Smaller things in this release:";
+"Pullglance --demo runs the app on fictional data, to try things without a real pull request." = "Pullglance --demo runs the app on fictional data, to try things without a real pull request.";
+"Closing the Review Desk lets the page go instead of keeping it alive hidden." = "Closing the Review Desk lets the page go instead of keeping it alive hidden.";
+"Five stability fixes: a stuck gh, a held key, a popover in a loop." = "Five stability fixes: a stuck gh, a held key, a popover in a loop.";
+"Assigned to you" = "Assigned to you";
+"Pull requests assigned to you that someone else opened (a bot, an agent, a teammate) join My PRs, with the author on the row and an Assigned chip. Settings › Sections turns it off." = "Pull requests assigned to you that someone else opened (a bot, an agent, a teammate) join My PRs, with the author on the row and an Assigned chip. Settings › Sections turns it off.";
+"Drive it from the keyboard" = "Drive it from the keyboard";
+"J starts, H J K L do what the arrows do, F opens the filter, space opens the row's menu, ⌘/ lists every key." = "J starts, H J K L do what the arrows do, F opens the filter, space opens the row's menu, ⌘/ lists every key.";
