@@ -6,6 +6,8 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-29
+
 ### Added
 - **Watch** a pull request you are waiting on (row menu, or `W`): a bell on the row, a lookup every 30 seconds popover open or not, and a macOS notification the moment it moves (checks passed or failed, approved, changes requested, conflicts, merge queue position, merged, closed). The notification ends the watch and a click on it opens the pull request; the row says *Moved · why* until the popover has been opened and closed. Up to 10 at a time. Merging from the app with a merge queue or "Merge when checks pass" offers to watch until it lands, checked by default. With verbose logging on (Settings › Advanced), each lookup logs how much of GitHub's hourly GraphQL budget is left.
 - `Pullglance --demo` runs the app on the fictional data, for trying a feature by hand without a real pull request.
