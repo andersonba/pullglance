@@ -60,4 +60,19 @@ import Testing
             #expect(missing.isEmpty, "\(language) is missing \(missing.count) keys:\n\(missing.joined(separator: "\n"))")
         }
     }
+
+    /// Foundation keeps the last of duplicate keys in a `.strings` table: a second entry with another value
+    /// silently relabels every other use of that key. Duplicates may exist, but they must agree.
+    @Test func duplicateKeysAgreeInValue() throws {
+        for lang in ["en", "pt-BR"] {
+            let table = try String(contentsOf: Self.resources.appendingPathComponent("\(lang).lproj/Localizable.strings"), encoding: .utf8)
+            var values: [String: String] = [:]
+            for line in table.split(separator: "\n") {
+                guard let match = line.wholeMatch(of: /"((?:[^"\\]|\\.)*)" = "((?:[^"\\]|\\.)*)";/) else { continue }
+                let key = String(match.1), value = String(match.2)
+                if let seen = values[key] { #expect(seen == value, "\(lang): \"\(key)\" is both \"\(seen)\" and \"\(value)\"") }
+                values[key] = value
+            }
+        }
+    }
 }

@@ -527,7 +527,6 @@
 /* What's new */
 "New in %@" = "New in %@";
 "Next" = "Next";
-"Done" = "Done";
 "Release notes" = "Release notes";
 
 /* What's new screens */
@@ -549,3 +548,5 @@
 "Drive it from the keyboard" = "Drive it from the keyboard";
 "J starts, H J K L do what the arrows do, F opens the filter, space opens the row's menu, ⌘/ lists every key." = "J starts, H J K L do what the arrows do, F opens the filter, space opens the row's menu, ⌘/ lists every key.";
 "What's new…" = "What's new…";
+"yours to merge" = "yours to merge";
+"GitHub merges it" = "GitHub merges it";

@@ -98,3 +98,17 @@ import Testing
         #expect(OnboardingWindowController.whatsNewSteps(welcomeDue: false, whatsNew: seen, current: "0.6.0")?.count == 5)
     }
 }
+
+@Suite struct WelcomeWordsTests {
+    /// The welcome's keyboard step gained H J K L; the rest of its Portuguese keeps the app's own words
+    /// (Snooze is "Adormecer" everywhere else in the app).
+    @Test func thePortugueseWelcomeKeepsTheAppsWords() throws {
+        let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let table = try String(contentsOf: repo.appendingPathComponent("Sources/Pullglance/Resources/pt-BR.lproj/Localizable.strings"), encoding: .utf8)
+        let actions = try #require(OnboardingStep.all.first { $0.id == "actions" })
+        let line = try #require(table.split(separator: "\n").first { $0.hasPrefix("\"\(actions.text)\" = ") })
+        #expect(line.contains("Adormecer"))
+        #expect(line.contains("H J K L"))
+        #expect(!line.contains("Adiar"))
+    }
+}

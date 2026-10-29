@@ -125,7 +125,7 @@ struct DeskKeysAnimation: View {
             DrawingCard {
                 VStack(spacing: 10) {
                     HStack {
-                        Text(verbatim: "Files").font(.system(size: 11, weight: .semibold))
+                        Text("Files", bundle: .app).font(.system(size: 11, weight: .semibold))
                         Spacer()
                         Text(verbatim: "\(3 + index) of 12 viewed").font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit().contentTransition(.numericText(countsDown: false))
                     }
@@ -171,8 +171,8 @@ struct HandoffAnimation: View {
                                  if phase == .queued { DrawnPill(text: Text(verbatim: String(format: String(localized: "In queue · %lld", bundle: .app), 2)), tint: .purple).transition(.opacity) }
                              })
                     HStack(spacing: 16) {
-                        Label { Text(verbatim: "yours to merge").foregroundStyle(.secondary) } icon: { Circle().fill(.green).frame(width: 9, height: 9) }
-                        Label { Text(verbatim: "GitHub merges it").foregroundStyle(.secondary) } icon: { Circle().fill(Color(red: 0.51, green: 0.31, blue: 0.87)).frame(width: 9, height: 9) }
+                        Label { Text("yours to merge", bundle: .app).foregroundStyle(.secondary) } icon: { Circle().fill(.green).frame(width: 9, height: 9) }
+                        Label { Text("GitHub merges it", bundle: .app).foregroundStyle(.secondary) } icon: { Circle().fill(Color(red: 0.51, green: 0.31, blue: 0.87)).frame(width: 9, height: 9) }
                         Spacer()
                     }
                     .font(.system(size: 10.5))
@@ -263,8 +263,9 @@ struct AssignedAnimation: View {
             DrawingCard {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 6) {
-                        ForEach(["All", "Action", "Ready"], id: \.self) { chip in
-                            Text(verbatim: chip).font(.system(size: 10.5)).padding(.horizontal, 8).padding(.vertical, 2)
+                        ForEach([Text("All", bundle: .app), Text("Action", bundle: .app), Text("Ready", bundle: .app)].indices, id: \.self) { index in
+                            [Text("All", bundle: .app), Text("Action", bundle: .app), Text("Ready", bundle: .app)][index]
+                                .font(.system(size: 10.5)).padding(.horizontal, 8).padding(.vertical, 2)
                                 .background(.quaternary, in: Capsule())
                         }
                         Text("Assigned", bundle: .app).font(.system(size: 10.5)).padding(.horizontal, 8).padding(.vertical, 2)
