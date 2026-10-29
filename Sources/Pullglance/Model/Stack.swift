@@ -1,0 +1,29 @@
+import Foundation
+
+/// A stacked pull request's neighbours, as GitHub lists them (`PullRequestStack`). Position 1 is the
+/// closest to the base branch; `size` and every `position` are GitHub's and do not shift when a member
+/// merges, so "2 of 3" keeps saying the truth after the first one lands.
+enum StackMemberState: Equatable, Sendable { case open, draft, merged, closed }
+
+struct StackMember: Equatable, Sendable {
+    let position: Int
+    let number: Int
+    let title: String
+    let state: StackMemberState
+}
+
+struct PullRequestStack: Equatable, Sendable {
+    let number: Int
+    let size: Int
+    let baseRefName: String
+    /// This pull request's own place in the stack.
+    let position: Int
+    /// In position order; may be shorter than `size` (the query asks for the first 30).
+    let members: [StackMember]
+}
+
+/// A stack is scoped to its repository: the number is unique inside it, not across GitHub.
+struct StackKey: Hashable, Sendable {
+    let repo: String
+    let number: Int
+}

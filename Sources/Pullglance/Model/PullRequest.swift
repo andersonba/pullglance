@@ -70,6 +70,10 @@ struct PullRequest: Sendable, Equatable, Identifiable {
     let viewerReviewedBefore: Bool
     /// You are asked right now (`viewerLatestReviewRequest` exists); with the above, a re-review.
     let viewerRequested: Bool
+    /// The stack this pull request is part of (`stackEntry`), nil off a stack. A `var` with a default so
+    /// the memberwise init stays as it was.
+    var stack: PullRequestStack? = nil
+    var stackKey: StackKey? { stack.map { StackKey(repo: repo, number: $0.number) } }
 
     /// Where GitHub itself shows "Enable auto-merge": the viewer may, nothing is scheduled yet, and the PR
     /// cannot merge right now. A queue base takes the queue path instead; unknown merge state is not a yes.
