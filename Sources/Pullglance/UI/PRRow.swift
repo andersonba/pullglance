@@ -36,6 +36,9 @@ struct PRRow: View {
     /// A click on the repository name narrows the lists to this repository; nil keeps it plain text.
     var onRepoTap: (() -> Void)? = nil
     var isRepoFiltered = false
+    /// A click on the stack pill narrows the lists to this stack; nil keeps the pill inert.
+    var onStackTap: (() -> Void)? = nil
+    var isStackFiltered = false
 
     private var isRunning: Bool { if case .running = actionState { return true }; return false }
 
@@ -86,7 +89,17 @@ struct PRRow: View {
                 if !rowPills.isEmpty, !isDormant {
                     // Wraps to a second line when they do not fit, rather than truncating each pill.
                     PillFlow(spacing: 4, lineSpacing: 3) {
-                        ForEach(rowPills, id: \.self) { PillView(pill: $0).fixedSize() }
+                        ForEach(rowPills, id: \.self) { pill in
+                            if case .stack = pill, let stack = pr.stack {
+                                // The one pill that does something: hover lists the stack, a click narrows to it.
+                                Button(action: { onStackTap?() }) { PillView(pill: pill, isActive: isStackFiltered).fixedSize() }
+                                    .buttonStyle(.plain)
+                                    .help(Text(verbatim: stack.hoverText()))
+                                    .accessibilityLabel(Text(verbatim: String(localized: "Stack", bundle: .app) + ": " + PillView(pill: pill).title))
+                            } else {
+                                PillView(pill: pill).fixedSize()
+                            }
+                        }
                     }
                     .opacity(actionState == nil ? 1 : 0.35)
                 } else if isDormant, let snoozedUntil {
@@ -487,9 +500,14 @@ struct DiffSizeText: View {
 
 struct PillView: View {
     let pill: Pill
+    /// The stack pill while its filter is on: the accent, as the active repository link.
+    var isActive = false
 
     var body: some View {
-        Text(verbatim: title)
+        HStack(spacing: 3) {
+            if case .stack = pill { Image(systemName: "square.stack.3d.up").font(.system(size: 8)) }
+            Text(verbatim: title)
+        }
             .font(.system(size: 9.5, weight: .regular))
             .padding(.horizontal, 6)
             .padding(.vertical, 1.5)
@@ -500,7 +518,7 @@ struct PillView: View {
             .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(tint.opacity(0.35), lineWidth: 0.5))
     }
 
-    private var title: String {
+    var title: String {
         switch pill {
         case .reason(.reReview): String(localized: "Re-review", bundle: .app)
         case .reason(.newActivity): String(localized: "New activity", bundle: .app)
@@ -519,10 +537,13 @@ struct PillView: View {
         case .openThreads(let count): String(localized: "\(count) open threads", bundle: .app)
         case .woke: String(localized: "Woke", bundle: .app)
         case .moved(let movement): String(localized: "Moved · \(movement.title)", bundle: .app)
+        case .stack(let position, let size): String(format: String(localized: "%lld of %lld", bundle: .app), position, size)
         }
     }
 
-    private var tint: Color {
+    private var tint: Color { isActive ? .accentColor : baseTint }
+
+    private var baseTint: Color {
         switch pill {
         case .reason: .blue
         case .ciFailed, .changesRequested, .conflicts: .red
@@ -531,7 +552,7 @@ struct PillView: View {
         case .woke, .moved: .orange
         case .inMergeQueue, .autoMerge: .purple
         case .awaitingReview: .orange
-        case .behindBase, .openThreads: .gray
+        case .behindBase, .openThreads, .stack: .gray
         }
     }
 }

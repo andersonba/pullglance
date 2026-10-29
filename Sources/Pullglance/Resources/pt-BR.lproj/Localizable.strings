@@ -513,3 +513,10 @@
 "Conflicts with the base branch" = "Conflito com a branch base";
 "Behind the base branch" = "Atrás da branch base";
 "Position %lld in the merge queue" = "Posição %lld na fila de merge";
+
+/* Stacks */
+"Stack #%lld on %@" = "Stack #%lld sobre %@";
+"merged" = "mesclado";
+"closed" = "fechado";
+"draft" = "rascunho";
+"Stack" = "Stack";

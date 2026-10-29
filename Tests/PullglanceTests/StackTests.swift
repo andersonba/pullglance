@@ -46,3 +46,28 @@ import Testing
         }
     }
 }
+
+@Suite struct StackHoverTests {
+    private let members = [
+        StackMember(position: 1, number: 430, title: "Base", state: .merged),
+        StackMember(position: 2, number: 431, title: "Auth", state: .open),
+        StackMember(position: 3, number: 433, title: "Account", state: .draft),
+    ]
+
+    @Test func hoverListsTheStackAndMarksThisRow() {
+        let stack = PullRequestStack(number: 7, size: 3, baseRefName: "main", position: 2, members: members)
+        #expect(stack.hoverText() == "Stack #7 on main\n  1  #430 Base · merged\n▸ 2  #431 Auth\n  3  #433 Account · draft")
+    }
+
+    /// The query fetches 30 entries; a bigger stack still reads, with what came.
+    @Test func hoverTextWithFewerEntriesThanSize() {
+        let stack = PullRequestStack(number: 7, size: 45, baseRefName: "main", position: 31, members: members)
+        #expect(stack.hoverText().hasPrefix("Stack #7 on main\n"))
+        #expect(stack.hoverText().components(separatedBy: "\n").count == 4)
+    }
+
+    @Test func hoverTextWhenTheRowIsNotAmongTheEntries() {
+        let stack = PullRequestStack(number: 7, size: 3, baseRefName: "main", position: 9, members: members)
+        #expect(!stack.hoverText().contains("▸"))
+    }
+}

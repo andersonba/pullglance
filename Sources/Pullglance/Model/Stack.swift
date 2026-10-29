@@ -27,3 +27,24 @@ struct StackKey: Hashable, Sendable {
     let repo: String
     let number: Int
 }
+
+extension PullRequestStack {
+    /// The stack as the pill's tooltip shows it: number and base on the first line, then one line per entry
+    /// in position order, this pull request's own marked, and a state word for the ones not plainly open.
+    func hoverText() -> String {
+        var lines = [String(format: String(localized: "Stack #%lld on %@", bundle: .app), number, baseRefName)]
+        for member in members {
+            let mark = member.position == position ? "▸ " : "  "
+            var line = "\(mark)\(member.position)  #\(member.number) \(member.title)"
+            let state: String? = switch member.state {
+            case .open: nil
+            case .merged: String(localized: "merged", bundle: .app)
+            case .closed: String(localized: "closed", bundle: .app)
+            case .draft: String(localized: "draft", bundle: .app)
+            }
+            if let state { line += " · " + state }
+            lines.append(line)
+        }
+        return lines.joined(separator: "\n")
+    }
+}
