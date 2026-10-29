@@ -71,3 +71,21 @@ import Testing
         #expect(!stack.hoverText().contains("▸"))
     }
 }
+
+@Suite struct RailTests {
+    /// The rail joins rows next to each other that share a stack; nothing else, and never across a gap.
+    @Test func railJoinsAdjacentMembersOfOneStack() {
+        func pr(_ n: Int, stack: Int?) -> PullRequest {
+            var pr = makePR(number: n)
+            pr.stack = stack.map { PullRequestStack(number: $0, size: 2, baseRefName: "main", position: 1, members: []) }
+            return pr
+        }
+        let rows = [pr(1, stack: 7), pr(2, stack: 7), pr(3, stack: nil), pr(4, stack: 8), pr(5, stack: 7)]
+        #expect(railLinks(at: 0, in: rows) == [.down])
+        #expect(railLinks(at: 1, in: rows) == [.up])
+        #expect(railLinks(at: 2, in: rows) == [])
+        #expect(railLinks(at: 3, in: rows) == [], "another stack is not a neighbour")
+        #expect(railLinks(at: 4, in: rows) == [])
+        #expect(railLinks(at: 1, in: [pr(1, stack: 7), pr(2, stack: 7), pr(3, stack: 7)]) == [.up, .down])
+    }
+}

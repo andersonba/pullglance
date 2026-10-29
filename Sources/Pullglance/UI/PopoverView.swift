@@ -703,6 +703,7 @@ struct PopoverView: View {
         let isWoke = store.woke.contains(pr.id)
         let watched = store.isWatched(pr)
         let stackFiltered = store.quickStackFilter != nil && store.quickStackFilter == pr.stackKey
+        let rail: RailLinks = store.quickStackFilter == nil ? [] : railLinks(at: among.firstIndex { $0.id == pr.id } ?? -1, in: among)
         return SwipeActionsRow(
             id: pr.id,
             actions: quickActions(for: actionSection, dormant: dormant),
@@ -736,7 +737,8 @@ struct PopoverView: View {
                 onRepoTap: reordering ? nil : { withAnimation(.easeInOut(duration: 0.2)) { store.toggleQuickRepo(pr.repo) } },
                 isRepoFiltered: store.quickRepoFilter == [pr.repo],
                 onStackTap: reordering || pr.stack == nil ? nil : { withAnimation(.easeInOut(duration: 0.2)) { store.toggleQuickStack(pr) } },
-                isStackFiltered: stackFiltered
+                isStackFiltered: stackFiltered,
+                rail: rail
             )
             // In reorder mode nothing inside the row is clickable; the whole row is the drag handle.
             .allowsHitTesting(!reordering)
@@ -868,8 +870,9 @@ struct PopoverView: View {
             } else if store.viaTeam == nil {
                 ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding()
             } else {
-                ForEach(store.viaTeamList) { pr in
-                    row(pr, section: .needsTeamsReview, showAuthor: true, teamLabel: pr.requestedTeams.first)
+                let team = store.viaTeamList
+                ForEach(team) { pr in
+                    row(pr, section: .needsTeamsReview, showAuthor: true, teamLabel: pr.requestedTeams.first, among: team)
                     Divider()
                 }
                 HStack(spacing: 4) {

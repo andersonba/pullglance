@@ -48,3 +48,19 @@ extension PullRequestStack {
         return lines.joined(separator: "\n")
     }
 }
+
+/// Which neighbours of a row share its stack, for the rail drawn through the status dots while the stack
+/// lens is on: `.up` for the row above, `.down` for the row below.
+struct RailLinks: OptionSet, Sendable {
+    let rawValue: Int
+    static let up = RailLinks(rawValue: 1)
+    static let down = RailLinks(rawValue: 2)
+}
+
+func railLinks(at index: Int, in prs: [PullRequest]) -> RailLinks {
+    guard prs.indices.contains(index), let key = prs[index].stackKey else { return [] }
+    var links: RailLinks = []
+    if index > 0, prs[index - 1].stackKey == key { links.insert(.up) }
+    if index + 1 < prs.count, prs[index + 1].stackKey == key { links.insert(.down) }
+    return links
+}

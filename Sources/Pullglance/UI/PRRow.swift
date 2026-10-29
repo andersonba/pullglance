@@ -39,6 +39,8 @@ struct PRRow: View {
     /// A click on the stack pill narrows the lists to this stack; nil keeps the pill inert.
     var onStackTap: (() -> Void)? = nil
     var isStackFiltered = false
+    /// Under the stack lens: a line through the dot to the neighbours that share the stack.
+    var rail: RailLinks = []
 
     private var isRunning: Bool { if case .running = actionState { return true }; return false }
 
@@ -124,6 +126,9 @@ struct PRRow: View {
             }
         }
         .padding(.vertical, 6)
+        // The rail sits behind the content, from the row's edge to the dot's centre and on to the other
+        // edge, at the dot's x; nothing is added to the layout, so the row's height and the dot stay put.
+        .background(alignment: .topLeading) { railView }
         .padding(.horizontal, 12)
         .opacity(isDormant ? 0.35 : 1)
         .contentShape(Rectangle())
@@ -135,6 +140,18 @@ struct PRRow: View {
             PullRequestOpener.open(pr, from: section.tab)
         }
         .contextMenu { PRRowMenu(section: section, isDormant: isDormant, isPinned: isPinned, isWatched: isWatched, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, snoozeLength: snoozeLength, onAction: onAction, onSnoozeFor: onSnoozeFor) }
+    }
+
+    /// The dot's centre is 17pt down (6 of padding, 3 above the dot, half of its 16) and 8pt in.
+    @ViewBuilder private var railView: some View {
+        if !rail.isEmpty {
+            let color = Color.secondary.opacity(0.45)
+            VStack(spacing: 0) {
+                Rectangle().fill(rail.contains(.up) ? color : .clear).frame(width: 2, height: 17)
+                Rectangle().fill(rail.contains(.down) ? color : .clear).frame(width: 2).frame(maxHeight: .infinity)
+            }
+            .offset(x: 7)
+        }
     }
 
     /// Left column: CI dot normally; spinner, merged check or failure mark while an action is in play;
