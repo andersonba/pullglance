@@ -465,7 +465,7 @@
 "The number, and two tabs" = "The number, and two tabs";
 "The number counts what needs you: failing checks, approvals ready to merge, reviews asked of you. Pick the sections it counts in Settings › Sections. Inside, My PRs by state, To review by who asks first." = "The number counts what needs you: failing checks, approvals ready to merge, reviews asked of you. Pick the sections it counts in Settings › Sections. Inside, My PRs by state, To review by who asks first.";
 "Act from the row" = "Act from the row";
-"Swipe a row for Pin, Snooze and Comment. Press ↓ or J to drive the list from the keyboard, ⌘/ shows every key. The same keys work on the row under the pointer. Right-click the icon up there for the menu." = "Swipe a row for Pin, Snooze and Comment. Press ↓ or J to drive the list from the keyboard, ⌘/ shows every key. The same keys work on the row under the pointer. Right-click the icon up there for the menu.";
+"Swipe a row for Pin, Snooze and Comment. Press ↓ or J to drive the list from the keyboard, H J K L do what the arrows do, ⌘/ shows every key. The same keys work on the row under the pointer. Right-click the icon up there for the menu." = "Swipe a row for Pin, Snooze and Comment. Press ↓ or J to drive the list from the keyboard, H J K L do what the arrows do, ⌘/ shows every key. The same keys work on the row under the pointer. Right-click the icon up there for the menu.";
 "Open it from anywhere" = "Open it from anywhere";
 "⌥⌘P opens and closes the popover whichever app is in front, with the icon lit as for a click. Record another shortcut here, or later in Settings › General." = "⌥⌘P opens and closes the popover whichever app is in front, with the icon lit as for a click. Record another shortcut here, or later in Settings › General.";
 "Snooze what can wait" = "Snooze what can wait";
@@ -523,3 +523,9 @@
 "Stack #%lld" = "Stack #%lld";
 "Clear stack filter" = "Clear stack filter";
 "Show this stack" = "Show this stack";
+
+/* What's new */
+"New in %@" = "New in %@";
+"Next" = "Next";
+"Done" = "Done";
+"Release notes" = "Release notes";

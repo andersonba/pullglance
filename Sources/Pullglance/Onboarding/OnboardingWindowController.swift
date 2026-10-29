@@ -35,7 +35,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
     private let store: PRStore
     private let checker = RequirementChecker()
-    private let model = OnboardingModel()
+    private let model = OnboardingModel(steps: OnboardingStep.all)
     private var host: NSHostingView<OnboardingView>!
     private var keyMonitor: Any?
 
@@ -85,7 +85,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
             case 53: window.close(); return nil
             case 123: self.model.go(to: self.model.step - 1); return nil
             case 124:
-                let ghStep = OnboardingStep.all[self.model.step].content == .requirements
+                let ghStep = self.model.steps[self.model.step].content == .requirements
                 if !ghStep || self.checker.allPassed { self.model.go(to: self.model.step + 1) }
                 return nil
             default: return event

@@ -7,12 +7,17 @@ import SwiftUI
 @MainActor
 @Observable
 final class OnboardingModel {
+    /// The list this window shows: the welcome's steps, or a what's new selection.
+    let steps: [OnboardingStep]
     var step: Int
 
-    init(step: Int = 0) { self.step = step }
+    init(steps: [OnboardingStep], step: Int = 0) {
+        self.steps = steps
+        self.step = step
+    }
 
     func go(to index: Int) {
-        guard OnboardingStep.all.indices.contains(index), index != step else { return }
+        guard steps.indices.contains(index), index != step else { return }
         withAnimation(.spring(duration: 0.5, bounce: 0.18)) { step = index }
     }
 }
@@ -25,6 +30,9 @@ struct OnboardingView: View {
     @Bindable var store: PRStore
     let checker: RequirementChecker
     @Bindable var model: OnboardingModel
+    /// The welcome, or the what's new tour: same shell, a version label per screen, Next and Done.
+    var style: Style = .welcome
+    enum Style { case welcome, whatsNew }
     /// gh just passed: the window counts as completed from here on, whatever way it goes away (⌘Q too).
     var ghPassed: () -> Void = {}
     let finish: () -> Void
@@ -33,7 +41,11 @@ struct OnboardingView: View {
     @State private var hop = false
 
     private var step: Int { model.step }
-    private var current: OnboardingStep { OnboardingStep.all[step] }
+    private var steps: [OnboardingStep] { model.steps }
+    private var current: OnboardingStep { steps[step] }
+    private var isLast: Bool { step == steps.count - 1 }
+    /// The list is newest release first: the first step's version is the current release.
+    private var newestVersion: String? { steps.first?.version }
     private var isGhStep: Bool { current.content == .requirements }
     private var canContinue: Bool { !isGhStep || checker.allPassed }
     private var pose: MascotPose { isGhStep && checker.allPassed ? .celebrating : current.pose }
@@ -43,7 +55,7 @@ struct OnboardingView: View {
             HStack(alignment: .top, spacing: 20) {
                 mascot
                 ZStack(alignment: .topLeading) {
-                    ForEach(Array(OnboardingStep.all.enumerated()), id: \.element.id) { index, item in
+                    ForEach(Array(steps.enumerated()), id: \.element.id) { index, item in
                         column(for: item, active: index == step)
                             .offset(x: CGFloat(index - step) * 56)
                             .opacity(index == step ? 1 : 0)
@@ -91,9 +103,19 @@ struct OnboardingView: View {
 
     private func column(for item: OnboardingStep, active: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
+            if style == .whatsNew, let version = item.version {
+                // The release the screen belongs to; an older one (a catch-up screen) in grey.
+                Text(verbatim: String(format: String(localized: "New in %@", bundle: .app), version))
+                    .font(.system(size: 10.5, weight: .semibold)).tracking(0.6).textCase(.uppercase)
+                    .foregroundStyle(version == newestVersion ? Color.accentColor : Color.secondary)
+                    .padding(.bottom, -2)
+            }
             Text(LocalizedStringKey(item.title), bundle: .app).font(.system(size: 21, weight: .bold))
             Text(LocalizedStringKey(item.text), bundle: .app).font(.system(size: 12.5)).foregroundStyle(.secondary).lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
+            if case .openURL(let url) = item.tryIt {
+                Button { NSWorkspace.shared.open(url) } label: { Text("Release notes", bundle: .app) }.controlSize(.small).padding(.top, 2)
+            }
             content(for: item, active: active).padding(.top, 4)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -115,6 +137,18 @@ struct OnboardingView: View {
                            detail: Text("Optional. macOS asks once; you can change it in Settings later.", bundle: .app)) {
                 Toggle(isOn: $store.notifiesSnoozeEnd) { EmptyView() }.labelsHidden().toggleStyle(.switch).controlSize(.small)
             }
+        case .watch, .deskKeys, .handoff, .stacks, .keyboard, .assigned:
+            Color.clear.frame(height: 120)
+        case .more(let bullets):
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(bullets, id: \.self) { bullet in
+                    HStack(alignment: .top, spacing: 6) {
+                        Text(verbatim: "•").foregroundStyle(.tertiary)
+                        Text(LocalizedStringKey(bullet), bundle: .app).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .font(.system(size: 12)).foregroundStyle(.secondary)
         }
     }
 
@@ -195,7 +229,11 @@ struct OnboardingView: View {
             }
             Spacer()
             HStack(spacing: 6) {
-                ForEach(OnboardingStep.all.indices, id: \.self) { index in
+                ForEach(steps.indices, id: \.self) { index in
+                    // A thin bar where the release changes: the catch-up screens read as their own group.
+                    if style == .whatsNew, index > 0, steps[index].version != steps[index - 1].version {
+                        Rectangle().fill(Color.secondary.opacity(0.3)).frame(width: 1, height: 10).padding(.horizontal, 2)
+                    }
                     Capsule().fill(index == step ? Color.accentColor : Color.secondary.opacity(0.3))
                         .frame(width: index == step ? 18 : 6, height: 6)
                 }
@@ -203,9 +241,9 @@ struct OnboardingView: View {
             .animation(.easeInOut(duration: 0.25), value: step)
             Spacer()
             Button {
-                if step == OnboardingStep.all.count - 1 { finish() } else { model.go(to: step + 1) }
+                if isLast { finish() } else { model.go(to: step + 1) }
             } label: {
-                Text(LocalizedStringKey(current.button), bundle: .app).frame(minWidth: 72)
+                primaryLabel.frame(minWidth: 72)
             }
             .buttonStyle(.borderedProminent)
             .keyboardShortcut(.defaultAction)
@@ -215,5 +253,13 @@ struct OnboardingView: View {
         .frame(height: 56)
         .background(.bar)
         .overlay(alignment: .top) { Divider() }
+    }
+
+    /// The welcome's steps name their button; the tour's say Next, and Done on the last screen.
+    private var primaryLabel: Text {
+        switch style {
+        case .welcome: Text(LocalizedStringKey(current.button), bundle: .app)
+        case .whatsNew: isLast ? Text("Done", bundle: .app) : Text("Next", bundle: .app)
+        }
     }
 }
