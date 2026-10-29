@@ -89,3 +89,18 @@ import Testing
         #expect(railLinks(at: 1, in: [pr(1, stack: 7), pr(2, stack: 7), pr(3, stack: 7)]) == [.up, .down])
     }
 }
+
+@MainActor @Suite struct StackRowMenuTests {
+    /// The row's own menu (right-click, and `space` on a focused row) offers the stack: the keyboard's
+    /// only way to the filter.
+    @Test func theRowsOwnMenuOffersTheStack() {
+        var pr = makePR()
+        pr.stack = PullRequestStack(number: 7, size: 3, baseRefName: "main", position: 2, members: [])
+        let row = PRRow(pr: pr, section: .needsAction, isStackFiltered: true)
+        #expect(row.rowMenu.inStack)
+        #expect(row.rowMenu.stackFilterOn)
+        let plain = PRRow(pr: makePR(), section: .needsAction)
+        #expect(!plain.rowMenu.inStack)
+        #expect(!plain.rowMenu.stackFilterOn)
+    }
+}

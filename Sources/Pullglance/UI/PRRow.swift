@@ -139,7 +139,14 @@ struct PRRow: View {
             if case .failed(let action, _) = actionState { onAction(action); return }
             PullRequestOpener.open(pr, from: section.tab)
         }
-        .contextMenu { PRRowMenu(section: section, isDormant: isDormant, isPinned: isPinned, isWatched: isWatched, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil, actionState: actionState, snoozeLength: snoozeLength, onAction: onAction, onSnoozeFor: onSnoozeFor) }
+        .contextMenu { rowMenu }
+    }
+
+    /// The row's own menu: the right-click one, which `space` on a focused row opens too. The swipe's
+    /// "more" tile builds the same menu on the popover's side.
+    var rowMenu: PRRowMenu {
+        PRRowMenu(section: section, isDormant: isDormant, isPinned: isPinned, isWatched: isWatched, offersMerge: pr.offersAutoMerge, autoMergeOn: pr.autoMergeMethod != nil,
+                  actionState: actionState, snoozeLength: snoozeLength, inStack: pr.stack != nil, stackFilterOn: isStackFiltered, onAction: onAction, onSnoozeFor: onSnoozeFor)
     }
 
     /// The dot's centre is 17pt down (6 of padding, 3 above the dot, half of its 16) and 8pt in.
