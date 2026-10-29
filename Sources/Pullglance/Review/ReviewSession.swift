@@ -281,6 +281,9 @@ final class ReviewSession {
 
     /// Test hook: wait for the work `pageChanged` (and anything chained after it) started.
     func settle() async {
+        // A settings edit waits out its debounce before it joins the chain; wait for that first, or a test
+        // on a slow machine races the timer (the push lands after the check and the expectation fails).
+        if let pending = pendingSettingsPush { await pending.value }
         while let task = inFlight {
             await task.value
             if inFlight == task { break }

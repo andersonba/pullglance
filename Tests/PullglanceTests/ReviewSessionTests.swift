@@ -151,7 +151,7 @@ final class FakeScripting: ReviewScripting {
         s.pageChanged(to: URL(string: "https://github.com/acme/web/compare/main...feat"))
         await s.settle()
         for text in ["*", "*.", "*.md"] { settings.settings.customGlobsText = text }   // one per keystroke
-        try await Task.sleep(for: ReviewSession.settingsPushDelay * 3)
+        // No sleep: `settle()` waits for the debounce itself, so a slow runner cannot race it.
         await s.settle()
         #expect(scripting.calls.map(\.function) == ["setSettings", "counts", "setSettings", "counts"])
     }
