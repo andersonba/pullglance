@@ -63,3 +63,6 @@ user reads (strings, docs, changelog); in code it keeps its `Review*` names.
 - Code comments explain intent and non-obvious constraints, in the voice of the existing ones.
 - English and pt-BR strings live in `Sources/Pullglance/Resources/*.lproj`; `LocalizationCoverageTests` fails
   on a key missing in either.
+- `docs/` holds what the README links to: `how-it-works.md` and `images/`. Research notes, comparisons,
+  probes and other working documents do not go in the repository; keep them outside it (the scratchpad,
+  or `docs/superpowers/`, which the author's global gitignore keeps out of git).
