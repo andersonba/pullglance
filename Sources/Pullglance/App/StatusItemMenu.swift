@@ -45,10 +45,6 @@ final class StatusItemMenu: NSObject {
             item.target = self
             menu.addItem(item)
         }
-        if let release = updates?.available {
-            add(String(format: String(localized: "Update to %@…", bundle: .app), release.version), #selector(checkForUpdates))
-            menu.addItem(.separator())
-        }
         add(String(localized: "Refresh now", bundle: .app), #selector(refresh), key: "r")
         menu.addItem(.separator())
         // Short titles: the longest item sets the menu's width.
@@ -62,7 +58,11 @@ final class StatusItemMenu: NSObject {
         let version = NSMenuItem(title: String(format: String(localized: "Version %@", bundle: .app), AppInfo.version), action: nil, keyEquivalent: "")
         version.isEnabled = false
         menu.addItem(version)
-        if updates != nil {
+        // The offer takes the place of the check, right under the version: that is where a person looking for
+        // an update reads, and a lone item at the top of the menu went unnoticed there.
+        if let release = updates?.available {
+            add(String(format: String(localized: "Update to %@…", bundle: .app), release.version), #selector(checkForUpdates))
+        } else if updates != nil {
             add(String(localized: "Check for updates…", bundle: .app), #selector(checkForUpdates))
         }
         add(String(localized: "Quit", bundle: .app), #selector(quit), key: "q")

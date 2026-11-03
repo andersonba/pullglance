@@ -6,6 +6,9 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+### Changed
+- The icon's menu offers "Update to X.Y.Z…" right under the version line, in place of "Check for updates…", instead of as a lone item at the top of the menu that was easy to miss.
+
 ### Fixed
 - Reopening the Review Desk in dark mode no longer flashes white before GitHub paints: the page it parks on between uses follows the system appearance.
 
