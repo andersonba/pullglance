@@ -1606,8 +1606,14 @@ final class PRStore {
 
     /// Settings › General "Preview": one step up from one less, so the roll can be seen on demand. With two
     /// numbers, the first steps when it can, else the second, so a zero in front does not hide the roll.
+    /// With no number in the menu bar (no data yet, or nothing to count) there is nothing to step: a sample
+    /// rolls instead, in the shape of the mode in use, and leaves the menu bar as it was.
     func previewBadgeRoll() {
-        guard let count = badgeCount else { return }
+        guard let count = badgeCount, badgeText != nil else {
+            let dual = badgeMode == .dual
+            roll(from: dual ? "0 · 0" : "0", to: dual ? "1 · 0" : "1", up: true, sample: true)
+            return
+        }
         let second = badgeSecondCount
         let before = count > 0
             ? Pullglance.badgeText(first: count - 1, second: second, mode: badgeMode)
@@ -1616,9 +1622,10 @@ final class PRStore {
     }
 
     /// Steps `badgeRoll.progress` from 0 to 1 with an ease-out, a dozen frames; each frame redraws the label.
-    private func roll(from: String, to: String, up: Bool) {
+    /// A sample rests on its last frame for a moment, so the number is seen landing before it goes.
+    private func roll(from: String, to: String, up: Bool, sample: Bool = false) {
         badgeRollTask?.cancel()
-        badgeRoll = BadgeRoll(from: from, to: to, progress: 0, up: up)
+        badgeRoll = BadgeRoll(from: from, to: to, progress: 0, up: up, sample: sample)
         let frames = 12
         badgeRollTask = Task { [weak self, badgeRollDuration] in
             for frame in 1...frames {
@@ -1627,6 +1634,7 @@ final class PRStore {
                 let t = Double(frame) / Double(frames)
                 self.badgeRoll?.progress = 1 - pow(1 - t, 3)
             }
+            if sample { try? await Task.sleep(for: badgeRollDuration * 2) }
             guard !Task.isCancelled else { return }
             self?.badgeRoll = nil
         }

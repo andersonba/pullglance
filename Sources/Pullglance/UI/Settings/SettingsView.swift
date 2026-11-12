@@ -111,7 +111,7 @@ struct GeneralSettingsView: View {
                         Toggle(isOn: $store.rollsBadge) { EmptyView() }.labelsHidden()
                         Button { store.previewBadgeRoll() } label: { Text("Preview", bundle: .app) }
                             .controlSize(.small)
-                            .disabled(!store.rollsBadge || store.badgeCount == nil)
+                            .disabled(!store.rollsBadge)
                     }
                 } label: {
                     Text("Roll the number when it changes", bundle: .app)

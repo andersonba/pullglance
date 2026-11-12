@@ -253,6 +253,34 @@ import Testing
         #expect(back.from == "\(first) · \(second + 1)" && back.to == "\(first) · \(second)" && !back.up)
     }
 
+    /// Settings' Preview with nothing in the menu bar to roll (no data yet, or a count of zero): it rolls a
+    /// sample the label draws on its own, in the shape of the mode in use.
+    @Test func badgePreviewRollsASampleWhenNoNumberIsShown() async throws {
+        let store = PRStore(client: try await happyGH(), defaults: testDefaults(), now: { Date() }, badgeRollDuration: .milliseconds(60))
+        store.previewBadgeRoll()
+        let early = try #require(store.badgeRoll, "before the first data")
+        #expect(early.sample && early.from == "0" && early.to == "1" && early.up)
+        await store.refresh()
+        store.badgeSections = []
+        #expect(store.badgeText == nil)
+        store.previewBadgeRoll()
+        let single = try #require(store.badgeRoll)
+        #expect(single.sample && single.from == "0" && single.to == "1")
+        store.badgeMode = .dual
+        for section in Section.allCases { store.setBadgeSlot(nil, for: section) }
+        #expect(store.badgeText == nil)
+        store.previewBadgeRoll()
+        let dual = try #require(store.badgeRoll)
+        #expect(dual.sample && dual.from == "0 · 0" && dual.to == "1 · 0")
+        let settled = await waitUntil { store.badgeRoll == nil }
+        #expect(settled, "the sample leaves the menu bar as it was")
+        // With a number to show, the preview is the real one.
+        store.badgeMode = .single
+        store.badgeSections = Section.defaultBadge
+        store.previewBadgeRoll()
+        #expect(store.badgeRoll?.sample == false)
+    }
+
     /// Settings' Preview with two numbers and nothing in the first: it steps the second one, the one that
     /// can go one lower, so there is something to see.
     @Test func dualBadgePreviewRollsTheNumberThatCanStepDown() async throws {

@@ -17,7 +17,7 @@ struct MenuBarLabel: View {
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        Image(nsImage: Self.render(text: shown, isError: isError, roll: text == nil ? nil : roll, dot: showsWokeDot))
+        Image(nsImage: Self.render(text: shown, isError: isError, roll: text == nil && roll?.sample != true ? nil : roll, dot: showsWokeDot))
             // The right-click menu (`StatusItemMenu`) lives in AppKit; this is its way to the Settings scene.
             .onReceive(NotificationCenter.default.publisher(for: .openSettingsRequested)) { _ in openSettings() }
     }

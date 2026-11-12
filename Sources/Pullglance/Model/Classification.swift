@@ -81,6 +81,9 @@ struct BadgeRoll: Equatable, Sendable {
     var progress: Double
     /// New digits come from below when the count went up.
     let up: Bool
+    /// Settings' preview while the menu bar shows no number: the label draws the roll with nothing at rest
+    /// behind it, and the number leaves when the roll does.
+    var sample = false
 }
 
 /// Which of the two numbers a section counts toward.
