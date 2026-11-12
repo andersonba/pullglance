@@ -43,6 +43,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
     private var pillHost: NSHostingView<ReviewFilePill>!
     private var pillEdge: NSLayoutConstraint?
     private var barHeight: NSLayoutConstraint!
+    private var addressRow: NSStackView!
     private var modalHost: NSView?
 
     private init(store: PRStore) {
@@ -67,6 +68,14 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         window.minSize = NSSize(width: 544, height: 300)
         window.delegate = self
         window.contentView = makeContent()
+        // The address row is the title bar: it takes the title bar's height, so its controls centre on the
+        // line the system centres the window buttons on, whatever that height is on this macOS. Below
+        // required, so that where there is no title bar to match (full screen) the row keeps its own insets.
+        if let titleBarBottom = (window.contentLayoutGuide as? NSLayoutGuide)?.topAnchor {
+            let match = addressRow.bottomAnchor.constraint(equalTo: titleBarBottom)
+            match.priority = NSLayoutConstraint.Priority(999)
+            match.isActive = true
+        }
         window.initialFirstResponder = host.webView
         window.setFrameAutosaveName("ReviewWindow")
         if !window.setFrameUsingName("ReviewWindow") { window.center() }
@@ -415,6 +424,7 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         bar.orientation = .horizontal
         bar.spacing = 6
         bar.edgeInsets = NSEdgeInsets(top: 6, left: 78, bottom: 6, right: 8)
+        addressRow = bar
         backButton = symbolButton("chevron.left", String(localized: "Back (⌘[)", bundle: .app), #selector(goBack))
         forwardButton = symbolButton("chevron.right", String(localized: "Forward (⌘])", bundle: .app), #selector(goForward))
         reloadButton = symbolButton("arrow.clockwise", String(localized: "Reload (⌘R)", bundle: .app), #selector(reloadOrStop))

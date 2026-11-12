@@ -11,6 +11,7 @@ publishes it as the release notes.
 
 ### Fixed
 - Reopening the Review Desk in dark mode no longer flashes white before GitHub paints: the page it parks on between uses follows the system appearance.
+- The Review Desk's back, forward and reload buttons and its address field sit on the same line as the window's close, minimise and zoom buttons, instead of a little above them.
 
 ## [0.6.0] - 2026-10-29
 
