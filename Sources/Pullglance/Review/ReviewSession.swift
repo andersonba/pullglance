@@ -63,6 +63,12 @@ final class ReviewSession {
     private(set) var pageCounts: PageCounts?
     private(set) var busy = false
     private(set) var notice: Notice?
+    /// How far the running action has got, from the script's `progress` events: a ring in the bar in place of
+    /// the spinner. Nil outside an action and until the first event; a quick action never shows one.
+    private(set) var progress: Progress?
+    struct Progress: Equatable { var done: Int; var total: Int }
+    /// The running action is a Skip: its button says so, and leaves the numbers to the ring.
+    private(set) var isSkipping = false
     private(set) var presetChoice: ReviewPresetChoice = .auto
     /// The caret is in a page field (textarea, input, contenteditable): review shortcuts leave the keys to it.
     private(set) var isEditingInPage = false
@@ -149,10 +155,15 @@ final class ReviewSession {
             let none = (payload as? [String: Any])?["none"] as? String
             let d = payload as? [String: Any]
             AppLog.shared.debug("review event current cursor=\(FileCursor(payload) != nil)\(none.map { " (\($0))" } ?? "") index=\(d?["index"] ?? "-") viewed=\(d?["viewed"] ?? "-") via=\(d?["via"] ?? "-")")
-        } else {
+        } else if name != "progress" {   // one per file on a long marking; the log has the action's own line
             AppLog.shared.debug("review event \(name)")
         }
         switch name {
+        case "progress":
+            // Only the counted ones: the wait for the page also posts these, to say it is alive.
+            if busy, let d = payload as? [String: Any], let done = d["done"] as? Int, let total = d["total"] as? Int, total > 0 {
+                progress = Progress(done: min(done, total), total: total)
+            }
         case "context":
             // The page moved under us (Turbo). A new diff means undo no longer applies.
             if let dict = payload as? [String: Any], let base = dict["basePath"] as? String, base != currentBasePath { notice = nil }
@@ -302,6 +313,7 @@ final class ReviewSession {
 
     func mark() async {
         await perform { [self] in
+            isSkipping = true
             let ids = ruleIDs(for: presetChoice, settings: settingsStore.settings)
             let raw = try await scripting.call("mark", ["args": [ruleArgument(ids)]]) as? [String: Any] ?? [:]
             let failures = (raw["failures"] as? [[String: Any]] ?? []).map { "\($0["path"] ?? "?"): \($0["error"] ?? "?")" }
@@ -452,6 +464,8 @@ final class ReviewSession {
             AppLog.shared.info("review action failed: \(type(of: error))")
         }
         busy = false
+        progress = nil
+        isSkipping = false
         await recount()
         await refreshFileCounts()
     }

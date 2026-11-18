@@ -86,6 +86,29 @@ final class FakeScripting: ReviewScripting {
         #expect(scripting.calls.last { $0.function == "mark" }?.args.first is NSNull)   // auto → null rule ids
     }
 
+    /// A long marking says how far it has got and that it is a Skip; both are gone when it ends, and an event
+    /// with no count (the wait for the page saying it is alive) or outside an action shows nothing.
+    @Test func progressShowsWhileSkippingAndLeavesWithIt() async {
+        let (s, _, scripting, _) = await make(mine: [pr7])
+        scripting.results["mark"] = .success(["marked": 400, "failed": 0, "skipped": 0, "unknown": 0, "canUndo": true])
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        s.scriptEvent("progress", ["done": 3, "total": 400])
+        #expect(s.progress == nil, "nothing is running")
+        scripting.holds = ["mark"]
+        let marking = Task { await s.mark() }
+        _ = await waitUntil { scripting.calls.contains { $0.function == "mark" } }
+        #expect(s.isSkipping && s.progress == nil)
+        s.scriptEvent("progress", ["waiting": "page"])
+        #expect(s.progress == nil)
+        s.scriptEvent("progress", ["done": 120, "total": 400])
+        #expect(s.progress == ReviewSession.Progress(done: 120, total: 400))
+        scripting.release()
+        await marking.value
+        #expect(s.progress == nil && !s.isSkipping)
+        #expect(s.notice == .marked(count: 400, failed: 0, canUndo: true))
+    }
+
     @Test func chosenPresetIsPassedAndRemembered() async {
         let (s, _, scripting, _) = await make(mine: [pr7])
         scripting.results["mark"] = .success(["marked": 1, "failed": 0, "skipped": 0, "unknown": 0, "canUndo": true])

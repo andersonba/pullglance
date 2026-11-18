@@ -374,6 +374,7 @@
 "%lld unmarked" = "%lld desmarcados";
 "Loading files…" = "Carregando arquivos…";
 "Skip · %lld" = "Pular · %lld";
+"Skipping…" = "Pulando…";
 "Mark the files your rules match as viewed (⇧⌘V)" = "Marca como vistos os arquivos que as suas regras casam (⇧⌘V)";
 "All enabled rules" = "Todas as regras ativas";
 "Only" = "Somente";

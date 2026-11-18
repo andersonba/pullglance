@@ -374,6 +374,7 @@
 "%lld unmarked" = "%lld unmarked";
 "Loading files…" = "Loading files…";
 "Skip · %lld" = "Skip · %lld";
+"Skipping…" = "Skipping…";
 "Mark the files your rules match as viewed (⇧⌘V)" = "Mark the files your rules match as viewed (⇧⌘V)";
 "All enabled rules" = "All enabled rules";
 "Only" = "Only";

@@ -86,7 +86,11 @@ struct ReviewBar: View {
     @ViewBuilder private var progress: some View {
         switch session.notice {
         case .loading:
-            ProgressView().controlSize(.small)
+            if let progress = session.progress {
+                OperationRing(done: progress.done, total: progress.total)
+            } else {
+                ProgressView().controlSize(.small)
+            }
         case .marked(let count, let failed, let canUndo):
             HStack(spacing: 6) {
                 Text(failed == 0 ? String(localized: "\(count) marked", bundle: .app) : String(localized: "\(count) marked · \(failed) failed", bundle: .app))
@@ -170,5 +174,28 @@ struct ReviewBar: View {
             Button { actions.hide() } label: { Text("Hide review bar", bundle: .app) }.keyboardShortcut("b", modifiers: [.command, .option])
         } label: { Image(systemName: "ellipsis") }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 24)
+    }
+}
+
+/// A long action's progress, where the spinner would be: a ring that closes as the files go, and the count.
+/// Marking a few hundred files takes a minute, and a spinner alone reads as stuck.
+struct OperationRing: View {
+    let done: Int
+    let total: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ZStack {
+                Circle().stroke(Color.primary.opacity(0.15), lineWidth: 2.5)
+                Circle().trim(from: 0, to: CGFloat(done) / CGFloat(max(total, 1)))
+                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+            .frame(width: 12, height: 12)
+            .animation(.linear(duration: 0.25), value: done)
+            Text(verbatim: "\(done) / \(total)").font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("\(done) of \(total)", bundle: .app))
     }
 }

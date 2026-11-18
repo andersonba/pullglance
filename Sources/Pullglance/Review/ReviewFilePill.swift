@@ -102,7 +102,8 @@ struct TestsComboButton: NSViewRepresentable {
     }
 
     func updateNSView(_ button: NSComboButton, context: Context) {
-        button.title = String(localized: "Skip · \(session.matchCount)", bundle: .app)
+        // While it runs the button says what it is doing; how far it has got is the ring's to say.
+        button.title = session.isSkipping ? String(localized: "Skipping…", bundle: .app) : String(localized: "Skip · \(session.matchCount)", bundle: .app)
         // "Skip" says why; the tooltip says what happens to the files.
         button.toolTip = String(localized: "Mark the files your rules match as viewed (⇧⌘V)", bundle: .app)
         button.isEnabled = !session.busy && session.pageCounts != nil && session.matchCount > 0
