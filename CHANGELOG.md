@@ -18,6 +18,7 @@ publishes it as the release notes.
 - Reopening the Review Desk in dark mode no longer flashes white before GitHub paints: the page it parks on between uses follows the system appearance.
 - The Review Desk's back, forward and reload buttons and its address field sit on the same line as the window's close, minimise and zoom buttons, instead of a little above them.
 - **Preview** next to "Roll the number when it changes" works with no number in the menu bar too (nothing to count, or before the first data): it rolls a sample number, which then leaves. It used to do nothing there.
+- Settings › Review Desk › **Choose…** opens at the top of the list of rules. It used to open scrolled to the bottom, with the cursor in the custom globs.
 
 ## [0.6.0] - 2026-10-29
 

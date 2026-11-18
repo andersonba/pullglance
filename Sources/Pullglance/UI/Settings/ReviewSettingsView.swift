@@ -75,6 +75,11 @@ struct ReviewSettingsView: View {
 struct TestPresetsSheet: View {
     @Bindable var store: ReviewSettingsStore
     @Environment(\.dismiss) private var dismiss
+    /// The globs editor is the sheet's only text field, so the sheet would open with the focus in it and the
+    /// form scrolled down to it, the rules at the top out of sight. The title takes the opening focus
+    /// instead (it has to be focusable the way a text field is, or it is passed over unless keyboard
+    /// navigation is on); the editor is a Tab or a click away.
+    @FocusState private var titleFocused: Bool
 
     private var groups: [(name: String, presets: [ReviewPreset])] {
         var order: [String] = []
@@ -89,6 +94,9 @@ struct TestPresetsSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Files to skip", bundle: .app).font(.headline)
+                .focusable(true, interactions: .edit)
+                .focused($titleFocused)
+                .focusEffectDisabled()
             Form {
                 SwiftUI.Section {
                     ForEach(groups, id: \.name) { group in
@@ -124,5 +132,6 @@ struct TestPresetsSheet: View {
         }
         .padding(16)
         .frame(width: 460, height: 520)
+        .defaultFocus($titleFocused, true)
     }
 }
