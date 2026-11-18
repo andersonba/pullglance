@@ -1,7 +1,7 @@
 import AppKit
 import WebKit
 
-/// `Pullglance --review-bench <url> [--steps a,b,c] [--out directory] [--keep]`: the Review Desk without the
+/// `Pullglance --review-bench <url> [--steps a,b,c] [--out directory] [--patience seconds] [--keep]`: the Review Desk without the
 /// popover, for working on it from a terminal. The app opens the Desk on the address, runs the steps in
 /// order, writes what each one left behind (the session's state as JSON, a picture of the window) and exits
 /// with 0 when every step went through. The popover only opens on a real click, and the Desk only opens
@@ -28,6 +28,9 @@ struct ReviewBenchOptions: Equatable {
     var url: URL
     var steps = defaultSteps
     var directory = defaultDirectory
+    /// `--patience <seconds>`: how long the app waits on a silent page before giving a call up, in place of
+    /// its usual limit. For measuring how long something really takes when the limit is what fails.
+    var patience: Duration?
     /// Leave the window up after the steps, until it is closed by hand: signing in, looking around.
     var keep = false
 
@@ -43,6 +46,7 @@ struct ReviewBenchOptions: Equatable {
         }
         if let out = value(after: "--out") { options.directory = URL(fileURLWithPath: out, isDirectory: true) }
         options.keep = arguments.contains("--keep")
+        options.patience = value(after: "--patience").flatMap(Double.init).map { .seconds($0) }
         return options
     }
 
@@ -68,6 +72,7 @@ enum ReviewBench {
         guard let desk = ReviewWindowController.shared else { return false }
         // The pull request's state on the bar comes from the store's lists; one fetch, no polling.
         Task { await store.refresh() }
+        if let patience = options.patience { desk.host.bridge.patience = patience }
         desk.open(url: options.url)
         var report: [[String: Any]] = []
         var allPassed = true
@@ -97,7 +102,9 @@ enum ReviewBench {
     private static func perform(_ step: String, label: String, desk: ReviewWindowController, directory: URL) async throws -> URL? {
         let (name, argument) = ReviewBenchOptions.split(step)
         let session = desk.session
-        let noticeBefore = session.notice
+        // An action starts by replacing the notice, so an error there afterwards is its own; the other steps
+        // leave the notice alone, and one left by an earlier action is not theirs.
+        let isAction = ["skip", "undo", "unmark-all", "mark-current", "unmark-current", "refresh", "next", "prev", "next-unviewed", "prev-unviewed"].contains(name)
         switch name {
         case "wait":
             try await wait(desk, limit: argument.flatMap(Double.init) ?? 30)
@@ -154,8 +161,8 @@ enum ReviewBench {
         default:
             throw StepFailure(message: "unknown step")
         }
-        // An action answers with a notice; a failure is the step's failure. One left by an earlier step is not.
-        if case .error(let message) = session.notice, session.notice != noticeBefore { throw StepFailure(message: "notice: \(message)") }
+        if isAction, case .marked(_, let failed, _) = session.notice, failed > 0 { throw StepFailure(message: "\(failed) file(s) failed; see the log") }
+        if isAction, case .error(let message) = session.notice { throw StepFailure(message: "notice: \(message)") }
         return nil
     }
 
