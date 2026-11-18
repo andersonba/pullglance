@@ -12,6 +12,8 @@ final class AppLog: @unchecked Sendable {
         if process.contains("testing") || process.contains("xctest") {
             return FileManager.default.temporaryDirectory.appending(path: "pullglance-test-logs", directoryHint: .isDirectory)
         }
+        // A bench run keeps its log with its other files, verbose and out of the user's.
+        if let bench = ReviewBenchOptions.parse(CommandLine.arguments) { return bench.directory }
         let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
         return library.appending(path: "Logs").appending(path: "Pullglance")
     }()

@@ -190,6 +190,34 @@ final class ReviewWindowController: NSWindowController, NSWindowDelegate, NSMenu
         }
     }
 
+    /// The whole window as PNG, for the review bench: the chrome and the native bars as AppKit draws them,
+    /// the page from WebKit's own snapshot laid into the web view's place (the page lives in another
+    /// process, so drawing the window alone leaves a hole there), and the file pill back on top of it.
+    func picture() async -> Data? {
+        guard let frame = window?.contentView?.superview else { return nil }
+        frame.layoutSubtreeIfNeeded()
+        guard let rep = frame.bitmapImageRepForCachingDisplay(in: frame.bounds) else { return nil }
+        frame.cacheDisplay(in: frame.bounds, to: rep)
+        let web = host.webView
+        let page: NSImage? = await withCheckedContinuation { done in web.takeSnapshot(with: nil) { image, _ in done.resume(returning: image) } }
+        // The bitmap's origin is bottom-left whatever the frame view's flippedness.
+        func place(_ view: NSView) -> NSRect {
+            var rect = view.convert(view.bounds, to: frame)
+            if frame.isFlipped { rect.origin.y = frame.bounds.height - rect.maxY }
+            return rect
+        }
+        guard let context = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        page?.draw(in: place(web))
+        if !pillHost.isHidden, let pill = pillHost.bitmapImageRepForCachingDisplay(in: pillHost.bounds) {
+            pillHost.cacheDisplay(in: pillHost.bounds, to: pill)
+            pill.draw(in: place(pillHost))
+        }
+        NSGraphicsContext.restoreGraphicsState()
+        return rep.representation(using: .png, properties: [:])
+    }
+
     /// The camera's feedback: a white flash over the page and an accent glow along the window's edge, gone
     /// in half a second.
     private func flash() {

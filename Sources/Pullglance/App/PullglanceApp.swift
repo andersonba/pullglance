@@ -7,6 +7,7 @@ struct PullglanceApp: App {
     /// The popover's presentation, for the global hotkey; a click on the icon keeps working on its own.
     @State private var popover = PopoverPresenter.shared
     private let snapshot: SnapshotOptions?
+    private let bench: ReviewBenchOptions?
     /// Kept for the life of the app: it owns the right-click monitor.
     @State private var statusItemMenu: StatusItemMenu?
     @State private var updates: Updater?
@@ -24,6 +25,7 @@ struct PullglanceApp: App {
         // `--demo` without `--snapshot`: the app lives in the menu bar on the fictional data, to try a
         // feature by hand without a real pull request (watching, notifications). Nothing of the user's.
         let liveDemo = snapshot == nil && CommandLine.arguments.contains("--demo")
+        bench = snapshot == nil && !liveDemo ? ReviewBenchOptions.parse(CommandLine.arguments) : nil
         let notifier: SnoozeNotifier? = Bundle.main.bundleIdentifier == nil ? nil : SnoozeNotifier()
         let store: PRStore
         if snapshot?.demo == true || liveDemo {
@@ -37,13 +39,23 @@ struct PullglanceApp: App {
         }
         _store = State(initialValue: store)
         // Sparkle starts only in the packaged app (its Info.plist has the feed); never in a snapshot or demo run.
-        let updates = snapshot == nil && !liveDemo ? SparkleUpdater.makeIfConfigured() : nil
+        let updates = snapshot == nil && !liveDemo && bench == nil ? SparkleUpdater.makeIfConfigured() : nil
         _updates = State(initialValue: updates)
         if let snapshot {
             // Debug run: render to files and leave; no menu bar item, no timer.
             Task { @MainActor in
                 _ = await SnapshotRunner.run(snapshot, store: store)
                 exit(0)
+            }
+        } else if let bench {
+            // The Review Desk alone, driven by the steps on the command line: no menu bar item, no timer.
+            guard !ReviewBench.refusesThisIdentity else {
+                print("\(ReviewBenchOptions.flag) runs from `swift run`, on the debug identity; the installed app's GitHub session is not for it.")
+                exit(2)
+            }
+            Task { @MainActor in
+                let passed = await ReviewBench.run(bench, store: store)
+                if !bench.keep { exit(passed ? 0 : 1) }
             }
         } else {
             store.start()
@@ -66,7 +78,7 @@ struct PullglanceApp: App {
 
     var body: some Scene {
         // A snapshot run keeps the item out of the menu bar; SceneBuilder has no `if`.
-        MenuBarExtra(isInserted: .constant(snapshot == nil)) {
+        MenuBarExtra(isInserted: .constant(snapshot == nil && bench == nil)) {
             PopoverView(store: store, updates: updates)
         } label: {
             MenuBarLabel(text: store.badgeText, hasData: store.badgeCount != nil, isError: store.lastError != nil, roll: store.badgeRoll, showsWokeDot: store.hasUnseenWoke)

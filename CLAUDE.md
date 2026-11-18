@@ -36,6 +36,15 @@ user reads (strings, docs, changelog); in code it keeps its `Review*` names.
   come back unviewed on the page while the server has it. `setViewed` keeps a short watch (`stick`) and
   clicks the replaced button again; a change on the same node is the user's and is left alone.
 
+- `swift build && .build/debug/Pullglance --review-bench <url> --steps wait,state,shot --out <dir>` is the Review
+  Desk without the popover (`ReviewBench`): it opens the Desk on the address, runs the steps and leaves in the
+  directory a `report.json`, the session's state per `state` step, a PNG of the whole window per `shot` and a
+  verbose log, then exits 0 when every step went through. The steps (skip, mark, step through files, pick a
+  rule, toggle a preset) are listed on `ReviewBenchOptions`. This is how the Desk is tried and looked at from a
+  terminal. It runs on the debug identity only, with its own GitHub session (sign in once with
+  `--review-bench https://github.com/login --keep`); marking is real, so point it at pull requests made for it.
+  The window comes to the front while it runs.
+
 - The MenuBarExtra popover opens on a real click or on the global shortcut (⌥⌘P by default, `PopoverHotKey`), which
   goes through `PopoverPresenter` and the MenuBarExtraAccess package: on macOS 27 the window belongs to a
   session of the system's menu bar host, `performClick` does nothing, and the icon lights only for sessions
