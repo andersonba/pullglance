@@ -90,7 +90,7 @@ export async function markMatching(adapter: HostAdapter, rules: Rule[], opts: Ma
   return receipt
 }
 
-export async function undo(adapter: HostAdapter, receipt: Receipt, opts: { signal?: AbortSignal } = {}): Promise<Receipt> {
+export async function undo(adapter: HostAdapter, receipt: Receipt, opts: { signal?: AbortSignal; onProgress?: (done: number, total: number) => void } = {}): Promise<Receipt> {
   const current = adapter.currentContext()
   if (!current || current.key !== receipt.context.key) throw new ContextMismatch()
 
@@ -100,8 +100,15 @@ export async function undo(adapter: HostAdapter, receipt: Receipt, opts: { signa
     targets = [...targets, ...receipt.unknown.filter((f) => server.get(f.id) === true)]
   }
   const asViewed = targets.map((f) => ({ ...f, viewed: true }))
-  const batch = await runBatch(adapter, asViewed, false, receipt.context.key, { signal: opts.signal })
+  const batch = await runBatch(adapter, asViewed, false, receipt.context.key, { signal: opts.signal, onProgress: opts.onProgress })
   return { context: receipt.context, completeness: receipt.completeness, ...batch }
+}
+
+/** Unmarks every viewed file of the page, several at a time like a marking, and stops on repeated failures like one. */
+export async function unmarkAll(adapter: HostAdapter, opts: { signal?: AbortSignal; onProgress?: (done: number, total: number) => void } = {}): Promise<Receipt> {
+  const listing = await adapter.listFiles()
+  const batch = await runBatch(adapter, listing.files.filter((f) => f.viewed), false, listing.context.key, opts)
+  return { context: listing.context, completeness: listing.completeness, ...batch }
 }
 
 export function loadAll(adapter: HostAdapter, onProgress?: (done: number, total?: number) => void, signal?: AbortSignal) {

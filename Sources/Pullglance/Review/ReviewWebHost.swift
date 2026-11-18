@@ -247,6 +247,12 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
         log("download failed: \(error.localizedDescription)")
     }
 
+    /// A new document took the place of the one the script was running in: whatever the app was waiting on
+    /// from it will not come. Same-document navigations (GitHub's own, between tabs) do not commit.
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        if webView === self.webView { bridge.documentReplaced() }
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         log("nav.finish \(Self.redacted(webView.url))")
         if webView === self.webView { onNavigationFinished?(webView.url, webView.title) }
@@ -305,6 +311,7 @@ final class ReviewWebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        if webView === self.webView { bridge.documentReplaced() }
         switch contentProcessTerminated(now: Date(), onScreen: webView.window?.isVisible == true) {
         case .loop:
             log("web content process terminated again within 10 s; not reloading")

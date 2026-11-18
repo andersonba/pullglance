@@ -10,14 +10,35 @@ export class FileReviewError extends Error {
 
 function isAbort(e: unknown) { return e instanceof DOMException && e.name === 'AbortError' }
 
-export async function postFileReview(basePath: string, path: string, viewed: boolean, fetchImpl: FetchLike, signal?: AbortSignal): Promise<void> {
+/** How long a 429 asks to wait, in milliseconds: its `Retry-After` in seconds when it has one, within reason. */
+export function retryAfterMs(res: Response, fallbackMs = 5000, capMs = 30_000): number {
+  const seconds = Number(res.headers.get('Retry-After'))
+  return Number.isFinite(seconds) && seconds >= 0 && res.headers.get('Retry-After') !== null ? Math.min(seconds * 1000, capMs) : fallbackMs
+}
+
+const pause = (ms: number, signal?: AbortSignal) => new Promise<void>((resolve) => {
+  const timer = setTimeout(resolve, ms)
+  signal?.addEventListener('abort', () => { clearTimeout(timer); resolve() }, { once: true })
+})
+
+/**
+ * GitHub answers 429 when marks come too fast: a few hundred files in a row get there (seen live 2026-11-18,
+ * after some 600 requests in two minutes). The request is fine and so is the session; it waits what the
+ * answer asks and goes again, a few times, instead of failing the file and stopping the batch.
+ */
+export async function postFileReview(basePath: string, path: string, viewed: boolean, fetchImpl: FetchLike, signal?: AbortSignal, retries = 3): Promise<void> {
   const { url, init } = fileReviewRequest(basePath, path, viewed)
   let res: Response
-  try {
-    res = await fetchImpl(url, { ...init, signal })
-  } catch (e) {
-    if (isAbort(e) || signal?.aborted) throw new AbortedInFlight()
-    throw e
+  for (let attempt = 0; ; attempt++) {
+    try {
+      res = await fetchImpl(url, { ...init, signal })
+    } catch (e) {
+      if (isAbort(e) || signal?.aborted) throw new AbortedInFlight()
+      throw e
+    }
+    if (res.status !== 429 || attempt >= retries) break
+    await pause(retryAfterMs(res), signal)
+    if (signal?.aborted) throw new AbortedInFlight()
   }
   if (res.ok) return
   let detail = ''

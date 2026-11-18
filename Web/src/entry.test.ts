@@ -317,13 +317,17 @@ describe('review script API', () => {
 
   it('marks by rule ids, then undoes', async () => {
     mountComparePage({ files: [{ path: 'a.test.ts' }, { path: 'b.ts' }] })
-    const api = install({ post: () => {} })
+    const events: Event[] = []
+    const api = install({ post: (e) => events.push(e) })
     const r = await api.mark(['js-unit'])
     expect(r.marked).toBe(1)
     expect(r.canUndo).toBe(true)
     expect(document.getElementById(`diff-${digestOf('a.test.ts')}`)!.classList.contains('open')).toBe(false)
+    // The app's patience with a long call counts from these; the last file always reports.
+    expect(events.filter((e) => e.name === 'progress').map((e) => e.payload)).toEqual([{ done: 1, total: 1 }])
     const u = await api.undo()
     expect(u.marked).toBe(1)
+    expect(events.filter((e) => e.name === 'progress')).toHaveLength(2)
     await expect(api.undo()).rejects.toThrow('nothing to undo')
   })
 

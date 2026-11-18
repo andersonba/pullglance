@@ -86,10 +86,14 @@ describe('createGitHubAdapter', () => {
     expect(button.getAttribute('aria-pressed')).toBe('true')
   })
 
-  it('setViewed via DOM: desiste se a hidratação não chega', async () => {
+  // A very long list is still mounting half a minute after load (seen live 2026-11-18, 1200 files). The
+  // button is never clicked while the page does not own it; the server takes the mark instead of the file failing.
+  it('setViewed: a page that never gets ready is not clicked, the server takes the mark', async () => {
     mountFilesPage({ files: [{ path: 'a.ts' }], hydrated: false })
-    const a = createGitHubAdapter({ domTimeoutMs: 30 })
-    await expect(a.setViewed(file('a.ts'), true)).rejects.toThrow(/still loading/)
+    const calls: string[] = []
+    const a = createGitHubAdapter({ domTimeoutMs: 30, fetchImpl: async (u) => { calls.push(u); return okJson() } })
+    expect(await a.setViewed(file('a.ts'), true)).toBe('api')
+    expect(calls).toEqual(['/acme/web/pull/42/file_review'])
     expect(document.querySelector('button[aria-label="Not Viewed"]')).not.toBeNull()   // never clicked
   })
 
@@ -121,6 +125,19 @@ describe('createGitHubAdapter', () => {
     expect(button.getAttribute('aria-pressed')).toBe('false')
     await new Promise((r) => setTimeout(r, 400))
     expect(button.getAttribute('aria-pressed')).toBe('false')
+    a.stopWatching()
+  })
+
+  it('setViewed: the button leaves the page with the click (a long, virtualized list), the server takes the mark', async () => {
+    mountFilesPage({ files: [{ path: 'a.ts' }] })
+    const calls: Array<[string, string]> = []
+    const a = createGitHubAdapter({ domTimeoutMs: 300, fetchImpl: async (u, i) => { calls.push([u, i!.method!]); return okJson() } })
+    const header = document.querySelector('[data-diff-header-wrapper="true"]')!
+    // The list re-renders around the click and this header is not in the new window of drawn files.
+    header.querySelector('button[aria-pressed]')!.addEventListener('click', (e) => { e.stopImmediatePropagation(); header.remove() }, { capture: true })
+    expect(await a.setViewed(file('a.ts'), true)).toBe('api')
+    expect(calls).toEqual([['/acme/web/pull/42/file_review', 'POST']])
+    expect((await a.listFiles()).files.find((f) => f.path === 'a.ts')?.viewed ?? true).toBe(true)
     a.stopWatching()
   })
 

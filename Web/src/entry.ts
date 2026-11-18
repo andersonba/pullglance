@@ -1,4 +1,4 @@
-import { markMatching, undo as undoAction, loadAll } from '@/core/actions'
+import { markMatching, undo as undoAction, unmarkAll as unmarkAllAction, loadAll } from '@/core/actions'
 import { matchFiles } from '@/core/matcher'
 import type { FileListing, Receipt, Rule } from '@/core/model'
 import { OperationLock } from '@/core/lock'
@@ -35,7 +35,12 @@ const LISTING_MIN_INTERVAL_MS = 1000
 export function install(deps: Deps) {
   const adapter = deps.adapter ?? createGitHubAdapter()
   // Everything that writes to the page or moves it goes through here first (see `PageReadiness`).
-  const pageReady = (signal?: AbortSignal) => adapter.whenPageReady(deps.readyTimeoutMs ?? READY_TIMEOUT_MS, signal)
+  // The wait says it is alive while it lasts (see `progress`): a heavy page takes its time getting ready, and
+  // the app would otherwise read that silence as a page that died.
+  const pageReady = async (signal?: AbortSignal) => {
+    const alive = setInterval(() => deps.post({ name: 'progress', payload: { waiting: 'page' } }), 2000)
+    try { return await adapter.whenPageReady(deps.readyTimeoutMs ?? READY_TIMEOUT_MS, signal) } finally { clearInterval(alive) }
+  }
   // The file tree sidebar follows the listing: viewed files leave it while the setting says so.
   const treeSync = createTreeSync(document, () => adapter.fileTree())
   let settings: Settings = DEFAULT_SETTINGS
@@ -74,11 +79,24 @@ export function install(deps: Deps) {
     }
   }
 
+  /**
+   * A long operation tells the app it is still at work. The app's patience with a call is counted from the
+   * last of these, not from the call's start: marking hundreds of files takes longer than any fixed limit
+   * that would still catch a page that died. Spaced out, except the last one.
+   */
+  let lastProgressAt = 0
+  const progress = (done: number, total?: number) => {
+    const now = Date.now()
+    if (done !== total && now - lastProgressAt < 300) return
+    lastProgressAt = now
+    deps.post({ name: 'progress', payload: { done, total: total ?? null } })
+  }
+
   async function mark(ruleIds: string[] | null): Promise<MarkResult> {
     return lock.run(async (signal) => {
       const waitedForPage = await pageReady(signal)
-      if (settings.loadBeforeMark && (await adapter.listFiles()).completeness === 'partial') await loadAll(adapter, undefined, signal)
-      const receipt = await markMatching(adapter, selectRules(ruleIds), { signal, verify: settings.verify && adapter.pageKind() === 'pull' })
+      if (settings.loadBeforeMark && (await adapter.listFiles()).completeness === 'partial') await loadAll(adapter, progress, signal)
+      const receipt = await markMatching(adapter, selectRules(ruleIds), { signal, verify: settings.verify && adapter.pageKind() === 'pull', onProgress: progress })
       lastReceipt = receipt.marked.length > 0 || receipt.unknown.length > 0 ? receipt : null
       invalidateListing()
       return {
@@ -93,7 +111,7 @@ export function install(deps: Deps) {
     if (!lastReceipt) throw new Error('nothing to undo')
     return lock.run(async (signal) => {
       await pageReady(signal)
-      const r = await undoAction(adapter, lastReceipt!, { signal })
+      const r = await undoAction(adapter, lastReceipt!, { signal, onProgress: progress })
       lastReceipt = null
       invalidateListing()
       return { marked: r.marked.length, failed: r.failed.length }
@@ -103,11 +121,8 @@ export function install(deps: Deps) {
   async function unmarkAll(): Promise<{ marked: number; failed: number }> {
     return lock.run(async (signal) => {
       await pageReady(signal)
-      const listing = await adapter.listFiles()
-      let marked = 0, failed = 0
-      for (const f of listing.files.filter((x) => x.viewed)) {
-        try { await adapter.setViewed(f, false, signal); marked++ } catch { failed++ }
-      }
+      const r = await unmarkAllAction(adapter, { signal, onProgress: progress })
+      const marked = r.marked.length, failed = r.failed.length
       lastReceipt = null
       invalidateListing()
       return { marked, failed }

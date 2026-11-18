@@ -17,6 +17,16 @@ describe('postFileReview', () => {
     await expect(postFileReview('/p', 'a', true, async () => new Response('x', { status: 500 }))).rejects.toBeInstanceOf(FileReviewError)
   })
 
+  it('a 429 waits what it asks and goes again; one that keeps coming fails the file', async () => {
+    const limited = () => new Response('', { status: 429, headers: { 'Retry-After': '0' } })
+    let calls = 0
+    await postFileReview('/p', 'a', true, async () => (++calls < 3 ? limited() : okJson()))
+    expect(calls).toBe(3)
+    calls = 0
+    await expect(postFileReview('/p', 'a', true, async () => { calls++; return limited() }, undefined, 2)).rejects.toMatchObject({ status: 429 })
+    expect(calls).toBe(3)   // the first try and two more
+  })
+
   it('abort em voo vira AbortedInFlight', async () => {
     const ac = new AbortController()
     const p = postFileReview('/p', 'a', true, (_u, init) => new Promise((_, rej) => init?.signal?.addEventListener('abort', () => rej(new DOMException('x', 'AbortError')))), ac.signal)

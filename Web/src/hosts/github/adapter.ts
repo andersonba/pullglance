@@ -119,18 +119,41 @@ export function createGitHubAdapter(deps: GitHubAdapterDeps = {}): GitHubAdapter
     const control = controlFor(file.id)
     if (control) {
       if (control.isViewed() === viewed) return 'noop'
-      // A click before the page owns the button is redrawn away by the hydration: wait for it.
-      if (control.isReady) await waitFor(() => control.isReady!(), domTimeoutMs, signal, `page still loading: the Viewed button of ${file.path} is not React's yet`)
-      control.toggle()
-      try {
-        await waitFor(() => control.isViewed() === viewed, domTimeoutMs, signal, `GitHub didn't confirm marking ${file.path}`)
-      } catch (e) {
-        if (e instanceof WaitAborted) throw new AbortedInFlight()   // o clique já saiu; o estado final é desconhecido
-        throw e
+      // A click before the page owns the button is redrawn away by the hydration: wait for it. A page that
+      // is still not ready after the wait (a very long list mounts for half a minute) gets no click at all.
+      const onPull = pageKindOf(win.location.pathname) === 'pull'
+      let owned = true
+      if (control.isReady) {
+        try {
+          await waitFor(() => control.isReady!(), domTimeoutMs, signal, `page still loading: the Viewed button of ${file.path} is not React's yet`)
+        } catch (e) {
+          if (e instanceof WaitAborted || !onPull) throw e
+          owned = false
+        }
       }
+      // A long file list keeps only the files near the viewport drawn (seen live 2026-11-18, 1200 files:
+      // two headers in the page). Marking one collapses it, the list moves, and the button about to be
+      // clicked, or just clicked, leaves the page: a click on a node that is gone does nothing, and one that
+      // left right after cannot be seen confirming. Either way the page has no answer; the server takes
+      // the mark instead, and saying the same thing twice to it is harmless.
+      if (owned && control.el.isConnected) {
+        control.toggle()
+        try {
+          await waitFor(() => control.isViewed() === viewed || !control.el.isConnected, domTimeoutMs, signal, `GitHub didn't confirm marking ${file.path}`)
+        } catch (e) {
+          if (e instanceof WaitAborted) throw new AbortedInFlight()   // o clique já saiu; o estado final é desconhecido
+          throw e
+        }
+        if (control.el.isConnected) {
+          overlay.set(ctx.key, file.id, viewed)
+          stick(file, control.el, viewed)
+          return 'dom'
+        }
+      }
+      if (!onPull) throw new Error(`${file.path} left the page before it could be marked`)   // compare: só via DOM
+      await postFileReview(ctx.basePath, file.path, viewed, fetchImpl, signal)
       overlay.set(ctx.key, file.id, viewed)
-      stick(file, control.el, viewed)
-      return 'dom'
+      return 'api'
     }
     if ((overlay.get(ctx.key, file.id) ?? file.viewed) === viewed) return 'noop'
     if (pageKindOf(win.location.pathname) !== 'pull') throw new Error(`${file.path} is not loaded on this page`)   // compare: só via DOM
