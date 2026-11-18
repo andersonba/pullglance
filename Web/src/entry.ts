@@ -8,7 +8,8 @@ import { createTreeSync } from '@/features/tree/hide-viewed'
 
 /** `ready` is whether this document's script has received the app's settings: a fresh document says no. */
 export interface Context { kind: 'pull' | 'compare' | 'other'; basePath: string; key: string | null; ready: boolean }
-export interface Counts { total: number; viewed: number; matching: number; partial: boolean; perRule: Record<string, number> }
+/** `matching` follows the rules asked for; `enabled` is always every rule that is on, for the menu's first item. */
+export interface Counts { total: number; viewed: number; matching: number; enabled: number; partial: boolean; perRule: Record<string, number> }
 export interface MarkResult {
   marked: number; failed: number; skipped: number; unknown: number; canUndo: boolean
   /** For the app's log: how many files the rules picked, why each failure failed, and how long the page took to be ready. */
@@ -67,6 +68,7 @@ export function install(deps: Deps) {
       total: listing.files.length,
       viewed: listing.files.length - unviewed.length,
       matching: matchFiles(unviewed, selectRules(ruleIds)).length,
+      enabled: matchFiles(unviewed, rules).length,
       partial: listing.completeness === 'partial',
       perRule,
     }

@@ -171,7 +171,7 @@ struct ShortcutsCard: View {
             }
             if ReviewSettingsStore.shared.settings.windowEnabled {
                 group(Text("Review Desk", bundle: .app)) {
-                    line(Text("Mark viewed · Mark tests", bundle: .app), ["⌘↩", "⇧⌘V"])
+                    line(Text("Mark viewed · Skip", bundle: .app), ["⌘↩", "⇧⌘V"])
                     line(Text("Previous · Next file", bundle: .app), ["⌘K", "⌘J"])
                     line(Text("Top · End of page", bundle: .app), ["⌘↑", "⌘↓"])
                     line(Text("Page up · down", bundle: .app), ["⇧space", "space"])

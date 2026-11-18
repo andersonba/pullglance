@@ -103,7 +103,7 @@ struct ReviewCommands: Commands {
             Divider()
             // Shortcuts live in the window's key monitor (page focus only). ⇧⌘V, ⌘J and ⌘K have no key
             // equivalent here so the always-enabled menu cannot take Paste and Match Style or a text field's keys.
-            Button { ReviewWindowController.shared?.markTests() } label: { Text("Mark Tests as Viewed", bundle: .app) }
+            Button { ReviewWindowController.shared?.markTests() } label: { Text("Skip Files Matching Rules", bundle: .app) }
             Button { ReviewWindowController.shared?.undoMarking() } label: { Text("Undo Last Marking", bundle: .app) }
             Button { ReviewWindowController.shared?.markViewedAndNext() } label: { Text("Mark Viewed and Go to Next", bundle: .app) }
             Button { ReviewWindowController.shared?.nextFile() } label: { Text("Next File", bundle: .app) }

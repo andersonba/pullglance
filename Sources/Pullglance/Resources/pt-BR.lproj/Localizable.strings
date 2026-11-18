@@ -257,7 +257,7 @@
 "Desk" = "Desk";
 "Comment · Merge" = "Comentar · Mergear";
 "Open on GitHub · Copy link" = "Abrir no GitHub · Copiar link";
-"Mark viewed · Mark tests" = "Marcar visto · Marcar testes";
+"Mark viewed · Skip" = "Marcar visto · Pular";
 "Previous · Next file" = "Arquivo anterior · próximo";
 "Top · End of page" = "Topo · Fim da página";
 "Page up · down" = "Página acima · abaixo";
@@ -351,12 +351,12 @@
 "The diff, at the first file still to review. Same for a click, ↩, and the browser when the Desk is off." = "O diff, no primeiro arquivo por revisar. Vale para o clique, o ↩ e o navegador quando o Desk está desligado.";
 "The pull request page: comments, checks, merge. Same for a click, ↩, and the browser when the Desk is off." = "A página do pull request: comentários, checks, merge. Vale para o clique, o ↩ e o navegador quando o Desk está desligado.";
 "My PRs open on the conversation; To review opens on the first file still to review. Same for a click, ↩, and the browser when the Desk is off." = "My PRs abre na conversa; To review abre no primeiro arquivo por revisar. Vale para o clique, o ↩ e o navegador quando o Desk está desligado.";
-"Tests" = "Testes";
+"Skip" = "Pular";
 "Choose…" = "Escolher…";
-"What the Tests button in the bar marks as viewed in one go: presets by stack, plus your own globs." = "O que o botão Tests da barra marca como visto de uma vez: presets por stack, mais os seus globs.";
+"What the Skip button in the bar marks as viewed in one go: presets by stack, plus your own globs." = "O que o botão Pular da barra marca como visto de uma vez: presets por stack, mais os seus globs.";
 "%lld presets on · %lld custom globs" = "%lld presets ligados · %lld globs personalizados";
 "Custom globs, one per line. Lines starting with # are ignored." = "Globs personalizados, um por linha. Linhas começando com # são ignoradas.";
-"Files counted as tests" = "Arquivos contados como testes";
+"Files to skip" = "Arquivos para pular";
 "Custom globs" = "Globs personalizados";
 "Mark automatically when opening a pull request" = "Marcar automaticamente ao abrir um pull request";
 "Load the whole file list before marking" = "Carregar a lista inteira de arquivos antes de marcar";
@@ -373,8 +373,10 @@
 "%lld marked · %lld failed" = "%lld marcados · %lld falharam";
 "%lld unmarked" = "%lld desmarcados";
 "Loading files…" = "Carregando arquivos…";
-"Mark tests · %lld" = "Marcar testes · %lld";
-"Auto (enabled presets)" = "Auto (presets ativos)";
+"Skip · %lld" = "Pular · %lld";
+"Mark the files your rules match as viewed (⇧⌘V)" = "Marca como vistos os arquivos que as suas regras casam (⇧⌘V)";
+"All enabled rules" = "Todas as regras ativas";
+"Only" = "Somente";
 "Preset" = "Preset";
 "Edit rules…" = "Editar regras…";
 "Undo last marking" = "Desfazer última marcação";
@@ -383,7 +385,7 @@
 "Open in Browser" = "Abrir no navegador";
 "Hide review bar" = "Ocultar barra de review";
 "Undo" = "Desfazer";
-"Mark Tests as Viewed" = "Marcar testes como vistos";
+"Skip Files Matching Rules" = "Pular arquivos das regras";
 "Undo Last Marking" = "Desfazer última marcação";
 "Next Unviewed File" = "Próximo arquivo não visto";
 "Previous Unviewed File" = "Arquivo não visto anterior";
@@ -453,7 +455,6 @@
 "Mark this file as viewed and go to the next unviewed one (⌘↩)" = "Marcar este arquivo como visto e ir ao próximo não visto (⌘↩)";
 "%lld of %lld" = "%lld de %lld";
 "%lld of %lld viewed" = "%lld de %lld vistos";
-"Tests · %lld" = "Testes · %lld";
 "Review files" = "Revisar arquivos";
 "Pull to refresh" = "Puxe para atualizar";
 "Your pull requests, in the menu bar." = "Seus pull requests, na barra de menus.";

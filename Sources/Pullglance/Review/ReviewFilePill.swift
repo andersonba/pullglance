@@ -83,7 +83,8 @@ struct ReviewFilePill: View {
     }
 }
 
-/// "Tests · n" with the preset menu attached: the button marks, the arrow picks. `NSComboButton` is the
+/// "Skip · n" with the rules menu attached: the button marks as viewed the files the rules match (the ones
+/// not worth reading one by one: tests by default), the arrow picks which rules. `NSComboButton` is the
 /// native control for exactly this (Finder's and Xcode's split buttons); SwiftUI has no equivalent.
 struct TestsComboButton: NSViewRepresentable {
     let session: ReviewSession
@@ -101,7 +102,9 @@ struct TestsComboButton: NSViewRepresentable {
     }
 
     func updateNSView(_ button: NSComboButton, context: Context) {
-        button.title = String(localized: "Mark tests · \(session.matchCount)", bundle: .app)
+        button.title = String(localized: "Skip · \(session.matchCount)", bundle: .app)
+        // "Skip" says why; the tooltip says what happens to the files.
+        button.toolTip = String(localized: "Mark the files your rules match as viewed (⇧⌘V)", bundle: .app)
         button.isEnabled = !session.busy && session.pageCounts != nil && session.matchCount > 0
         button.menu = context.coordinator.menu()
     }
@@ -141,7 +144,11 @@ struct TestsComboButton: NSViewRepresentable {
                 item.state = session.presetChoice == choice ? .on : .off
                 menu.addItem(item)
             }
-            add(String(localized: "Auto (enabled presets)", bundle: .app), .auto)
+            // The first item is everything that is on, the custom globs included; each of the others narrows
+            // the button to that one rule, which the header says.
+            add(String(localized: "All enabled rules", bundle: .app) + " · \(session.pageCounts?.enabled ?? 0)", .auto)
+            menu.addItem(.separator())
+            menu.addItem(.sectionHeader(title: String(localized: "Only", bundle: .app)))
             for preset in ReviewPresets.all {
                 add("\(preset.group) · \(preset.label) · \(counts[preset.id] ?? 0)", .preset(preset.id))
             }

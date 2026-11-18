@@ -10,9 +10,9 @@ import Testing
 
     /// Keys built from `\(…)` interpolations, in the form the lookup uses. The scan skips interpolated literals.
     private static let formattedKeys = [
-        "%lld files", "%lld marked", "%lld marked · %lld failed", "%lld unmarked", "Mark tests · %lld",
+        "%lld files", "%lld marked", "%lld marked · %lld failed", "%lld unmarked", "Skip · %lld",
         "Approve #%@", "Comment on #%@", "Downloaded %@ · Show in Finder",
-        "%lld of %lld", "%lld of %lld viewed", "Tests · %lld",
+        "%lld of %lld", "%lld of %lld viewed",
         "In queue · %lld", "The merge queue merges it with the strategy set for %@.", "Show only %@",
         "Stack #%lld on %@", "Stack #%lld", "New in %@",
     ]

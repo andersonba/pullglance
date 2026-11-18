@@ -20,6 +20,8 @@ final class ReviewSession {
         var total: Int
         var viewed: Int
         var matching: Int
+        /// Files every enabled rule matches, whatever the choice in the menu: its first item's count.
+        var enabled: Int = 0
         var partial: Bool
         var perRule: [String: Int]
     }
@@ -255,7 +257,7 @@ final class ReviewSession {
         guard page.showsBar, !needsSettingsPush else { return }
         let ids = ruleIDs(for: presetChoice, settings: settingsStore.settings)
         guard let raw = try? await scripting.call("counts", ["args": [ruleArgument(ids)]]) as? [String: Any] else { return }
-        pageCounts = PageCounts(total: raw["total"] as? Int ?? 0, viewed: raw["viewed"] as? Int ?? 0, matching: raw["matching"] as? Int ?? 0,
+        pageCounts = PageCounts(total: raw["total"] as? Int ?? 0, viewed: raw["viewed"] as? Int ?? 0, matching: raw["matching"] as? Int ?? 0, enabled: raw["enabled"] as? Int ?? 0,
                                 partial: raw["partial"] as? Bool ?? false, perRule: raw["perRule"] as? [String: Int] ?? [:])
     }
 

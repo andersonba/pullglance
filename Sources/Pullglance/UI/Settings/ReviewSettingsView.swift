@@ -35,12 +35,12 @@ struct ReviewSettingsView: View {
                         Button { choosingTests = true } label: { Text("Choose…", bundle: .app) }.controlSize(.small)
                     }
                 } label: {
-                    Text("Files counted as tests", bundle: .app)
+                    Text("Files to skip", bundle: .app)
                 }
-                Text("What the Tests button in the bar marks as viewed in one go: presets by stack, plus your own globs.", bundle: .app)
+                Text("What the Skip button in the bar marks as viewed in one go: presets by stack, plus your own globs.", bundle: .app)
                     .font(.caption2).foregroundStyle(.tertiary)
             } header: {
-                Text("Tests", bundle: .app)
+                Text("Skip", bundle: .app)
             }
             SwiftUI.Section {
                 Toggle(isOn: $store.settings.autoMark) { Text("Mark automatically when opening a pull request", bundle: .app) }
@@ -88,7 +88,7 @@ struct TestPresetsSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Files counted as tests", bundle: .app).font(.headline)
+            Text("Files to skip", bundle: .app).font(.headline)
             Form {
                 SwiftUI.Section {
                     ForEach(groups, id: \.name) { group in

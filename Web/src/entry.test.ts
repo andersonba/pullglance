@@ -298,6 +298,10 @@ describe('review script API', () => {
     expect(c.total).toBe(2)
     expect(c.matching).toBe(1)                  // a.test.ts by the js-unit preset
     expect(c.perRule['js-unit']).toBe(1)
+    // Narrowed to one rule, `matching` follows it; `enabled` stays every rule that is on.
+    const narrowed = await api.counts(['go'])
+    expect(narrowed.matching).toBe(0)
+    expect(narrowed.enabled).toBe(1)
     expect(events.some((e) => e.name === 'context')).toBe(true)
   })
 
