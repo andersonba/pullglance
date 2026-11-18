@@ -64,7 +64,7 @@ struct SettingsView: View {
             // The review window is a beta (Diagnostics turns it on); its tab exists only while it is on.
             if review.settings.windowEnabled {
                 ReviewSettingsView()
-                    .tabItem { Label { Text("Review Desk", bundle: .app) } icon: { Image(systemName: "checklist") } }
+                    .tabItem { Label { Text("Review Desk", bundle: .app) } icon: { Image(nsImage: Self.betaTabIcon(symbol: "checklist")) } }
                     .tag(SettingsTab.review)
             }
             AdvancedSettingsView(store: store)
@@ -839,5 +839,34 @@ private struct BadgeModeRow: View {
             .padding(.vertical, 4)
             .background(Color(white: 0.16), in: RoundedRectangle(cornerRadius: 6))
             .help(Text(verbatim: store.badgeDescription ?? ""))
+    }
+}
+
+extension SettingsView {
+    /// A tab's symbol with a "BETA" chip beside it. The Settings tabs are toolbar items: they take a title
+    /// and an image and nothing else, so the chip is drawn into the image. The toolbar shrinks an image
+    /// taller than its icon row, and a chip stacked on the symbol's corner made it tall enough to come out
+    /// unreadable; beside the symbol, at the symbol's own height, the image is shown at its size. A template,
+    /// like the symbols on the other tabs, so it follows the selection tint: the chip is filled and the word
+    /// is cut out of it.
+    static func betaTabIcon(symbol name: String) -> NSImage {
+        guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 20, weight: .regular)) else { return NSImage() }
+        let word = NSAttributedString(string: "BETA", attributes: [.font: NSFont.systemFont(ofSize: 9, weight: .heavy), .kern: 0.3])
+        let chip = NSSize(width: ceil(word.size().width) + 8, height: 12)
+        let gap: CGFloat = 3
+        let size = NSSize(width: symbol.size.width + gap + chip.width, height: symbol.size.height)
+        let image = NSImage(size: size, flipped: false) { rect in
+            guard let context = NSGraphicsContext.current else { return false }
+            symbol.draw(in: NSRect(origin: .zero, size: symbol.size))
+            let box = NSRect(x: rect.maxX - chip.width, y: rect.maxY - chip.height, width: chip.width, height: chip.height)
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: box, xRadius: chip.height / 2, yRadius: chip.height / 2).fill()
+            context.compositingOperation = .destinationOut
+            word.draw(at: NSPoint(x: box.minX + (box.width - word.size().width) / 2, y: box.minY + (box.height - word.size().height) / 2))
+            return true
+        }
+        image.isTemplate = true
+        return image
     }
 }
