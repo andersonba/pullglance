@@ -22,6 +22,7 @@ describe('PRESETS', () => {
   it('ids únicos e stories desligado por padrão', () => {
     expect(new Set(PRESETS.map((p) => p.id)).size).toBe(PRESETS.length)
     expect(PRESETS.find((p) => p.id === 'js-stories')?.enabled).toBe(false)
+    expect(PRESETS.find((p) => p.id === 'markdown')?.enabled).toBe(false)
   })
 
   it.each(POSITIVE)('%s casa com algum preset habilitado (esperado grupo %s ou generic-dirs)', (path, expected) => {

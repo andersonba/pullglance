@@ -1,5 +1,15 @@
 [
  {
+  "id": "markdown",
+  "group": "Docs",
+  "label": "Markdown",
+  "description": "*.md, *.mdx",
+  "globs": [
+   "**/*.{md,mdx}"
+  ],
+  "enabled": false
+ },
+ {
   "id": "js-unit",
   "group": "JavaScript / TypeScript",
   "label": "Unit tests",

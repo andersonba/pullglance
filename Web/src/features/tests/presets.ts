@@ -6,6 +6,8 @@ const p = (id: string, group: string, label: string, description: string, globs:
   ({ id, group, label, description, globs, enabled })
 
 export const PRESETS: readonly Preset[] = [
+  // Not a test and off by default: first, so the one rule people have to go and turn on is the one they see.
+  p('markdown', 'Docs', 'Markdown', '*.md, *.mdx', ['**/*.{md,mdx}'], false),
   p('js-unit', 'JavaScript / TypeScript', 'Unit tests', 'Jest, Vitest, Mocha: *.test.*, *.spec.*, __tests__/', ['**/*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs}', '**/__tests__/**']),
   p('js-stories', 'JavaScript / TypeScript', 'Storybook', '*.stories.*', ['**/*.stories.{js,jsx,ts,tsx}'], false),
   p('snapshots-fixtures', 'General', 'Snapshots, fixtures and mocks', '__snapshots__/, *.snap, __fixtures__/, fixtures/, __mocks__/', ['**/__snapshots__/**', '**/*.snap', '**/__fixtures__/**', '**/fixtures/**', '**/__mocks__/**']),

@@ -8,6 +8,7 @@ import Testing
         #expect(ReviewPresets.all.contains { $0.id == "js-stories" && !$0.enabled })
         #expect(ReviewSettings.default.presets["js-unit"] == true)
         #expect(ReviewSettings.default.presets["js-stories"] == false)
+        #expect(ReviewSettings.default.presets["markdown"] == false, "Markdown is opt-in")
     }
 
     @Test func customGlobsIgnoreBlankAndCommentLines() {

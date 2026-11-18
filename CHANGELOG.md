@@ -6,6 +6,9 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+### Added
+- A **Markdown** rule (`*.md`, `*.mdx`) for the Review Desk's Skip button, off by default: Settings › Review Desk › Files to skip.
+
 ### Changed
 - The Review Desk's **Mark tests** button is now **Skip**: it marks as viewed the files your rules match, which no longer have to be tests. Its menu says what each choice does: **All enabled rules** (the presets that are on plus your custom globs, with its count) and, under **Only**, each rule on its own. The first item used to read "Auto (enabled presets)" while it also included the custom globs.
 - The icon's menu offers "Update to X.Y.Z…" right under the version line, in place of "Check for updates…", instead of as a lone item at the top of the menu that was easy to miss.
