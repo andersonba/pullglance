@@ -6,6 +6,8 @@ publishes it as the release notes.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-18
+
 ### Added
 - A **Markdown** rule (`*.md`, `*.mdx`) for the Review Desk's Skip button, off by default: Settings › Review Desk › Files to skip.
 
