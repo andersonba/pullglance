@@ -15,18 +15,20 @@ struct ReviewBarActions {
     var reviewFiles: () -> Void = {}
 }
 
-/// One line under the address bar: context on the left, progress and actions on the right.
+/// One line under the address bar: the pull request on the left; on the right its actions, and what the last one did.
 struct ReviewBar: View {
     @Environment(\.openSettings) private var openSettings
     let session: ReviewSession
     let actions: ReviewBarActions
 
     var body: some View {
-        // Left: the pull request and its progress, read as one line. Right: its actions. A centered middle
-        // zone left a small element floating in wide windows.
+        // Left: the pull request. Right: its actions, with the running action's ring and its result right
+        // before the Skip button they belong to: the eye is there when it is clicked. (A centered middle zone
+        // left a small element floating in wide windows; on the left, the result sat a window away from
+        // the button that caused it.)
         HStack(spacing: 12) {
-            HStack(spacing: 8) { leading; progress }.frame(maxWidth: .infinity, alignment: .leading)
-            HStack(spacing: 8) { trailing }.fixedSize()
+            HStack(spacing: 8) { leading }.frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 8) { progress; trailing }.fixedSize()
         }
         .controlSize(.small)
         .padding(.horizontal, 12)
@@ -95,8 +97,8 @@ struct ReviewBar: View {
             HStack(spacing: 6) {
                 Text(failed == 0 ? String(localized: "\(count) marked", bundle: .app) : String(localized: "\(count) marked · \(failed) not saved", bundle: .app))
                     .font(.system(size: 11)).foregroundStyle(failed == 0 ? AnyShapeStyle(.secondary) : AnyShapeStyle(.orange))
-                // What is left still matches the rules: the same action again takes only those.
-                if failed > 0 { Button { Task { await session.mark() } } label: { Text("Retry", bundle: .app) }.controlSize(.small) }
+                // Only the files that were not saved; see `ReviewSession.retry`.
+                if failed > 0 { Button { Task { await session.retry() } } label: { Text("Retry", bundle: .app) }.controlSize(.small) }
                 if canUndo { Button { Task { await session.undo() } } label: { Text("Undo", bundle: .app) }.controlSize(.small) }
             }
         case .undone(let count, let failed):

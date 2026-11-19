@@ -317,14 +317,20 @@ final class ReviewSession {
         track { await $0.recount() }
     }
 
-    func mark() async {
+    func mark() async { await marking("mark") }
+
+    /// Goes again for the files the last marking did not save. Not `mark`: a file GitHub refused still shows
+    /// as viewed on the page, so nothing matches the rules any more; the script kept the files themselves.
+    func retry() async { await marking("retry") }
+
+    private func marking(_ function: String) async {
         await perform { [self] in
             isSkipping = true
             let ids = ruleIDs(for: presetChoice, settings: settingsStore.settings)
-            let raw = try await scripting.call("mark", ["args": [ruleArgument(ids)]]) as? [String: Any] ?? [:]
+            let raw = try await scripting.call(function, ["args": function == "mark" ? [ruleArgument(ids)] : []]) as? [String: Any] ?? [:]
             let failures = (raw["failures"] as? [[String: Any]] ?? []).map { "\($0["path"] ?? "?"): \($0["error"] ?? "?")" }
-            AppLog.shared.debug("review mark: rules=\(ids.map { $0.joined(separator: ",") } ?? "auto") targets=\(raw["targets"] ?? "-") marked=\(raw["marked"] ?? "-") failed=\(raw["failed"] ?? "-") unknown=\(raw["unknown"] ?? "-") listing=\(raw["completeness"] ?? "-") waitedForPage=\(raw["waitedForPage"] ?? "-")ms")
-            if !failures.isEmpty { AppLog.shared.info("review mark failed for \(failures.count) file(s): \(failures.joined(separator: " | "))") }
+            AppLog.shared.debug("review \(function): rules=\(ids.map { $0.joined(separator: ",") } ?? "auto") targets=\(raw["targets"] ?? "-") marked=\(raw["marked"] ?? "-") failed=\(raw["failed"] ?? "-") unknown=\(raw["unknown"] ?? "-") listing=\(raw["completeness"] ?? "-") waitedForPage=\(raw["waitedForPage"] ?? "-")ms")
+            if !failures.isEmpty { AppLog.shared.info("review \(function) failed for \(failures.count) file(s): \(failures.joined(separator: " | "))") }
             // Not saved is not saved, whether the server refused the file or the batch stopped before reaching it.
             let notSaved = (raw["failed"] as? Int ?? 0) + (raw["skipped"] as? Int ?? 0)
             return .marked(count: raw["marked"] as? Int ?? 0, failed: notSaved, canUndo: raw["canUndo"] as? Bool ?? false)

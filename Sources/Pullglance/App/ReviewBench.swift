@@ -15,7 +15,7 @@ import WebKit
 /// - `wait` or `wait:45`: until the page has loaded and, where there is a review bar, the script has counted
 ///   the files; the number is the limit in seconds.
 /// - `state`: the session as JSON. `shot`: the window as PNG. `inspect`: the script's structural summary.
-/// - `skip`, `undo`, `unmark-all`, `mark-current`, `unmark-current`, `refresh`, `reload`.
+/// - `skip`, `retry` (the files the last skip did not save), `undo`, `unmark-all`, `mark-current`, `unmark-current`, `refresh`, `reload`.
 /// - `next`, `prev` (any file), `next-unviewed`, `prev-unviewed`.
 /// - `choose:auto`, `choose:custom`, `choose:<preset id>`: the Skip menu.
 /// - `preset:<id>=on|off`, `globs:<glob>;<glob>`: the rules in Settings.
@@ -104,7 +104,7 @@ enum ReviewBench {
         let session = desk.session
         // An action starts by replacing the notice, so an error there afterwards is its own; the other steps
         // leave the notice alone, and one left by an earlier action is not theirs.
-        let isAction = ["skip", "undo", "unmark-all", "mark-current", "unmark-current", "refresh", "next", "prev", "next-unviewed", "prev-unviewed"].contains(name)
+        let isAction = ["skip", "retry", "undo", "unmark-all", "mark-current", "unmark-current", "refresh", "next", "prev", "next-unviewed", "prev-unviewed"].contains(name)
         switch name {
         case "wait":
             try await wait(desk, limit: argument.flatMap(Double.init) ?? 30)
@@ -122,6 +122,7 @@ enum ReviewBench {
             try png.write(to: file)
             return file
         case "skip": await session.mark()
+        case "retry": await session.retry()
         case "undo": await session.undo()
         case "unmark-all": await session.unmarkAll()
         case "mark-current": await session.markCurrentAndNext()

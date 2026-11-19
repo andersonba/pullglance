@@ -1,4 +1,4 @@
-import { markMatching, undo as undoAction, unmarkAll as unmarkAllAction, loadAll } from '@/core/actions'
+import { markMatching, undo as undoAction, unmarkAll as unmarkAllAction, retryFiles, loadAll } from '@/core/actions'
 import { matchFiles } from '@/core/matcher'
 import type { FileListing, Receipt, Rule } from '@/core/model'
 import { OperationLock } from '@/core/lock'
@@ -46,6 +46,8 @@ export function install(deps: Deps) {
   let settings: Settings = DEFAULT_SETTINGS
   let rules: Rule[] = rulesFromSettings(settings)
   let lastReceipt: Receipt | null = null
+  /** The files the last marking did not save, for `retry`. */
+  let notSaved: Receipt['skipped'] = []
   const lock = new OperationLock()
   // Every delayed re-read goes through here, so dispose() can cancel what is still pending.
   const timers = new Set<ReturnType<typeof setTimeout>>()
@@ -103,12 +105,28 @@ export function install(deps: Deps) {
       if (settings.loadBeforeMark && (await adapter.listFiles()).completeness === 'partial') await loadAll(adapter, progress, signal)
       const receipt = await markMatching(adapter, selectRules(ruleIds), { signal, verify: settings.verify && adapter.pageKind() === 'pull', onProgress: progress })
       lastReceipt = receipt.marked.length > 0 || receipt.unknown.length > 0 ? receipt : null
-      invalidateListing()
-      return {
-        marked: receipt.marked.length, failed: receipt.failed.length, skipped: receipt.skipped.length, unknown: receipt.unknown.length, canUndo: lastReceipt !== null,
-        targets: receipt.marked.length + receipt.failed.length + receipt.unknown.length + receipt.skipped.length,
-        failures: receipt.failed.map((f) => ({ path: f.file.path, error: f.error })), completeness: receipt.completeness, waitedForPage,
-      }
+      return report(receipt, waitedForPage)
+    })
+  }
+
+  function report(receipt: Receipt, waitedForPage: number): MarkResult {
+    notSaved = [...receipt.failed.map((f) => f.file), ...receipt.skipped]
+    invalidateListing()
+    return {
+      marked: receipt.marked.length, failed: receipt.failed.length, skipped: receipt.skipped.length, unknown: receipt.unknown.length, canUndo: lastReceipt !== null,
+      targets: receipt.marked.length + receipt.failed.length + receipt.unknown.length + receipt.skipped.length,
+      failures: receipt.failed.map((f) => ({ path: f.file.path, error: f.error })), completeness: receipt.completeness, waitedForPage,
+    }
+  }
+
+  /** Goes again for the files the last marking did not save; what it saves joins what Undo takes back. */
+  async function retry(): Promise<MarkResult> {
+    return lock.run(async (signal) => {
+      lastCount = { done: 0, total: null }
+      const receipt = await retryFiles(adapter, notSaved, { signal, onProgress: progress })
+      if (lastReceipt && lastReceipt.context.key === receipt.context.key) lastReceipt.marked.push(...receipt.marked)
+      else if (receipt.marked.length > 0) lastReceipt = receipt
+      return report(receipt, 0)
     })
   }
 
@@ -467,7 +485,7 @@ export function install(deps: Deps) {
   let listingWatch: ListingWatch | null = null
 
   const unwatchContext = adapter.onContextChange((ctx) => {
-    if (ctx === null || ctx.key !== lastReceipt?.context.key) lastReceipt = null
+    if (ctx === null || ctx.key !== lastReceipt?.context.key) { lastReceipt = null; notSaved = [] }
     lock.cancel()
     deps.post({ name: 'context', payload: context() })
     invalidateListing()
@@ -583,7 +601,7 @@ export function install(deps: Deps) {
       document.removeEventListener('focusin', updateEditing)
       document.removeEventListener('focusout', onFocusOut)
     },
-    counts, mark, undo, unmarkAll, scrollToUnviewed: (direction: 'next' | 'previous') => scrollToUnviewed(direction),
+    counts, mark, retry, undo, unmarkAll, scrollToUnviewed: (direction: 'next' | 'previous') => scrollToUnviewed(direction),
     /** The first unviewed file from the top of the page, wherever the reader is: where a review request starts. */
     firstUnviewed: () => scrollToUnviewed('next', -1),
     stepAmong,

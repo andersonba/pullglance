@@ -1,4 +1,4 @@
-import { markMatching, countMatching, undo, unmarkAll } from './actions'
+import { markMatching, countMatching, undo, unmarkAll, retryFiles } from './actions'
 import { ContextMismatch } from './host'
 import { FakeHostAdapter } from './testing/fake-host'
 import type { ChangedFile, PageContext, Rule, Receipt } from './model'
@@ -103,6 +103,22 @@ describe('markMatching', () => {
     expect(r.marked.map((m) => m.file.id)).toEqual(['a.test.ts'])
     expect(r.failed).toEqual([{ file: expect.objectContaining({ id: 'b.test.ts' }), error: 'file_review responded 429' }])
     expect(r.verified).toEqual({ confirmed: 1, diverged: [expect.objectContaining({ id: 'b.test.ts' })] })
+  })
+
+  // Seen live 2026-11-18: "0 marked · 4 not saved" over a "Skip · 0" button. The page showed the four as
+  // viewed, so marking "what matches" again found nothing; the retry takes the files themselves.
+  it('retryFiles: saves on the server the files a marking lost, though the page shows them viewed', async () => {
+    const host = new FakeHostAdapter({ context: ctx, files: [f('a.test.ts'), f('b.test.ts')] })
+    host.optimisticLiars.add('a.test.ts'); host.optimisticLiars.add('b.test.ts')
+    host.refuseIds.add('a.test.ts'); host.refuseIds.add('b.test.ts')
+    const first = await markMatching(host, [TEST_RULE], { verify: true })
+    expect(first.marked).toEqual([])
+    expect((await markMatching(host, [TEST_RULE], { verify: true })).marked).toEqual([])   // nothing matches: the page says viewed
+    host.refuseIds.delete('a.test.ts')
+    const again = await retryFiles(host, first.failed.map((x) => x.file))
+    expect(again.marked.map((m) => m.file.id)).toEqual(['a.test.ts'])
+    expect(again.failed.map((x) => x.file.id)).toEqual(['b.test.ts'])
+    expect(host.server.get('a.test.ts')).toBe(true)
   })
 
   it('verify: an unmark the server lacks is saved there too', async () => {

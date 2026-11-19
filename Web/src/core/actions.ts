@@ -144,6 +144,38 @@ export async function undo(adapter: HostAdapter, receipt: Receipt, opts: MarkOpt
   return undone
 }
 
+/**
+ * A second go at the files a marking did not save. They cannot be found again by looking at the page: a file
+ * the server refused still shows as viewed there, so nothing "matches" any more. The files are the ones
+ * the marking reported, and they go to the server directly where the host can (see `saveViewed`).
+ */
+export async function retryFiles(adapter: HostAdapter, files: ChangedFile[], opts: MarkOptions = {}): Promise<Receipt> {
+  const listing = await adapter.listFiles()
+  const receipt: Receipt = { context: listing.context, completeness: listing.completeness, marked: [], failed: [], unknown: [], skipped: [], stoppedEarly: false }
+  const queue = [...files]
+  let done = 0
+  let consecutive = 0
+  const worker = async () => {
+    while (queue.length > 0) {
+      if (opts.signal?.aborted || adapter.currentContext()?.key !== listing.context.key || consecutive >= (opts.maxConsecutiveFailures ?? 3)) return
+      const file = queue.shift()!
+      try {
+        if (adapter.saveViewed) { await adapter.saveViewed(file, true, opts.signal); receipt.marked.push({ file, via: 'api' }) }
+        else { const via = await adapter.setViewed(file, true, opts.signal); if (via !== 'noop') receipt.marked.push({ file, via }) }
+        consecutive = 0
+      } catch (error) {
+        consecutive++
+        receipt.failed.push({ file, error: error instanceof Error ? error.message : String(error) })
+      }
+      opts.onProgress?.(++done, files.length)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.max(1, opts.concurrency ?? 4) }, worker))
+  receipt.skipped = queue
+  receipt.stoppedEarly = queue.length > 0
+  return receipt
+}
+
 /** Unmarks every viewed file of the page, several at a time like a marking, and stops on repeated failures like one. */
 export async function unmarkAll(adapter: HostAdapter, opts: MarkOptions = {}): Promise<Receipt> {
   const listing = await adapter.listFiles()

@@ -125,6 +125,11 @@ final class FakeScripting: ReviewScripting {
         #expect(s.notice == .marked(count: 240, failed: 160, canUndo: true))
         try? await Task.sleep(for: .milliseconds(120))
         #expect(s.notice == .marked(count: 240, failed: 160, canUndo: true), "not cleared by the clock")
+        // Retry asks the script for those files; it does not mark "what matches" again.
+        scripting.results["retry"] = .success(["marked": 150, "failed": 10, "skipped": 0, "unknown": 0, "canUndo": true])
+        await s.retry()
+        #expect(scripting.calls.last?.function == "retry" || scripting.calls.contains { $0.function == "retry" })
+        #expect(s.notice == .marked(count: 150, failed: 10, canUndo: true))
         scripting.results["undo"] = .success(["marked": 9, "failed": 231])
         await s.undo()
         #expect(s.notice == .undone(count: 9, failed: 231))
