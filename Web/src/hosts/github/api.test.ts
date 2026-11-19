@@ -20,8 +20,10 @@ describe('postFileReview', () => {
   it('a 429 waits what it asks and goes again; one that keeps coming fails the file', async () => {
     const limited = () => new Response('', { status: 429, headers: { 'Retry-After': '0' } })
     let calls = 0
-    await postFileReview('/p', 'a', true, async () => (++calls < 3 ? limited() : okJson()))
+    const waits: number[] = []
+    await postFileReview('/p', 'a', true, async () => (++calls < 3 ? limited() : okJson()), undefined, 3, (ms) => waits.push(ms))
     expect(calls).toBe(3)
+    expect(waits).toEqual([0, 0])   // each wait is announced before it starts
     calls = 0
     await expect(postFileReview('/p', 'a', true, async () => { calls++; return limited() }, undefined, 2)).rejects.toMatchObject({ status: 429 })
     expect(calls).toBe(3)   // the first try and two more

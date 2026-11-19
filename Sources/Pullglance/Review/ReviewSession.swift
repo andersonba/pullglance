@@ -11,7 +11,8 @@ final class ReviewSession {
     enum Notice: Equatable {
         case loading
         case marked(count: Int, failed: Int, canUndo: Bool)
-        case undone(count: Int)
+        /// `failed`: files the server did not take the unmark for; they are still viewed.
+        case undone(count: Int, failed: Int = 0)
         case error(String)
         /// Something worth knowing, not a failure; goes away by itself.
         case info(String)
@@ -66,7 +67,12 @@ final class ReviewSession {
     /// How far the running action has got, from the script's `progress` events: a ring in the bar in place of
     /// the spinner. Nil outside an action and until the first event; a quick action never shows one.
     private(set) var progress: Progress?
-    struct Progress: Equatable { var done: Int; var total: Int }
+    struct Progress: Equatable {
+        var done: Int
+        var total: Int
+        /// GitHub asked to slow down and the action is waiting to go again: the ring says so instead of looking stuck.
+        var waiting = false
+    }
     /// The running action is a Skip: its button says so, and leaves the numbers to the ring.
     private(set) var isSkipping = false
     private(set) var presetChoice: ReviewPresetChoice = .auto
@@ -162,7 +168,7 @@ final class ReviewSession {
         case "progress":
             // Only the counted ones: the wait for the page also posts these, to say it is alive.
             if busy, let d = payload as? [String: Any], let done = d["done"] as? Int, let total = d["total"] as? Int, total > 0 {
-                progress = Progress(done: min(done, total), total: total)
+                progress = Progress(done: min(done, total), total: total, waiting: d["waiting"] as? String == "github")
             }
         case "context":
             // The page moved under us (Turbo). A new diff means undo no longer applies.
@@ -319,7 +325,9 @@ final class ReviewSession {
             let failures = (raw["failures"] as? [[String: Any]] ?? []).map { "\($0["path"] ?? "?"): \($0["error"] ?? "?")" }
             AppLog.shared.debug("review mark: rules=\(ids.map { $0.joined(separator: ",") } ?? "auto") targets=\(raw["targets"] ?? "-") marked=\(raw["marked"] ?? "-") failed=\(raw["failed"] ?? "-") unknown=\(raw["unknown"] ?? "-") listing=\(raw["completeness"] ?? "-") waitedForPage=\(raw["waitedForPage"] ?? "-")ms")
             if !failures.isEmpty { AppLog.shared.info("review mark failed for \(failures.count) file(s): \(failures.joined(separator: " | "))") }
-            return .marked(count: raw["marked"] as? Int ?? 0, failed: raw["failed"] as? Int ?? 0, canUndo: raw["canUndo"] as? Bool ?? false)
+            // Not saved is not saved, whether the server refused the file or the batch stopped before reaching it.
+            let notSaved = (raw["failed"] as? Int ?? 0) + (raw["skipped"] as? Int ?? 0)
+            return .marked(count: raw["marked"] as? Int ?? 0, failed: notSaved, canUndo: raw["canUndo"] as? Bool ?? false)
         }
     }
 
@@ -328,14 +336,14 @@ final class ReviewSession {
         guard case .marked(_, _, canUndo: true) = notice else { return }
         await perform { [self] in
             let raw = try await scripting.call("undo", ["args": []]) as? [String: Any] ?? [:]
-            return .undone(count: raw["marked"] as? Int ?? 0)
+            return .undone(count: raw["marked"] as? Int ?? 0, failed: raw["failed"] as? Int ?? 0)
         }
     }
 
     func unmarkAll() async {
         await perform { [self] in
             let raw = try await scripting.call("unmarkAll", ["args": []]) as? [String: Any] ?? [:]
-            return .undone(count: raw["marked"] as? Int ?? 0)
+            return .undone(count: raw["marked"] as? Int ?? 0, failed: raw["failed"] as? Int ?? 0)
         }
     }
 
@@ -437,8 +445,11 @@ final class ReviewSession {
     private func scheduleNoticeClear(after result: Notice) {
         noticeClear?.cancel()
         switch result {
-        case .marked(0, 0, _), .undone(0):
+        case .marked(0, 0, _), .undone(0, 0):
             notice = nil
+        case .marked(_, let failed, _) where failed > 0, .undone(_, let failed) where failed > 0:
+            // Something was not saved: that stays said, with its Retry, until the next action or page.
+            break
         case .marked, .undone, .info:
             noticeClear = Task { [weak self, lifetime = noticeLifetime] in
                 try? await Task.sleep(for: lifetime)

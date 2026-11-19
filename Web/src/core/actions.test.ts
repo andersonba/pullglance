@@ -1,4 +1,4 @@
-import { markMatching, countMatching, undo } from './actions'
+import { markMatching, countMatching, undo, unmarkAll } from './actions'
 import { ContextMismatch } from './host'
 import { FakeHostAdapter } from './testing/fake-host'
 import type { ChangedFile, PageContext, Rule, Receipt } from './model'
@@ -82,11 +82,36 @@ describe('markMatching', () => {
     expect(r.skipped.map((x) => x.id)).toEqual(['1.test.ts', '2.test.ts'])
   })
 
-  it('verify: reconcilia marked e unknown e reporta divergências', async () => {
+  // Seen live 2026-11-18 under a 429: the page showed the files viewed, the app said "4 marked", and a reload
+  // showed none. The page's word is checked, and what the server lacks is written to it directly.
+  it('verify: a mark the page showed and the server lacks is saved on the server', async () => {
     const host = new FakeHostAdapter({ context: ctx, files: [f('a.test.ts'), f('b.test.ts')] })
     host.optimisticLiars.add('b.test.ts')
     const r = await markMatching(host, [TEST_RULE], { verify: true })
+    expect(host.saved).toEqual(['b.test.ts'])
+    expect(host.server.get('b.test.ts')).toBe(true)
+    expect(r.verified).toEqual({ confirmed: 2, diverged: [] })
+    expect(r.marked).toHaveLength(2)
+    expect(r.failed).toEqual([])
+  })
+
+  it('verify: a mark the server keeps refusing counts as failed, not as marked', async () => {
+    const host = new FakeHostAdapter({ context: ctx, files: [f('a.test.ts'), f('b.test.ts')] })
+    host.optimisticLiars.add('b.test.ts')
+    host.refuseIds.add('b.test.ts')
+    const r = await markMatching(host, [TEST_RULE], { verify: true })
+    expect(r.marked.map((m) => m.file.id)).toEqual(['a.test.ts'])
+    expect(r.failed).toEqual([{ file: expect.objectContaining({ id: 'b.test.ts' }), error: 'file_review responded 429' }])
     expect(r.verified).toEqual({ confirmed: 1, diverged: [expect.objectContaining({ id: 'b.test.ts' })] })
+  })
+
+  it('verify: an unmark the server lacks is saved there too', async () => {
+    const host = new FakeHostAdapter({ context: ctx, files: [f('a.test.ts', { viewed: true })] })
+    host.optimisticLiars.add('a.test.ts')
+    const r = await unmarkAll(host, { verify: true })
+    expect(host.server.get('a.test.ts')).toBe(false)
+    expect(r.marked).toHaveLength(1)
+    expect(r.failed).toEqual([])
   })
 
   it('verify com reconcile falhando deixa verified ausente', async () => {

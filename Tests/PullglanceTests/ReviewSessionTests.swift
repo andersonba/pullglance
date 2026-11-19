@@ -103,10 +103,31 @@ final class FakeScripting: ReviewScripting {
         #expect(s.progress == nil)
         s.scriptEvent("progress", ["done": 120, "total": 400])
         #expect(s.progress == ReviewSession.Progress(done: 120, total: 400))
+        s.scriptEvent("progress", ["done": 120, "total": 400, "waiting": "github"])
+        #expect(s.progress == ReviewSession.Progress(done: 120, total: 400, waiting: true), "GitHub's rate limit")
+        s.scriptEvent("progress", ["done": 121, "total": 400])
+        #expect(s.progress?.waiting == false, "going again")
         scripting.release()
         await marking.value
         #expect(s.progress == nil && !s.isSkipping)
         #expect(s.notice == .marked(count: 400, failed: 0, canUndo: true))
+    }
+
+    /// What GitHub did not save is counted apart (refused files and the ones the batch never reached), and
+    /// the notice stays up: its Retry must still be there when the reader looks.
+    @Test func filesNotSavedAreSaidAndStaySaid() async {
+        let (s, _, scripting, _) = await make(mine: [pr7])
+        s.noticeLifetime = .milliseconds(30)
+        scripting.results["mark"] = .success(["marked": 240, "failed": 4, "skipped": 156, "unknown": 0, "canUndo": true])
+        s.pageChanged(to: URL(string: "https://github.com/acme/web/pull/7/files"))
+        await s.settle()
+        await s.mark()
+        #expect(s.notice == .marked(count: 240, failed: 160, canUndo: true))
+        try? await Task.sleep(for: .milliseconds(120))
+        #expect(s.notice == .marked(count: 240, failed: 160, canUndo: true), "not cleared by the clock")
+        scripting.results["undo"] = .success(["marked": 9, "failed": 231])
+        await s.undo()
+        #expect(s.notice == .undone(count: 9, failed: 231))
     }
 
     @Test func chosenPresetIsPassedAndRemembered() async {

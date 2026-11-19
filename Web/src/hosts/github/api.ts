@@ -26,7 +26,7 @@ const pause = (ms: number, signal?: AbortSignal) => new Promise<void>((resolve) 
  * after some 600 requests in two minutes). The request is fine and so is the session; it waits what the
  * answer asks and goes again, a few times, instead of failing the file and stopping the batch.
  */
-export async function postFileReview(basePath: string, path: string, viewed: boolean, fetchImpl: FetchLike, signal?: AbortSignal, retries = 3): Promise<void> {
+export async function postFileReview(basePath: string, path: string, viewed: boolean, fetchImpl: FetchLike, signal?: AbortSignal, retries = 3, onThrottle?: (waitMs: number) => void): Promise<void> {
   const { url, init } = fileReviewRequest(basePath, path, viewed)
   let res: Response
   for (let attempt = 0; ; attempt++) {
@@ -37,7 +37,9 @@ export async function postFileReview(basePath: string, path: string, viewed: boo
       throw e
     }
     if (res.status !== 429 || attempt >= retries) break
-    await pause(retryAfterMs(res), signal)
+    const waitMs = retryAfterMs(res)
+    onThrottle?.(waitMs)
+    await pause(waitMs, signal)
     if (signal?.aborted) throw new AbortedInFlight()
   }
   if (res.ok) return

@@ -87,18 +87,21 @@ struct ReviewBar: View {
         switch session.notice {
         case .loading:
             if let progress = session.progress {
-                OperationRing(done: progress.done, total: progress.total)
+                OperationRing(done: progress.done, total: progress.total, waiting: progress.waiting)
             } else {
                 ProgressView().controlSize(.small)
             }
         case .marked(let count, let failed, let canUndo):
             HStack(spacing: 6) {
-                Text(failed == 0 ? String(localized: "\(count) marked", bundle: .app) : String(localized: "\(count) marked · \(failed) failed", bundle: .app))
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                Text(failed == 0 ? String(localized: "\(count) marked", bundle: .app) : String(localized: "\(count) marked · \(failed) not saved", bundle: .app))
+                    .font(.system(size: 11)).foregroundStyle(failed == 0 ? AnyShapeStyle(.secondary) : AnyShapeStyle(.orange))
+                // What is left still matches the rules: the same action again takes only those.
+                if failed > 0 { Button { Task { await session.mark() } } label: { Text("Retry", bundle: .app) }.controlSize(.small) }
                 if canUndo { Button { Task { await session.undo() } } label: { Text("Undo", bundle: .app) }.controlSize(.small) }
             }
-        case .undone(let count):
-            Text("\(count) unmarked", bundle: .app).font(.system(size: 11)).foregroundStyle(.secondary)
+        case .undone(let count, let failed):
+            Text(failed == 0 ? String(localized: "\(count) unmarked", bundle: .app) : String(localized: "\(count) unmarked · \(failed) not saved", bundle: .app))
+                .font(.system(size: 11)).foregroundStyle(failed == 0 ? AnyShapeStyle(.secondary) : AnyShapeStyle(.orange))
         case .error(let message):
             Label { Text(verbatim: message) } icon: { Image(systemName: "exclamationmark.triangle.fill") }.font(.system(size: 11)).foregroundStyle(.orange).lineLimit(1)
         case .info(let message):
@@ -182,18 +185,24 @@ struct ReviewBar: View {
 struct OperationRing: View {
     let done: Int
     let total: Int
+    /// Waiting on GitHub's rate limit: amber, and the count says why it stands still.
+    var waiting = false
 
     var body: some View {
         HStack(spacing: 6) {
             ZStack {
                 Circle().stroke(Color.primary.opacity(0.15), lineWidth: 2.5)
                 Circle().trim(from: 0, to: CGFloat(done) / CGFloat(max(total, 1)))
-                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .stroke(waiting ? Color.orange : Color.accentColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             }
             .frame(width: 12, height: 12)
             .animation(.linear(duration: 0.25), value: done)
-            Text(verbatim: "\(done) / \(total)").font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
+            if waiting {
+                (Text(verbatim: "\(done) / \(total) · ") + Text("GitHub asked to wait", bundle: .app)).font(.system(size: 11)).monospacedDigit().foregroundStyle(.orange)
+            } else {
+                Text(verbatim: "\(done) / \(total)").font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("\(done) of \(total)", bundle: .app))

@@ -69,16 +69,54 @@ async function runBatch(
   return result
 }
 
-async function verify(adapter: HostAdapter, receipt: Receipt): Promise<void> {
+/**
+ * What the page showed is not what the server has: GitHub flips a Viewed button before its request answers,
+ * and a refused request (a 429 when marks come too fast, seen live 2026-11-18) leaves the page saying
+ * viewed over a server that never took it. So the batch is checked against the server, and a file the
+ * server does not have in the wanted state is written there directly, where the answer is per file. One
+ * that still does not go through leaves `marked` for `failed`: the count is what was saved.
+ * When the check itself cannot be made, `verified` stays absent and the receipt is the page's word.
+ */
+async function verify(adapter: HostAdapter, receipt: Receipt, viewed: boolean, opts: MarkOptions): Promise<void> {
   const candidates = [...receipt.marked.map((m) => m.file), ...receipt.unknown]
   if (candidates.length === 0) return
+  let server: Map<string, boolean>
   try {
-    const server = await adapter.reconcile(candidates.map((f) => f.id))
-    const diverged = candidates.filter((f) => server.get(f.id) !== true)
-    receipt.verified = { confirmed: candidates.length - diverged.length, diverged }
+    server = await adapter.reconcile(candidates.map((f) => f.id))
   } catch {
     receipt.verified = undefined
+    return
   }
+  const diverged = candidates.filter((f) => server.get(f.id) !== viewed)
+  receipt.verified = { confirmed: candidates.length - diverged.length, diverged: [] }
+  if (diverged.length === 0) return
+  const lost = new Map<string, string>()
+  const queue = [...diverged]
+  let done = receipt.verified.confirmed
+  let consecutive = 0
+  const worker = async () => {
+    while (queue.length > 0) {
+      const file = queue.shift()!
+      // The server keeps refusing: the rest would only wait their turn to be refused too.
+      if (!adapter.saveViewed || opts.signal?.aborted || consecutive >= (opts.maxConsecutiveFailures ?? 3)) { lost.set(file.id, 'not saved on the server'); continue }
+      try {
+        await adapter.saveViewed(file, viewed, opts.signal)
+        consecutive = 0
+        receipt.verified!.confirmed++
+      } catch (error) {
+        consecutive++
+        lost.set(file.id, error instanceof Error ? error.message : String(error))
+      }
+      opts.onProgress?.(++done, candidates.length)
+    }
+  }
+  opts.onProgress?.(done, candidates.length)
+  await Promise.all(Array.from({ length: Math.max(1, opts.concurrency ?? 4) }, worker))
+  if (lost.size === 0) return
+  receipt.verified.diverged = diverged.filter((f) => lost.has(f.id))
+  receipt.failed.push(...receipt.verified.diverged.map((file) => ({ file, error: lost.get(file.id)! })))
+  receipt.marked = receipt.marked.filter((m) => !lost.has(m.file.id))
+  receipt.unknown = receipt.unknown.filter((f) => !lost.has(f.id))
 }
 
 export async function markMatching(adapter: HostAdapter, rules: Rule[], opts: MarkOptions = {}): Promise<Receipt> {
@@ -86,11 +124,11 @@ export async function markMatching(adapter: HostAdapter, rules: Rule[], opts: Ma
   const targets = matchFiles(listing.files.filter((f) => !f.viewed), rules).map((m) => m.file)
   const batch = await runBatch(adapter, targets, true, listing.context.key, opts)
   const receipt: Receipt = { context: listing.context, completeness: listing.completeness, ...batch }
-  if (opts.verify) await verify(adapter, receipt)
+  if (opts.verify) await verify(adapter, receipt, true, opts)
   return receipt
 }
 
-export async function undo(adapter: HostAdapter, receipt: Receipt, opts: { signal?: AbortSignal; onProgress?: (done: number, total: number) => void } = {}): Promise<Receipt> {
+export async function undo(adapter: HostAdapter, receipt: Receipt, opts: MarkOptions = {}): Promise<Receipt> {
   const current = adapter.currentContext()
   if (!current || current.key !== receipt.context.key) throw new ContextMismatch()
 
@@ -101,14 +139,18 @@ export async function undo(adapter: HostAdapter, receipt: Receipt, opts: { signa
   }
   const asViewed = targets.map((f) => ({ ...f, viewed: true }))
   const batch = await runBatch(adapter, asViewed, false, receipt.context.key, { signal: opts.signal, onProgress: opts.onProgress })
-  return { context: receipt.context, completeness: receipt.completeness, ...batch }
+  const undone: Receipt = { context: receipt.context, completeness: receipt.completeness, ...batch }
+  if (opts.verify) await verify(adapter, undone, false, opts)
+  return undone
 }
 
 /** Unmarks every viewed file of the page, several at a time like a marking, and stops on repeated failures like one. */
-export async function unmarkAll(adapter: HostAdapter, opts: { signal?: AbortSignal; onProgress?: (done: number, total: number) => void } = {}): Promise<Receipt> {
+export async function unmarkAll(adapter: HostAdapter, opts: MarkOptions = {}): Promise<Receipt> {
   const listing = await adapter.listFiles()
   const batch = await runBatch(adapter, listing.files.filter((f) => f.viewed), false, listing.context.key, opts)
-  return { context: listing.context, completeness: listing.completeness, ...batch }
+  const receipt: Receipt = { context: listing.context, completeness: listing.completeness, ...batch }
+  if (opts.verify) await verify(adapter, receipt, false, opts)
+  return receipt
 }
 
 export function loadAll(adapter: HostAdapter, onProgress?: (done: number, total?: number) => void, signal?: AbortSignal) {

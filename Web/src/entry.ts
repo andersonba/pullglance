@@ -33,7 +33,7 @@ const HOLD_MS = 600              // after a mark: GitHub moves focus to the mark
 const LISTING_MIN_INTERVAL_MS = 1000
 
 export function install(deps: Deps) {
-  const adapter = deps.adapter ?? createGitHubAdapter()
+  const adapter = deps.adapter ?? createGitHubAdapter({ onThrottle: () => throttled() })
   // Everything that writes to the page or moves it goes through here first (see `PageReadiness`).
   // The wait says it is alive while it lasts (see `progress`): a heavy page takes its time getting ready, and
   // the app would otherwise read that silence as a page that died.
@@ -85,15 +85,20 @@ export function install(deps: Deps) {
    * that would still catch a page that died. Spaced out, except the last one.
    */
   let lastProgressAt = 0
+  let lastCount: { done: number; total: number | null } = { done: 0, total: null }
   const progress = (done: number, total?: number) => {
+    lastCount = { done, total: total ?? null }
     const now = Date.now()
     if (done !== total && now - lastProgressAt < 300) return
     lastProgressAt = now
-    deps.post({ name: 'progress', payload: { done, total: total ?? null } })
+    deps.post({ name: 'progress', payload: lastCount })
   }
+  /** GitHub asked to slow down and a write is waiting: the count stands still, and the app says why. */
+  const throttled = () => deps.post({ name: 'progress', payload: { ...lastCount, waiting: 'github' } })
 
   async function mark(ruleIds: string[] | null): Promise<MarkResult> {
     return lock.run(async (signal) => {
+      lastCount = { done: 0, total: null }
       const waitedForPage = await pageReady(signal)
       if (settings.loadBeforeMark && (await adapter.listFiles()).completeness === 'partial') await loadAll(adapter, progress, signal)
       const receipt = await markMatching(adapter, selectRules(ruleIds), { signal, verify: settings.verify && adapter.pageKind() === 'pull', onProgress: progress })
@@ -111,18 +116,18 @@ export function install(deps: Deps) {
     if (!lastReceipt) throw new Error('nothing to undo')
     return lock.run(async (signal) => {
       await pageReady(signal)
-      const r = await undoAction(adapter, lastReceipt!, { signal, onProgress: progress })
+      const r = await undoAction(adapter, lastReceipt!, { signal, verify: settings.verify && adapter.pageKind() === 'pull', onProgress: progress })
       lastReceipt = null
       invalidateListing()
-      return { marked: r.marked.length, failed: r.failed.length }
+      return { marked: r.marked.length, failed: r.failed.length + r.skipped.length }   // not undone is not undone, refused or never reached
     })
   }
 
   async function unmarkAll(): Promise<{ marked: number; failed: number }> {
     return lock.run(async (signal) => {
       await pageReady(signal)
-      const r = await unmarkAllAction(adapter, { signal, onProgress: progress })
-      const marked = r.marked.length, failed = r.failed.length
+      const r = await unmarkAllAction(adapter, { signal, verify: settings.verify && adapter.pageKind() === 'pull', onProgress: progress })
+      const marked = r.marked.length, failed = r.failed.length + r.skipped.length
       lastReceipt = null
       invalidateListing()
       return { marked, failed }

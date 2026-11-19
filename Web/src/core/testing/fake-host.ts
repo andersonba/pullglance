@@ -46,6 +46,15 @@ export class FakeHostAdapter implements HostAdapter {
     return current.hasControl ? 'dom' : 'api'
   }
 
+  /** Ids the server refuses even when written to directly. */
+  refuseIds = new Set<string>()
+  saved: string[] = []
+  async saveViewed(file: ChangedFile, viewed: boolean) {
+    if (this.refuseIds.has(file.id)) throw new Error('file_review responded 429')
+    this.saved.push(file.id)
+    this.server.set(file.id, viewed)
+  }
+
   async reconcile(ids: string[]) {
     return new Map(ids.map((id) => [id, this.server.get(id) ?? false]))
   }

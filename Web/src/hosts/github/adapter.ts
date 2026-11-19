@@ -23,6 +23,8 @@ export interface GitHubAdapterDeps {
   /** How long a mark keeps an eye on its button for a stale re-render, and how often it looks. */
   stickMs?: number
   stickEveryMs?: number
+  /** GitHub asked to slow down (a 429) and a server write is waiting that many milliseconds before going again. */
+  onThrottle?: (waitMs: number) => void
 }
 export interface GitHubAdapterConfig { rememberCompare: boolean }
 export interface ToolbarSlot { el: Element; placement: 'first' | 'last' | 'after'; hostFlag?: string }
@@ -151,13 +153,13 @@ export function createGitHubAdapter(deps: GitHubAdapterDeps = {}): GitHubAdapter
         }
       }
       if (!onPull) throw new Error(`${file.path} left the page before it could be marked`)   // compare: só via DOM
-      await postFileReview(ctx.basePath, file.path, viewed, fetchImpl, signal)
+      await postFileReview(ctx.basePath, file.path, viewed, fetchImpl, signal, undefined, deps.onThrottle)
       overlay.set(ctx.key, file.id, viewed)
       return 'api'
     }
     if ((overlay.get(ctx.key, file.id) ?? file.viewed) === viewed) return 'noop'
     if (pageKindOf(win.location.pathname) !== 'pull') throw new Error(`${file.path} is not loaded on this page`)   // compare: só via DOM
-    await postFileReview(ctx.basePath, file.path, viewed, fetchImpl, signal)
+    await postFileReview(ctx.basePath, file.path, viewed, fetchImpl, signal, undefined, deps.onThrottle)
     overlay.set(ctx.key, file.id, viewed)
     return 'api'
   }
@@ -184,6 +186,14 @@ export function createGitHubAdapter(deps: GitHubAdapterDeps = {}): GitHubAdapter
     }
     let timer = setTimeout(look, stickEveryMs)
     watchers.add(timer)
+  }
+
+  /** The server's own answer for one file, whatever the page shows (see `HostAdapter.saveViewed`). */
+  async function saveViewed(file: ChangedFile, viewed: boolean, signal?: AbortSignal): Promise<void> {
+    const ctx = requireContext()
+    if (pageKindOf(win.location.pathname) !== 'pull') throw new Error(`${file.path} has no server state on this page`)
+    await postFileReview(ctx.basePath, file.path, viewed, fetchImpl, signal, undefined, deps.onThrottle)
+    overlay.set(ctx.key, file.id, viewed)
   }
 
   async function reconcile(ids: string[]): Promise<Map<string, boolean>> {
@@ -259,6 +269,7 @@ export function createGitHubAdapter(deps: GitHubAdapterDeps = {}): GitHubAdapter
     listFiles,
     setViewed,
     reconcile,
+    saveViewed,
     loadAll,
     onContextChange,
     diagnostics: () => resolver.diagnostics(),

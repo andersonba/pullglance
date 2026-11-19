@@ -20,7 +20,8 @@ publishes it as the release notes.
 - The Review Desk's back, forward and reload buttons and its address field sit on the same line as the window's close, minimise and zoom buttons, instead of a little above them.
 - **Preview** next to "Roll the number when it changes" works with no number in the menu bar too (nothing to count, or before the first data): it rolls a sample number, which then leaves. It used to do nothing there.
 - Settings › Review Desk › **Choose…** opens at the top of the list of rules. It used to open scrolled to the bottom, with the cursor in the custom globs.
-- On very large pull requests (hundreds of files, a thousand and more), **Skip**, **Undo** and **Unmark all** in the Review Desk no longer give up with "The page did not respond" while the page is still working, or stop after a few files. The Desk waits for a page that is busy rather than gone, marks through GitHub's server the files whose button has left the page, waits and retries when GitHub asks it to slow down, and unmarks several files at a time.
+- On very large pull requests (hundreds of files, a thousand and more), **Skip**, **Undo** and **Unmark all** in the Review Desk no longer give up with "The page did not respond" while the page is still working, or stop after a few files. The Desk waits for a page that is busy rather than gone, marks through GitHub's server the files whose button has left the page, and unmarks several files at a time.
+- The Review Desk's count after **Skip**, **Undo** and **Unmark all** is what GitHub saved, not what the page showed. When GitHub refused marks for coming too fast, the page showed the files viewed, the Desk said "N marked", and a reload showed them unviewed. The Desk now checks with GitHub, saves what is missing, and says how many were not saved, with a **Retry** for those. While GitHub asks it to wait, the ring turns amber and says so.
 
 ## [0.6.0] - 2026-10-29
 

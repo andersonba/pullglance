@@ -370,8 +370,10 @@
 "Review files →" = "Revisar arquivos →";
 "Next ↓" = "Próximo ↓";
 "%lld marked" = "%lld marcados";
-"%lld marked · %lld failed" = "%lld marcados · %lld falharam";
+"%lld marked · %lld not saved" = "%lld marcados · %lld não gravados";
+"GitHub asked to wait" = "o GitHub pediu para esperar";
 "%lld unmarked" = "%lld desmarcados";
+"%lld unmarked · %lld not saved" = "%lld desmarcados · %lld não gravados";
 "Loading files…" = "Carregando arquivos…";
 "Skip · %lld" = "Pular · %lld";
 "Skipping…" = "Pulando…";
